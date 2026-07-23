@@ -49,9 +49,10 @@ export default function PropertyCard({
   };
 
   return (
-    <div className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition duration-300 hover:-translate-y-1">
+    <div className="group overflow-hidden rounded-3xl bg-white shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl">
 
-      <div className="relative">
+      {/* IMAGE */}
+      <div className="relative overflow-hidden">
 
         <img
           src={
@@ -59,75 +60,136 @@ export default function PropertyCard({
             "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d"
           }
           alt={title}
-          className="w-full h-64 object-cover"
+          className="h-72 w-full object-cover transition duration-500 group-hover:scale-110"
         />
 
+        {/* Gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
+
+        {/* Featured */}
+        <div className="absolute top-4 left-4 flex gap-2">
+
+          {featured && (
+            <span className="rounded-full bg-[#C9A227] px-3 py-1 text-xs font-bold text-white shadow">
+              ⭐ Featured
+            </span>
+          )}
+
+          {verified && (
+            <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white shadow">
+              ✔ Verified
+            </span>
+          )}
+
+        </div>
+
+        {/* Image Count */}
+        <div className="absolute bottom-4 right-4 rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-black shadow">
+          📷 {images.length}
+        </div>
+
+        {/* Previous */}
         {images.length > 1 && (
           <>
             <button
               onClick={prevImage}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 hover:bg-white shadow-lg text-xl"
+              className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-xl shadow transition hover:scale-110"
             >
               ‹
             </button>
 
             <button
               onClick={nextImage}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 hover:bg-white shadow-lg text-xl"
+              className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-xl shadow transition hover:scale-110"
             >
               ›
             </button>
           </>
         )}
 
-        <div className="absolute top-4 left-4 flex gap-2">
-          {featured && (
-            <span className="bg-[#C9A227] text-white px-3 py-1 rounded-full text-sm font-semibold">
-              ⭐ Featured
-            </span>
-          )}
-
-          {verified && (
-            <span className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-              ✔ Verified
-            </span>
-          )}
-        </div>
-
-        <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-semibold">
-          📷 {images.length}
-        </div>
       </div>
+
+      {/* CONTENT */}
 
       <div className="p-6">
 
-        <p className="text-[#C9A227] text-3xl font-bold">
-          R{price.toLocaleString("en-ZA")}
-          <span className="text-lg font-medium text-gray-700">
-            {" "}
-            / month
-          </span>
-        </p>
+        <div className="flex items-start justify-between">
 
-        <h2 className="text-2xl font-bold text-[#1B1B1B] mt-3">
+          <div>
+
+            <p className="text-3xl font-extrabold text-[#C9A227]">
+              R{price.toLocaleString("en-ZA")}
+            </p>
+
+            <p className="text-sm text-gray-500">
+              per month
+            </p>
+
+          </div>
+
+        </div>
+
+        <h2 className="mt-5 line-clamp-1 text-2xl font-bold text-[#1B1B1B]">
           {title}
         </h2>
 
-        <p className="text-gray-700 mt-2 text-lg">
+        <p className="mt-2 line-clamp-1 text-gray-600">
           📍 {location}
         </p>
 
-        <div className="flex justify-between mt-6 text-[#1B1B1B] font-semibold border-t pt-5">
-          <span>🛏 {bedrooms}</span>
-          <span>🛁 {bathrooms}</span>
-          <span>🚗 {parking}</span>
+        {/* FEATURES */}
+
+        <div className="mt-6 grid grid-cols-3 gap-3">
+
+          <div className="rounded-xl bg-[#F8F6F1] py-3 text-center">
+
+            <p className="text-2xl">🛏</p>
+
+            <p className="mt-1 font-bold text-[#1B1B1B]">
+              {bedrooms}
+            </p>
+
+            <p className="text-xs text-gray-500">
+              Beds
+            </p>
+
+          </div>
+
+          <div className="rounded-xl bg-[#F8F6F1] py-3 text-center">
+
+            <p className="text-2xl">🛁</p>
+
+            <p className="mt-1 font-bold text-[#1B1B1B]">
+              {bathrooms}
+            </p>
+
+            <p className="text-xs text-gray-500">
+              Baths
+            </p>
+
+          </div>
+
+          <div className="rounded-xl bg-[#F8F6F1] py-3 text-center">
+
+            <p className="text-2xl">🚗</p>
+
+            <p className="mt-1 font-bold text-[#1B1B1B]">
+              {parking}
+            </p>
+
+            <p className="text-xs text-gray-500">
+              Parking
+            </p>
+
+          </div>
+
         </div>
 
         <Link
           href={`/properties/${id}`}
-          className="block mt-6 bg-[#C9A227] hover:bg-[#A67C00] text-white text-center py-3 rounded-xl font-bold transition"
+          className="mt-7 block rounded-xl bg-[#C9A227] py-4 text-center text-lg font-bold text-white transition-all duration-300 hover:bg-[#A67C00] hover:shadow-lg"
         >
-          View Details
+          View Property →
         </Link>
 
       </div>

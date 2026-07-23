@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import PropertyGallery from "@/app/components/PropertyGallery";
 import PropertyMap from "@/app/components/PropertyMap";
+import FavoriteButton from "@/app/components/FavoriteButton";
+import ReportListingButton from "@/app/components/ReportListingButton";
 type Props = {
   params: Promise<{
     id: string;
@@ -46,9 +48,34 @@ export default async function PropertyDetails({ params }: Props) {
 
       <div className="max-w-6xl mx-auto px-6 py-12">
 
-        <h1 className="text-5xl font-bold text-black">
-          {property.title}
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <h1 className="text-5xl font-bold text-black">
+            {property.title}
+          </h1>
+
+          <div className="flex items-center gap-2">
+            <FavoriteButton propertyId={property.id} className="rounded-full border border-[#E8D8A5] bg-white p-3 text-[#C9A227] shadow-sm transition hover:scale-105" />
+            <ReportListingButton propertyId={property.id} />
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {property.verification_status === "verified" ? (
+            <span className="rounded-full bg-green-600 px-3 py-1 text-sm font-semibold text-white">
+              ✔ Verified Property
+            </span>
+          ) : (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-700">
+              ⏳ Pending Verification
+            </span>
+          )}
+
+          {property.user_id ? (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+              Verified Landlord
+            </span>
+          ) : null}
+        </div>
 
         <p className="text-[#C9A227] text-4xl font-bold mt-4">
           R{property.price.toLocaleString("en-ZA")} / month

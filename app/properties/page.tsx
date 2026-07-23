@@ -1,8 +1,10 @@
 import PropertyCard from "../components/PropertyCard";
+import PropertySearchBar from "../components/PropertySearchBar";
 import { getProperties } from "@/lib/getProperties";
 
 type Props = {
   searchParams: Promise<{
+    province?: string;
     city?: string;
     type?: string;
     maxPrice?: string;
@@ -16,25 +18,30 @@ export default async function PropertiesPage({
 
   let properties = await getProperties();
 
-  // Filter by city or province
-  if (params.city) {
-    const search = params.city.toLowerCase();
-
+  // Filter by Province
+  if (params.province) {
     properties = properties.filter(
-      (p: any) =>
-        p.city?.toLowerCase().includes(search) ||
-        p.province?.toLowerCase().includes(search)
+      (p: any) => p.province === params.province
     );
   }
 
-  // Filter by property type
+  // Filter by City
+  if (params.city) {
+    const search = params.city.toLowerCase();
+
+    properties = properties.filter((p: any) =>
+      p.city?.toLowerCase().includes(search)
+    );
+  }
+
+  // Filter by Property Type
   if (params.type) {
     properties = properties.filter(
       (p: any) => p.property_type === params.type
     );
   }
 
-  // Filter by maximum price
+  // Filter by Maximum Price
   if (params.maxPrice) {
     properties = properties.filter(
       (p: any) => Number(p.price) <= Number(params.maxPrice)
@@ -52,6 +59,10 @@ export default async function PropertiesPage({
         <p className="text-black mb-8">
           Find your next home anywhere in South Africa.
         </p>
+
+        <div className="mb-8">
+          <PropertySearchBar sticky />
+        </div>
 
         <p className="text-black font-semibold mb-8">
           {properties.length} properties found

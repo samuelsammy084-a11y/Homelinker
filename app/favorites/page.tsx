@@ -10,6 +10,19 @@ export default function FavoritesPage() {
 
   useEffect(() => {
     loadFavorites();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        loadFavorites();
+      } else {
+        setProperties([]);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   async function loadFavorites() {
@@ -18,6 +31,7 @@ export default function FavoritesPage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
+      setProperties([]);
       setLoading(false);
       return;
     }

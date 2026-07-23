@@ -18,39 +18,31 @@ export default function WhyChooseUs() {
   ];
 
   return (
-    <section className="max-w-7xl mx-auto px-6 py-24">
-
-      <div className="text-center mb-16">
-        <p className="text-[#C9A227] font-semibold uppercase tracking-widest">
+    <section className="mx-auto max-w-7xl px-6 py-24">
+      <div className="mb-16 text-center">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#C9A227]">
           Why HomeLinker
         </p>
 
-        <h2 className="text-4xl font-bold text-[#1B1B1B] mt-3">
-          A Better Way To Find Your Next Home
+        <h2 className="mt-3 text-4xl font-bold text-[#1B1B1B]">
+          A better way to find your next home
         </h2>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-8">
-
+      <div className="grid gap-8 md:grid-cols-3">
         {features.map((feature) => (
           <div
             key={feature.title}
-            className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition duration-300"
+            className="rounded-[24px] border border-slate-100 bg-white p-8 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
           >
-            <div className="text-5xl mb-6">{feature.icon}</div>
+            <div className="mb-6 text-5xl">{feature.icon}</div>
 
-            <h3 className="text-2xl font-bold text-[#1B1B1B]">
-              {feature.title}
-            </h3>
+            <h3 className="text-2xl font-bold text-[#1B1B1B]">{feature.title}</h3>
 
-            <p className="text-gray-600 mt-4 leading-7">
-              {feature.description}
-            </p>
+            <p className="mt-4 leading-7 text-slate-600">{feature.description}</p>
           </div>
         ))}
-
       </div>
-
     </section>
   );
 }

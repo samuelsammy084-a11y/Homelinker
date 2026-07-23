@@ -1,96 +1,45 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import PropertySearchBar from "./PropertySearchBar";
 
 export default function Hero() {
-  const router = useRouter();
-
-  const [city, setCity] = useState("");
-  const [type, setType] = useState("");
-  const [budget, setBudget] = useState("");
-
-  const inputClass =
-    "w-full rounded-xl border border-gray-300 bg-white px-4 py-4 text-black placeholder:text-black outline-none transition-all duration-200 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/20";
-
-  function handleSearch() {
-    const params = new URLSearchParams();
-
-    if (city) params.set("city", city);
-    if (type) params.set("type", type);
-    if (budget) params.set("maxPrice", budget);
-
-    router.push(`/properties?${params.toString()}`);
-  }
-
   return (
-    <section
-      className="relative min-h-[90vh] flex items-center justify-center bg-cover bg-center"
-      style={{
-        backgroundImage:
-          "url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=2073&auto=format&fit=crop')",
-      }}
-    >
-      <div className="absolute inset-0 bg-black/60"></div>
+    <section className="relative isolate overflow-hidden bg-[#111111]">
+      <div
+        className="absolute inset-0 bg-cover bg-center opacity-40"
+        style={{
+          backgroundImage:
+            "url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=2073&auto=format&fit=crop')",
+        }}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.28),transparent_35%)]" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/75 to-black/55" />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
-
-        <h1 className="text-6xl md:text-7xl font-extrabold text-white">
-          Find Your Perfect Place
-        </h1>
-
-        <p className="mt-6 text-xl text-gray-200">
-          Connecting people to homes across South Africa.
-        </p>
-
-        <div className="mt-12 bg-white rounded-2xl shadow-2xl p-5">
-
-          <div className="grid md:grid-cols-4 gap-4">
-
-            <input
-              type="text"
-              placeholder="📍 Location"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className={inputClass}
-            />
-
-            <select
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Budget</option>
-              <option value="2500">Up to R2 500</option>
-              <option value="5000">Up to R5 000</option>
-              <option value="10000">Up to R10 000</option>
-              <option value="20000">Up to R20 000</option>
-            </select>
-
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Property Type</option>
-              <option>Room</option>
-              <option>Bachelor</option>
-              <option>Apartment</option>
-              <option>House</option>
-              <option>Townhouse</option>
-            </select>
-
-            <button
-              onClick={handleSearch}
-              className="bg-[#C9A227] hover:bg-[#A67C00] text-white rounded-xl font-bold transition-all duration-300 hover:scale-105"
-            >
-              🔍 Search
-            </button>
-
+      <div className="relative z-10 mx-auto flex min-h-[92vh] max-w-7xl items-center justify-center px-6 py-24 text-center">
+        <div className="w-full max-w-4xl">
+          <div className="inline-flex items-center rounded-full border border-[#C9A227]/40 bg-[#C9A227]/10 px-4 py-2 text-sm font-semibold text-[#F8D36A] shadow-lg backdrop-blur">
+            🏡 Trusted rental marketplace in South Africa
           </div>
 
-        </div>
+          <h1 className="mt-8 text-5xl font-extrabold leading-tight text-white sm:text-6xl lg:text-7xl">
+            Find your next home
+            <span className="block text-[#F3C94B]">with confidence</span>
+          </h1>
 
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-200 sm:text-xl">
+            Search verified homes, rooms, and apartments that suit your budget and lifestyle.
+          </p>
+
+          <div className="mt-6 flex flex-wrap justify-center gap-3 text-sm font-medium text-slate-100">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2 backdrop-blur">Verified listings</span>
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2 backdrop-blur">Flexible budgets</span>
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2 backdrop-blur">Fast and simple search</span>
+          </div>
+
+          <div className="mt-10 rounded-[28px] border border-white/15 bg-white/95 p-5 shadow-2xl shadow-black/30 backdrop-blur">
+            <PropertySearchBar />
+          </div>
+        </div>
       </div>
     </section>
   );
