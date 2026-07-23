@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export default function Navbar() {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
 
@@ -30,17 +32,34 @@ export default function Navbar() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
   async function handleLogout() {
     await supabase.auth.signOut();
     setMenuOpen(false);
     window.location.href = "/";
   }
 
-  return (
-    <nav className="sticky top-0 z-50 bg-[#111111] border-b border-[#C9A227] shadow-xl">
-      <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
+  function isActive(href: string) {
+    if (href === "/") return pathname === href;
+    if (href === "/properties") return pathname.startsWith("/properties");
+    if (href === "/contact") return pathname.startsWith("/contact");
+    if (href === "/dashboard") return pathname.startsWith("/dashboard");
+    if (href === "/favorites") return pathname.startsWith("/favorites");
+    return false;
+  }
 
-        {/* Logo */}
+  function linkClass(href: string) {
+    return isActive(href)
+      ? "text-[#C9A227] font-semibold"
+      : "text-white hover:text-[#C9A227]";
+  }
+
+  return (
+    <nav className="sticky top-0 z-50 border-b border-[#C9A227] bg-[#111111] shadow-xl">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-center gap-3">
           <Image
             src="/images/logo/logo.png"
@@ -57,57 +76,38 @@ export default function Navbar() {
           </h1>
         </Link>
 
-        {/* Desktop Menu */}
-        <div className="hidden lg:flex items-center gap-8">
-
-          <Link href="/" className="text-white hover:text-[#C9A227]">
+        <div className="hidden items-center gap-8 lg:flex">
+          <Link href="/" className={linkClass("/")}>
             Home
           </Link>
 
-          <Link href="/properties" className="text-white hover:text-[#C9A227]">
+          <Link href="/properties" className={linkClass("/properties")}>
             Browse
           </Link>
 
-          <Link href="/contact" className="text-white hover:text-[#C9A227]">
+          <Link href="/contact" className={linkClass("/contact")}>
             Contact
           </Link>
 
+          <Link href="/dashboard" className={linkClass("/dashboard")}>
+            Dashboard
+          </Link>
+
+          <Link href="/favorites" className={linkClass("/favorites")}>
+            Favorites
+          </Link>
+
           {user ? (
-            <>
-              <Link
-                href="/dashboard"
-                className="text-white hover:text-[#C9A227]"
-              >
-                Dashboard
-              </Link>
-
-              <Link
-                href="/favorites"
-                className="text-white hover:text-[#C9A227]"
-              >
-                ❤️ Favorites
-              </Link>
-
-              <button
-                onClick={handleLogout}
-                className="text-white hover:text-red-500"
-              >
-                Logout
-              </button>
-            </>
+            <button onClick={handleLogout} className="text-white hover:text-red-500">
+              Logout
+            </button>
           ) : (
             <>
-              <Link
-                href="/login"
-                className="text-white hover:text-[#C9A227]"
-              >
+              <Link href="/login" className="text-white hover:text-[#C9A227]">
                 Login
               </Link>
 
-              <Link
-                href="/register"
-                className="text-white hover:text-[#C9A227]"
-              >
+              <Link href="/register" className="text-white hover:text-[#C9A227]">
                 Register
               </Link>
             </>
@@ -115,39 +115,31 @@ export default function Navbar() {
 
           <Link
             href="/post-listing"
-            className="bg-[#C9A227] hover:bg-[#A67C00] text-white px-6 py-3 rounded-xl font-bold"
+            className="rounded-xl bg-[#C9A227] px-6 py-3 font-bold text-white transition hover:bg-[#A67C00]"
           >
-            Post Listing
+            Post Property
           </Link>
-
         </div>
 
-        {/* Mobile Menu Button */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="lg:hidden text-white"
+          className="text-white lg:hidden"
+          aria-label="Toggle navigation"
         >
           {menuOpen ? <X size={30} /> : <Menu size={30} />}
         </button>
-
       </div>
 
-      {/* Mobile Menu */}
       {menuOpen && (
-        <div className="lg:hidden bg-[#111111] border-t border-[#C9A227]">
+        <div className="border-t border-[#C9A227] bg-[#111111] lg:hidden">
           <div className="flex flex-col gap-5 p-6">
-
-            <Link
-              href="/"
-              className="text-white"
-              onClick={() => setMenuOpen(false)}
-            >
+            <Link href="/" className={linkClass("/")} onClick={() => setMenuOpen(false)}>
               Home
             </Link>
 
             <Link
               href="/properties"
-              className="text-white"
+              className={linkClass("/properties")}
               onClick={() => setMenuOpen(false)}
             >
               Browse
@@ -155,52 +147,39 @@ export default function Navbar() {
 
             <Link
               href="/contact"
-              className="text-white"
+              className={linkClass("/contact")}
               onClick={() => setMenuOpen(false)}
             >
               Contact
             </Link>
 
+            <Link
+              href="/dashboard"
+              className={linkClass("/dashboard")}
+              onClick={() => setMenuOpen(false)}
+            >
+              Dashboard
+            </Link>
+
+            <Link
+              href="/favorites"
+              className={linkClass("/favorites")}
+              onClick={() => setMenuOpen(false)}
+            >
+              Favorites
+            </Link>
+
             {user ? (
-              <>
-                <Link
-                  href="/dashboard"
-                  className="text-white"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Dashboard
-                </Link>
-
-                <Link
-                  href="/favorites"
-                  className="text-white"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  ❤️ Favorites
-                </Link>
-
-                <button
-                  onClick={handleLogout}
-                  className="text-left text-white"
-                >
-                  Logout
-                </button>
-              </>
+              <button onClick={handleLogout} className="text-left text-white">
+                Logout
+              </button>
             ) : (
               <>
-                <Link
-                  href="/login"
-                  className="text-white"
-                  onClick={() => setMenuOpen(false)}
-                >
+                <Link href="/login" className="text-white" onClick={() => setMenuOpen(false)}>
                   Login
                 </Link>
 
-                <Link
-                  href="/register"
-                  className="text-white"
-                  onClick={() => setMenuOpen(false)}
-                >
+                <Link href="/register" className="text-white" onClick={() => setMenuOpen(false)}>
                   Register
                 </Link>
               </>
@@ -209,11 +188,10 @@ export default function Navbar() {
             <Link
               href="/post-listing"
               onClick={() => setMenuOpen(false)}
-              className="bg-[#C9A227] text-white text-center py-3 rounded-xl font-bold"
+              className="rounded-xl bg-[#C9A227] py-3 text-center font-bold text-white"
             >
-              Post Listing
+              Post Property
             </Link>
-
           </div>
         </div>
       )}

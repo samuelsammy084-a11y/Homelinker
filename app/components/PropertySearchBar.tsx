@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Search } from "lucide-react";
 
@@ -8,7 +8,7 @@ type PropertySearchBarProps = {
   sticky?: boolean;
 };
 
-export default function PropertySearchBar({ sticky = false }: PropertySearchBarProps) {
+function PropertySearchBarContent({ sticky = false }: PropertySearchBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -102,5 +102,19 @@ export default function PropertySearchBar({ sticky = false }: PropertySearchBarP
         </button>
       </div>
     </div>
+  );
+}
+
+export default function PropertySearchBar(props: PropertySearchBarProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="rounded-[28px] border border-slate-200 bg-white/95 p-4 shadow-xl shadow-slate-200/70 backdrop-blur">
+          <div className="h-12 animate-pulse rounded-xl bg-slate-100" />
+        </div>
+      }
+    >
+      <PropertySearchBarContent {...props} />
+    </Suspense>
   );
 }

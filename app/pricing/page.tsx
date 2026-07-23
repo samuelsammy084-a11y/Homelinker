@@ -89,7 +89,7 @@ export default function PricingPage() {
               R0
             </h3>
 
-            <ul className="space-y-4 mt-8">
+            <ul className="space-y-4 mt-8 text-black">
               <li>✔ 1 Listing</li>
               <li>✔ 7 Days</li>
               <li>✔ Basic Visibility</li>
@@ -144,7 +144,7 @@ export default function PricingPage() {
               R199
             </h3>
 
-            <ul className="space-y-4 mt-8">
+            <ul className="space-y-4 mt-8 text-black">
               <li>✔ Unlimited Listings</li>
               <li>✔ Analytics</li>
               <li>✔ Featured Listings</li>
