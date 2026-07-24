@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import NotificationBell from "./NotificationBell";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -97,17 +98,28 @@ export default function Navbar() {
             Favorites
           </Link>
 
+          {user && <NotificationBell />}
+
           {user ? (
-            <button onClick={handleLogout} className="text-white hover:text-red-500">
+            <button
+              onClick={handleLogout}
+              className="text-white hover:text-red-500"
+            >
               Logout
             </button>
           ) : (
             <>
-              <Link href="/login" className="text-white hover:text-[#C9A227]">
+              <Link
+                href="/login"
+                className="text-white hover:text-[#C9A227]"
+              >
                 Login
               </Link>
 
-              <Link href="/register" className="text-white hover:text-[#C9A227]">
+              <Link
+                href="/register"
+                className="text-white hover:text-[#C9A227]"
+              >
                 Register
               </Link>
             </>
@@ -133,7 +145,11 @@ export default function Navbar() {
       {menuOpen && (
         <div className="border-t border-[#C9A227] bg-[#111111] lg:hidden">
           <div className="flex flex-col gap-5 p-6">
-            <Link href="/" className={linkClass("/")} onClick={() => setMenuOpen(false)}>
+            <Link
+              href="/"
+              className={linkClass("/")}
+              onClick={() => setMenuOpen(false)}
+            >
               Home
             </Link>
 
@@ -169,17 +185,31 @@ export default function Navbar() {
               Favorites
             </Link>
 
+            {user && (
+              <div className="flex justify-start">
+                <NotificationBell />
+              </div>
+            )}
+
             {user ? (
               <button onClick={handleLogout} className="text-left text-white">
                 Logout
               </button>
             ) : (
               <>
-                <Link href="/login" className="text-white" onClick={() => setMenuOpen(false)}>
+                <Link
+                  href="/login"
+                  className="text-white"
+                  onClick={() => setMenuOpen(false)}
+                >
                   Login
                 </Link>
 
-                <Link href="/register" className="text-white" onClick={() => setMenuOpen(false)}>
+                <Link
+                  href="/register"
+                  className="text-white"
+                  onClick={() => setMenuOpen(false)}
+                >
                   Register
                 </Link>
               </>
