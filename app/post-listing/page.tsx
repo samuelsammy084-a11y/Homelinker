@@ -17,28 +17,47 @@ export default function PostListingPage() {
 
   const [step, setStep] = useState(1);
 
-  // Step 1
+  // Success & Error Popup
+  const [popup, setPopup] = useState<{
+    show: boolean;
+    type: "success" | "error";
+    title: string;
+    message: string;
+  }>({
+    show: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  // STEP 1
   const [listingType, setListingType] =
     useState<"rent" | "sale" | "">("");
 
-  // Step 2
+  // STEP 2
   const [propertyType, setPropertyType] = useState("");
 
-  // Step 3
+  // STEP 3
   const [province, setProvince] = useState("");
   const [city, setCity] = useState("");
   const [suburb, setSuburb] = useState("");
   const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(null);
-const [longitude, setLongitude] = useState<number | null>(null);
-  // Step 4
+
+  const [latitude, setLatitude] =
+    useState<number | null>(null);
+
+  const [longitude, setLongitude] =
+    useState<number | null>(null);
+
+  // STEP 4
   const [price, setPrice] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
   const [parking, setParking] = useState("");
 
   const [deposit, setDeposit] = useState("");
-  const [availableFrom, setAvailableFrom] = useState("");
+  const [availableFrom, setAvailableFrom] =
+    useState("");
 
   const [floorSize, setFloorSize] = useState("");
   const [landSize, setLandSize] = useState("");
@@ -46,115 +65,203 @@ const [longitude, setLongitude] = useState<number | null>(null);
   const [rates, setRates] = useState("");
   const [levies, setLevies] = useState("");
 
-  const [petFriendly, setPetFriendly] = useState(false);
-  const [furnished, setFurnished] = useState(false);
+  const [petFriendly, setPetFriendly] =
+    useState(false);
 
-  // Step 5
+  const [furnished, setFurnished] =
+    useState(false);
+
+  // STEP 5
   const [images, setImages] = useState<File[]>([]);
 
-  // Step 6
+  // STEP 6
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [description, setDescription] =
+    useState("");
+      async function publishListing() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
- async function publishListing() {
-  const {
-  data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-  alert("Please log in first.");
-  return;
-}
-  try {
-    let imageUrl = "";
-    let imageUrls: string[] = [];
-
-    // Upload images to Supabase Storage
-    if (images.length > 0) {
-      for (const image of images) {
-        const fileName = `${Date.now()}-${Math.random()}-${image.name}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("property-images")
-          .upload(fileName, image);
-
-        if (uploadError) {
-          alert(uploadError.message);
-          return;
-        }
-
-        const { data } = supabase.storage
-          .from("property-images")
-          .getPublicUrl(fileName);
-
-        imageUrls.push(data.publicUrl);
-      }
-
-      imageUrl = imageUrls[0];
-    }
-
-    const { error } = await supabase
-      .from("properties")
-      .insert([
-  {
-    user_id: user.id,
-
-    listing_type: listingType,
-    property_type: propertyType,
-
-    title,
-    description,
-          province,
-          city,
-          suburb,
-
-         street_address: address,
-
-latitude,
-longitude,
-
-price: Number(price),
-          bedrooms: Number(bedrooms),
-          bathrooms: Number(bathrooms),
-          parking: Number(parking),
-
-          deposit: deposit ? Number(deposit) : null,
-          available_from: availableFrom || null,
-
-          floor_size: floorSize ? Number(floorSize) : null,
-          land_size: landSize ? Number(landSize) : null,
-
-          condition: condition || null,
-          rates: rates ? Number(rates) : null,
-          levies: levies ? Number(levies) : null,
-
-          furnished,
-          pet_friendly: petFriendly,
-
-          image_url: imageUrl,
-          image_urls: imageUrls,
-        },
-      ]);
-
-    if (error) {
-      console.error(error);
-      alert(error.message);
+    if (!user) {
+      setPopup({
+        show: true,
+        type: "error",
+        title: "Login Required",
+        message: "Please login before posting a property.",
+      });
       return;
     }
 
-    alert("🎉 Listing published successfully!");
+    try {
+      let imageUrl = "";
+      let imageUrls: string[] = [];
 
-    router.push("/");
-  } catch (err: any) {
-    console.error(err);
-    alert(err.message);
+      // Upload Images
+      if (images.length > 0) {
+        for (const image of images) {
+          const fileName = `${Date.now()}-${Math.random()}-${image.name}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("property-images")
+            .upload(fileName, image);
+
+          if (uploadError) {
+            setPopup({
+              show: true,
+              type: "error",
+              title: "Upload Failed",
+              message: uploadError.message,
+            });
+            return;
+          }
+
+          const { data } = supabase.storage
+            .from("property-images")
+            .getPublicUrl(fileName);
+
+          imageUrls.push(data.publicUrl);
+        }
+
+        imageUrl = imageUrls[0];
+      }
+
+      const { error } = await supabase
+        .from("properties")
+        .insert([
+          {
+            user_id: user.id,
+
+            listing_type: listingType,
+            property_type: propertyType,
+
+            title,
+            description,
+
+            province,
+            city,
+            suburb,
+
+            street_address: address,
+
+            latitude,
+            longitude,
+
+            price: Number(price),
+
+            bedrooms: Number(bedrooms),
+            bathrooms: Number(bathrooms),
+            parking: Number(parking),
+
+            deposit: deposit ? Number(deposit) : null,
+            available_from: availableFrom || null,
+
+            floor_size: floorSize
+              ? Number(floorSize)
+              : null,
+
+            land_size: landSize
+              ? Number(landSize)
+              : null,
+
+            condition: condition || null,
+
+            rates: rates ? Number(rates) : null,
+
+            levies: levies ? Number(levies) : null,
+
+            furnished,
+
+            pet_friendly: petFriendly,
+
+            image_url: imageUrl,
+
+            image_urls: imageUrls,
+          },
+        ]);
+
+      if (error) {
+        setPopup({
+          show: true,
+          type: "error",
+          title: "Something went wrong",
+          message: error.message,
+        });
+
+        return;
+      }
+
+      setPopup({
+        show: true,
+        type: "success",
+        title: "Listing Published!",
+        message:
+          "Your property has been successfully listed on HomeLinker.",
+      });
+
+      setTimeout(() => {
+        router.push("/");
+      }, 1800);
+    } catch (err: any) {
+      setPopup({
+        show: true,
+        type: "error",
+        title: "Unexpected Error",
+        message: err.message,
+      });
+    }
   }
-}
 
   return (
-    <main className="min-h-screen bg-[#F8F6F1] py-12 px-6">
+        <main className="min-h-screen bg-[#F8F6F1] py-12 px-6">
+
+      {/* Success / Error Popup */}
+      {popup.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+
+          <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl animate-[fadeIn_.25s_ease]">
+
+            <div
+              className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full text-5xl ${
+                popup.type === "success"
+                  ? "bg-green-100"
+                  : "bg-red-100"
+              }`}
+            >
+              {popup.type === "success" ? "✅" : "❌"}
+            </div>
+
+            <h2 className="mt-6 text-center text-3xl font-black text-[#111111]">
+              {popup.title}
+            </h2>
+
+            <p className="mt-3 text-center text-[#666666]">
+              {popup.message}
+            </p>
+
+            <button
+              onClick={() =>
+                setPopup({
+                  show: false,
+                  type: "success",
+                  title: "",
+                  message: "",
+                })
+              }
+              className="mt-8 w-full rounded-2xl bg-[#C9A227] py-4 font-bold text-white transition hover:bg-[#A67C00]"
+            >
+              Continue
+            </button>
+
+          </div>
+
+        </div>
+      )}
+
       <div className="mx-auto max-w-6xl">
+
         <div className="mb-10 text-center">
+
           <h1 className="text-5xl font-black text-[#111111]">
             Create Listing
           </h1>
@@ -162,76 +269,77 @@ price: Number(price),
           <p className="mt-4 text-[#555555]">
             List your property on HomeLinker
           </p>
+
         </div>
 
         <div className="mb-12">
 
-  <div className="flex items-center justify-between mb-6">
+          <div className="mb-6 flex items-center justify-between">
 
-    {[
-      "Listing",
-      "Property",
-      "Location",
-      "Details",
-      "Photos",
-      "Description",
-      "Review",
-    ].map((label, index) => {
+            {[
+              "Listing",
+              "Property",
+              "Location",
+              "Details",
+              "Photos",
+              "Description",
+              "Review",
+            ].map((label, index) => {
+              const current = index + 1;
 
-      const current = index + 1;
+              return (
+                <div
+                  key={label}
+                  className="flex flex-1 flex-col items-center"
+                >
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-full font-bold transition-all duration-300 ${
+                      current < step
+                        ? "bg-[#C9A227] text-white shadow-lg"
+                        : current === step
+                        ? "scale-110 border-4 border-[#C9A227] bg-[#111111] text-white shadow-xl"
+                        : "border border-[#E8D9A8] bg-[#F6F2E8] text-[#777777]"
+                    }`}
+                  >
+                    {current < step ? "✓" : current}
+                  </div>
 
-      return (
-        <div
-          key={label}
-          className="flex flex-col items-center flex-1"
-        >
-
-          <div
-            className={`h-12 w-12 rounded-full flex items-center justify-center font-bold transition-all duration-300
-            ${
-              current < step
-                ? "bg-[#C9A227] text-white shadow-lg"
-                : current === step
-                ? "bg-[#111111] border-4 border-[#C9A227] text-white scale-110 shadow-xl"
-                : "bg-[#F6F2E8] text-[#777777] border border-[#E8D9A8]"
-            }`}
-          >
-            {current < step ? "✓" : current}
+                  <span
+                    className={`mt-3 text-sm font-semibold ${
+                      current <= step
+                        ? "text-[#111111]"
+                        : "text-[#888888]"
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
-          <span
-            className={`mt-3 text-sm font-semibold ${
-              current <= step
-                ? "text-[#111111]"
-                : "text-[#888888]"
-            }`}
-          >
-            {label}
-          </span>
+          <div className="relative h-4 overflow-hidden rounded-full bg-[#EFE6C9]">
+
+            <div
+              className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-[#C9A227] to-[#E5C65B] transition-all duration-500"
+              style={{
+                width: `${((step - 1) / 6) * 100}%`,
+              }}
+            />
+
+          </div>
+
+          <div className="mt-3 flex justify-between text-sm font-medium text-[#666666]">
+
+            <span>Step {step} of 7</span>
+
+            <span>
+              {Math.round(((step - 1) / 6) * 100)}% Complete
+            </span>
+
+          </div>
 
         </div>
-      );
-    })}
-
-  </div>
-
-  <div className="relative h-4 rounded-full bg-[#EFE6C9] overflow-hidden">
-
-    <div
-      className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-[#C9A227] to-[#E5C65B] transition-all duration-500"
-      style={{
-  width: `${((step - 1) / 6) * 100}%`,
-}}
-    />
-
-  </div>
-
-  <div className="mt-3 flex justify-between text-sm font-medium text-[#666666]">
-    <span>Step {step} of 7</span>
-    <span>{Math.round(((step - 1) / 6) * 100)}% Complete</span>
-  </div>
-
-</div>
                 {step === 1 && (
           <ListingTypeStep
             listingType={listingType}
@@ -251,23 +359,22 @@ price: Number(price),
         )}
 
         {step === 3 && (
-
           <LocationStep
-  province={province}
-  setProvince={setProvince}
-  city={city}
-  setCity={setCity}
-  suburb={suburb}
-  setSuburb={setSuburb}
-  address={address}
-  setAddress={setAddress}
-  latitude={latitude}
-  setLatitude={setLatitude}
-  longitude={longitude}
-  setLongitude={setLongitude}
-  onBack={() => setStep(2)}
-  onNext={() => setStep(4)}
-/>
+            province={province}
+            setProvince={setProvince}
+            city={city}
+            setCity={setCity}
+            suburb={suburb}
+            setSuburb={setSuburb}
+            address={address}
+            setAddress={setAddress}
+            latitude={latitude}
+            setLatitude={setLatitude}
+            longitude={longitude}
+            setLongitude={setLongitude}
+            onBack={() => setStep(2)}
+            onNext={() => setStep(4)}
+          />
         )}
 
         {step === 4 && (
@@ -343,7 +450,7 @@ price: Number(price),
             onPublish={publishListing}
           />
         )}
-      </div>
+              </div>
     </main>
   );
 }
