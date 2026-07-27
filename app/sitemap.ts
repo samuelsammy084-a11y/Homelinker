@@ -1,9 +1,14 @@
 import type { MetadataRoute } from "next";
+import { supabase } from "@/lib/supabase";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://homelinker.co.za";
 
-  return [
+  const { data: properties } = await supabase
+    .from("properties")
+    .select("id, updated_at");
+
+  const staticPages: MetadataRoute.Sitemap = [
     {
       url: baseUrl,
       lastModified: new Date(),
@@ -11,9 +16,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
-      url: `${baseUrl}/browse`,
+      url: `${baseUrl}/properties`,
       lastModified: new Date(),
-      changeFrequency: "daily",
+      changeFrequency: "hourly",
       priority: 0.9,
     },
     {
@@ -29,16 +34,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/login`,
+      url: `${baseUrl}/about`,
       lastModified: new Date(),
       changeFrequency: "monthly",
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/register`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.5,
+      priority: 0.7,
     },
   ];
+
+  const propertyPages: MetadataRoute.Sitemap =
+    properties?.map((property) => ({
+      url: `${baseUrl}/properties/${property.id}`,
+      lastModified: property.updated_at
+        ? new Date(property.updated_at)
+        : new Date(),
+      changeFrequency: "daily",
+      priority: 0.8,
+    })) ?? [];
+
+  return [...staticPages, ...propertyPages];
 }

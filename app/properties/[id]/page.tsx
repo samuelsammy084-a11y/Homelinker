@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import PropertyGallery from "@/app/components/PropertyGallery";
@@ -10,6 +11,68 @@ type Props = {
     id: string;
   }>;
 };
+
+export async function generateMetadata({
+  params,
+}: Props): Promise<Metadata> {
+  const { id } = await params;
+
+  const { data: property } = await supabase
+    .from("properties")
+    .select("*")
+    .eq("id", Number(id))
+    .single();
+
+  if (!property) {
+    return {
+      title: "Property Not Found | HomeLinker",
+      description: "The requested property could not be found.",
+    };
+  }
+
+  const title = `${property.title} in ${property.city} | HomeLinker`;
+
+  const description =
+    property.description?.substring(0, 160) ||
+    `Browse this ${property.property_type} in ${property.city}, ${property.province}.`;
+
+  const image =
+    property.image_urls?.length > 0
+      ? property.image_urls[0]
+      : property.image_url || "/og-image.jpg";
+
+  return {
+    title,
+    description,
+
+    alternates: {
+      canonical: `https://homelinker.co.za/properties/${property.id}`,
+    },
+
+    openGraph: {
+      title,
+      description,
+      url: `https://homelinker.co.za/properties/${property.id}`,
+      siteName: "HomeLinker",
+      type: "article",
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: property.title,
+        },
+      ],
+    },
+
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [image],
+    },
+  };
+}
 
 export default async function PropertyDetails({ params }: Props) {
   const { id } = await params;
@@ -37,9 +100,42 @@ export default async function PropertyDetails({ params }: Props) {
           property.image_url ||
             "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
         ];
-
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "Residence",
+  name: property.title,
+  description: property.description,
+  image: images,
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: property.street_address,
+    addressLocality: property.city,
+    addressRegion: property.province,
+    addressCountry: "ZA",
+  },
+  geo:
+    property.latitude && property.longitude
+      ? {
+          "@type": "GeoCoordinates",
+          latitude: property.latitude,
+          longitude: property.longitude,
+        }
+      : undefined,
+  offers: {
+    "@type": "Offer",
+    price: property.price,
+    priceCurrency: "ZAR",
+    availability: "https://schema.org/InStock",
+  },
+};
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
+  <script
+    type="application/ld+json"
+    dangerouslySetInnerHTML={{
+      __html: JSON.stringify(schema),
+    }}
+  />
       <div className="max-w-7xl mx-auto px-6 pt-10">
         <PropertyGallery images={images} />
       </div>
@@ -98,11 +194,8 @@ export default async function PropertyDetails({ params }: Props) {
 
         <div className="flex flex-wrap gap-8 mt-10 text-lg text-black">
           <div>🛏 {property.bedrooms} Bedrooms</div>
-
           <div>🛁 {property.bathrooms} Bathrooms</div>
-
           <div>🚗 {property.parking} Parking</div>
-
           <div>🏠 {property.property_type}</div>
         </div>
 
@@ -117,7 +210,6 @@ export default async function PropertyDetails({ params }: Props) {
         </div>
 
         <div className="flex flex-wrap gap-4 mt-12">
-
           {property.contact_number ? (
             <>
               <a
@@ -151,7 +243,6 @@ export default async function PropertyDetails({ params }: Props) {
           >
             ← Back
           </Link>
-
         </div>
 
         <p className="text-red-600 font-bold mt-6">
@@ -165,7 +256,6 @@ export default async function PropertyDetails({ params }: Props) {
             title={property.title}
           />
         )}
-
       </div>
     </main>
   );
