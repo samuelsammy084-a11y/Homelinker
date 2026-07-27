@@ -4,6 +4,7 @@ import PropertyGallery from "@/app/components/PropertyGallery";
 import PropertyMap from "@/app/components/PropertyMap";
 import FavoriteButton from "@/app/components/FavoriteButton";
 import ReportListingButton from "@/app/components/ReportListingButton";
+
 type Props = {
   params: Promise<{
     id: string;
@@ -39,22 +40,22 @@ export default async function PropertyDetails({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
-
       <div className="max-w-7xl mx-auto px-6 pt-10">
-
         <PropertyGallery images={images} />
-
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-12">
-
         <div className="flex flex-wrap items-start justify-between gap-4">
           <h1 className="text-5xl font-bold text-black">
             {property.title}
           </h1>
 
           <div className="flex items-center gap-2">
-            <FavoriteButton propertyId={property.id} className="rounded-full border border-[#E8D8A5] bg-white p-3 text-[#C9A227] shadow-sm transition hover:scale-105" />
+            <FavoriteButton
+              propertyId={property.id}
+              className="rounded-full border border-[#E8D8A5] bg-white p-3 text-[#C9A227] shadow-sm transition hover:scale-105"
+            />
+
             <ReportListingButton propertyId={property.id} />
           </div>
         </div>
@@ -82,20 +83,20 @@ export default async function PropertyDetails({ params }: Props) {
         </p>
 
         <div className="mt-3 space-y-1">
-  <p className="text-lg font-medium text-[#1B1B1B]">
-    📍 {property.street_address}
-  </p>
+          <p className="text-lg font-medium text-[#1B1B1B]">
+            📍 {property.street_address}
+          </p>
 
-  <p className="text-[#1B1B1B]">
-    {property.suburb}
-  </p>
+          <p className="text-[#1B1B1B]">
+            {property.suburb}
+          </p>
 
-  <p className="text-[#1B1B1B]">
-    {property.city}, {property.province}
-  </p>
-</div>
+          <p className="text-[#1B1B1B]">
+            {property.city}, {property.province}
+          </p>
+        </div>
+
         <div className="flex flex-wrap gap-8 mt-10 text-lg text-black">
-
           <div>🛏 {property.bedrooms} Bedrooms</div>
 
           <div>🛁 {property.bathrooms} Bathrooms</div>
@@ -103,11 +104,9 @@ export default async function PropertyDetails({ params }: Props) {
           <div>🚗 {property.parking} Parking</div>
 
           <div>🏠 {property.property_type}</div>
-
         </div>
 
         <div className="mt-12">
-
           <h2 className="text-3xl font-bold text-black mb-4">
             Description
           </h2>
@@ -115,52 +114,59 @@ export default async function PropertyDetails({ params }: Props) {
           <p className="text-black leading-8 text-lg">
             {property.description}
           </p>
-
         </div>
 
         <div className="flex flex-wrap gap-4 mt-12">
 
-  <a
-    href={`tel:${property.contact_number}`}
-    className="bg-[#C9A227] text-white px-8 py-4 rounded-xl font-semibold"
-  >
-    📞 Call
-  </a>
+          {property.contact_number ? (
+            <>
+              <a
+                href={`tel:${property.contact_number}`}
+                className="bg-[#C9A227] text-white px-8 py-4 rounded-xl font-semibold"
+              >
+                📞 Call
+              </a>
 
-  <a
-    href={`https://wa.me/27${property.contact_number.replace(
-      /^0/,
-      ""
-    )}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="bg-green-600 text-white px-8 py-4 rounded-xl font-semibold"
-  >
-    💬 WhatsApp
-  </a>
+              <a
+                href={`https://wa.me/27${property.contact_number.replace(
+                  /^0/,
+                  ""
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-green-600 text-white px-8 py-4 rounded-xl font-semibold"
+              >
+                💬 WhatsApp
+              </a>
+            </>
+          ) : (
+            <div className="rounded-xl bg-yellow-100 px-8 py-4 font-semibold text-yellow-800">
+              Contact number not available yet
+            </div>
+          )}
 
-  <Link
-    href="/properties"
-    className="border border-black text-black px-8 py-4 rounded-xl"
-  >
-    ← Back
-  </Link>
+          <Link
+            href="/properties"
+            className="border border-black text-black px-8 py-4 rounded-xl"
+          >
+            ← Back
+          </Link>
 
-</div><p className="text-red-600 font-bold">
-  Latitude: {String(property.latitude)} |
-  Longitude: {String(property.longitude)}
-</p>
+        </div>
 
-{property.latitude && property.longitude && (
-  <PropertyMap
-    latitude={property.latitude}
-    longitude={property.longitude}
-    title={property.title}
-  />
-)}
+        <p className="text-red-600 font-bold mt-6">
+          Latitude: {String(property.latitude)} | Longitude: {String(property.longitude)}
+        </p>
 
-</div>
+        {property.latitude && property.longitude && (
+          <PropertyMap
+            latitude={property.latitude}
+            longitude={property.longitude}
+            title={property.title}
+          />
+        )}
 
-</main>
+      </div>
+    </main>
   );
 }

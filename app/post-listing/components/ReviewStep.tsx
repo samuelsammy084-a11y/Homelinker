@@ -54,55 +54,70 @@ export default function ReviewStep({
 
       <div className="space-y-8">
 
+        {/* Basic Information */}
         <div>
-          <h3 className="font-bold text-xl text-[#111111] mb-2">
+          <h3 className="mb-3 text-2xl font-bold text-[#111111]">
             Basic Information
           </h3>
 
-          <div className="rounded-2xl bg-[#FFF9E8] p-6 space-y-2">
+          <div className="rounded-2xl border border-[#E8D9A8] bg-[#FFF9E8] p-6 space-y-3">
 
-            <p><b>Listing:</b> {listingType}</p>
+            <p className="text-[#111111]">
+              <span className="font-bold">Listing:</span> {listingType}
+            </p>
 
-            <p><b>Property:</b> {propertyType}</p>
+            <p className="text-[#111111]">
+              <span className="font-bold">Property:</span> {propertyType}
+            </p>
 
-            <p><b>Price:</b> R {price}</p>
+            <p className="text-[#111111]">
+              <span className="font-bold">Price:</span> R {price}
+            </p>
 
-            <p><b>Bedrooms:</b> {bedrooms}</p>
+            <p className="text-[#111111]">
+              <span className="font-bold">Bedrooms:</span> {bedrooms}
+            </p>
 
-            <p><b>Bathrooms:</b> {bathrooms}</p>
+            <p className="text-[#111111]">
+              <span className="font-bold">Bathrooms:</span> {bathrooms}
+            </p>
 
-            <p><b>Parking:</b> {parking}</p>
+            <p className="text-[#111111]">
+              <span className="font-bold">Parking:</span> {parking}
+            </p>
 
           </div>
         </div>
 
+        {/* Location */}
         <div>
 
-          <h3 className="font-bold text-xl text-[#111111] mb-2">
+          <h3 className="mb-3 text-2xl font-bold text-[#111111]">
             Location
           </h3>
 
-          <div className="rounded-2xl bg-[#FFF9E8] p-6">
+          <div className="rounded-2xl border border-[#E8D9A8] bg-[#FFF9E8] p-6 space-y-2">
 
-            <p>{address}</p>
+            <p className="text-[#111111]">{address}</p>
 
-            <p>{suburb}</p>
+            <p className="text-[#111111]">{suburb}</p>
 
-            <p>{city}</p>
+            <p className="text-[#111111]">{city}</p>
 
-            <p>{province}</p>
+            <p className="text-[#111111]">{province}</p>
 
           </div>
 
         </div>
 
+        {/* Title */}
         <div>
 
-          <h3 className="font-bold text-xl mb-2">
+          <h3 className="mb-3 text-2xl font-bold text-[#111111]">
             Title
           </h3>
 
-          <div className="rounded-2xl bg-[#FFF9E8] p-6">
+          <div className="rounded-2xl border border-[#E8D9A8] bg-[#FFF9E8] p-6 text-[#111111] text-lg font-medium">
 
             {title}
 
@@ -110,13 +125,14 @@ export default function ReviewStep({
 
         </div>
 
+        {/* Description */}
         <div>
 
-          <h3 className="font-bold text-xl mb-2">
+          <h3 className="mb-3 text-2xl font-bold text-[#111111]">
             Description
           </h3>
 
-          <div className="rounded-2xl bg-[#FFF9E8] p-6 whitespace-pre-wrap">
+          <div className="rounded-2xl border border-[#E8D9A8] bg-[#FFF9E8] p-6 whitespace-pre-wrap text-[#111111] leading-7">
 
             {description}
 
@@ -124,20 +140,22 @@ export default function ReviewStep({
 
         </div>
 
+        {/* Photos */}
         <div>
 
-          <h3 className="font-bold text-xl mb-3">
+          <h3 className="mb-3 text-2xl font-bold text-[#111111]">
             Photos ({images.length})
           </h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
 
             {images.map((image, index) => (
 
               <img
                 key={index}
                 src={URL.createObjectURL(image)}
-                className="h-40 w-full rounded-2xl object-cover"
+                alt={`Property ${index + 1}`}
+                className="h-40 w-full rounded-2xl border border-[#E8D9A8] object-cover shadow-md"
               />
 
             ))}
@@ -152,14 +170,14 @@ export default function ReviewStep({
 
         <button
           onClick={onBack}
-          className="rounded-2xl border border-[#C9A227] px-8 py-4 font-semibold text-[#C9A227]"
+          className="rounded-2xl border-2 border-[#C9A227] px-8 py-4 font-semibold text-[#C9A227] transition hover:bg-[#FFF6D8]"
         >
           ← Back
         </button>
 
         <button
           onClick={onPublish}
-          className="rounded-2xl bg-[#C9A227] px-10 py-4 font-bold text-white hover:bg-[#A67C00]"
+          className="rounded-2xl bg-[#C9A227] px-10 py-4 font-bold text-white transition hover:bg-[#A67C00]"
         >
           Publish Listing
         </button>

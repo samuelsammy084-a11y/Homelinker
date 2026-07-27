@@ -2,20 +2,8 @@ import { supabase } from "./supabase";
 
 export async function getProperties() {
   const { data, error } = await supabase
-    .from("listings")
-    .select(`
-      *,
-      listing_images (
-        image_url,
-        sort_order
-      ),
-      profiles (
-        full_name,
-        verified
-      )
-    `)
-    .eq("status", "approved")
-    .order("featured", { ascending: false })
+    .from("properties")
+    .select("*")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -23,16 +11,18 @@ export async function getProperties() {
     return [];
   }
 
-  return (data || []).map((listing: any) => ({
-    ...listing,
+  return (data || []).map((property: any) => ({
+    ...property,
 
     image_urls:
-      listing.listing_images
-        ?.sort((a: any, b: any) => a.sort_order - b.sort_order)
-        .map((img: any) => img.image_url) || [],
+      property.image_urls?.length
+        ? property.image_urls
+        : property.image_url
+        ? [property.image_url]
+        : [],
 
-    owner_name: listing.profiles?.full_name || "HomeLinker User",
+    owner_name: "HomeLinker User",
 
-    owner_verified: listing.profiles?.verified || false,
+    owner_verified: false,
   }));
 }
