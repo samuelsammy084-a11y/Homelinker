@@ -126,7 +126,7 @@ export default function PostListingPage() {
         imageUrl = imageUrls[0];
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("properties")
         .insert([
           {
@@ -178,8 +178,9 @@ export default function PostListingPage() {
 
             image_urls: imageUrls,
           },
-        ]);
-
+        ])
+.select()
+.single();
       if (error) {
         setPopup({
           show: true,
@@ -192,16 +193,16 @@ export default function PostListingPage() {
       }
 
       setPopup({
-        show: true,
-        type: "success",
-        title: "Listing Published!",
-        message:
-          "Your property has been successfully listed on HomeLinker.",
-      });
+  show: true,
+  type: "success",
+  title: "Listing Saved!",
+  message:
+    "Now choose a plan to publish your property.",
+});
 
-      setTimeout(() => {
-        router.push("/");
-      }, 1800);
+setTimeout(() => {
+  router.push(`/payment?id=${property.id}`);
+}, 1800);
     } catch (err: any) {
       setPopup({
         show: true,
