@@ -193,16 +193,16 @@ export default function PostListingPage() {
       }
 
       setPopup({
-  show: true,
-  type: "success",
-  title: "Listing Saved!",
-  message:
-    "Now choose a plan to publish your property.",
-});
+        show: true,
+        type: "success",
+        title: "Listing Published!",
+        message:
+          "Your property has been successfully listed on HomeLinker.",
+      });
 
-setTimeout(() => {
-  router.push(`/payment?id=${property.id}`);
-}, 1800);
+      setTimeout(() => {
+       router.push("/dashboard");
+      }, 1800);
     } catch (err: any) {
       setPopup({
         show: true,
