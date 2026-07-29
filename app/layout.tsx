@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://homelinker.co.za"),
+  metadataBase: new URL("https://www.homelinker.co.za"),
 
   title: {
     default: "HomeLinker | South Africa's Property Marketplace",
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   authors: [
     {
       name: "HomeLinker",
-      url: "https://homelinker.co.za",
+      url: "https://www.homelinker.co.za",
     },
   ],
 
@@ -69,20 +69,20 @@ export const metadata: Metadata = {
   },
 
   alternates: {
-    canonical: "https://homelinker.co.za",
+    canonical: "https://www.homelinker.co.za",
   },
 
   openGraph: {
     type: "website",
     locale: "en_ZA",
-    url: "https://homelinker.co.za",
+    url: "https://www.homelinker.co.za",
     siteName: "HomeLinker",
     title: "HomeLinker | South Africa's Property Marketplace",
     description:
       "Find rooms, apartments, houses and properties to rent or buy across South Africa.",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "https://www.homelinker.co.za/og-image.png",
         width: 1200,
         height: 630,
         alt: "HomeLinker - South Africa's Property Marketplace",
@@ -95,7 +95,7 @@ export const metadata: Metadata = {
     title: "HomeLinker | South Africa's Property Marketplace",
     description:
       "Find rooms, apartments, houses and properties to rent or buy across South Africa.",
-    images: ["/og-image.jpg"],
+    images: ["https://www.homelinker.co.za/og-image.png"],
   },
 
   icons: {
