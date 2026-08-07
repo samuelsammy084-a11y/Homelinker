@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.homelinker.co.za"),
+  metadataBase: new URL("https://homelinker.co.za"),
 
   title: {
     default: "HomeLinker | South Africa's Property Marketplace",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 
   keywords: [
     "HomeLinker",
-    "South Africa property",
+    "South Africa Property",
     "Property Marketplace",
     "Rooms to Rent",
     "Apartments to Rent",
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   authors: [
     {
       name: "HomeLinker",
-      url: "https://www.homelinker.co.za",
+      url: "https://homelinker.co.za",
     },
   ],
 
@@ -69,20 +69,20 @@ export const metadata: Metadata = {
   },
 
   alternates: {
-    canonical: "https://www.homelinker.co.za",
+    canonical: "https://homelinker.co.za",
   },
 
   openGraph: {
     type: "website",
     locale: "en_ZA",
-    url: "https://www.homelinker.co.za",
+    url: "https://homelinker.co.za",
     siteName: "HomeLinker",
     title: "HomeLinker | South Africa's Property Marketplace",
     description:
       "Find rooms, apartments, houses and properties to rent or buy across South Africa.",
     images: [
       {
-        url: "https://www.homelinker.co.za/og-image.png",
+        url: "https://homelinker.co.za/og-image.png",
         width: 1200,
         height: 630,
         alt: "HomeLinker - South Africa's Property Marketplace",
@@ -95,7 +95,7 @@ export const metadata: Metadata = {
     title: "HomeLinker | South Africa's Property Marketplace",
     description:
       "Find rooms, apartments, houses and properties to rent or buy across South Africa.",
-    images: ["https://www.homelinker.co.za/og-image.png"],
+    images: ["https://homelinker.co.za/og-image.png"],
   },
 
   icons: {
@@ -130,7 +130,9 @@ export default function RootLayout({
         />
       </body>
 
-      <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!} />
+      <GoogleAnalytics
+        gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!}
+      />
     </html>
   );
 }
