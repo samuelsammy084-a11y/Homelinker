@@ -21,8 +21,8 @@ export default function RegisterPage() {
       options: {
         redirectTo:
           process.env.NODE_ENV === "development"
-            ? "http://localhost:3000"
-            : "https://homelinker.co.za",
+            ? "http://localhost:3000/auth/callback?next=/dashboard"
+            : "https://homelinker.co.za/auth/callback?next=/dashboard",
       },
     });
 
@@ -47,8 +47,8 @@ export default function RegisterPage() {
       options: {
         emailRedirectTo:
           process.env.NODE_ENV === "development"
-            ? "http://localhost:3000"
-            : "https://homelinker.co.za",
+            ? "http://localhost:3000/auth/callback?next=/dashboard"
+            : "https://homelinker.co.za/auth/callback?next=/dashboard",
         data: {
           full_name: fullName,
           phone: phone,

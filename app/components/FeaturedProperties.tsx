@@ -38,6 +38,7 @@ export default async function FeaturedProperties() {
             <PropertyCard
               key={property.id}
               id={property.id}
+              slug={property.slug}
               images={
                 property.image_urls?.length
                   ? property.image_urls

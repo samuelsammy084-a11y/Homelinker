@@ -6,6 +6,7 @@ import { BedDouble, Bath, CarFront, ChevronLeft, ChevronRight, MapPin } from "lu
 
 type PropertyCardProps = {
   id: number;
+  slug?: string;
   images: string[];
   price: number;
   title: string;
@@ -19,6 +20,7 @@ type PropertyCardProps = {
 
 export default function PropertyCard({
   id,
+  slug,
   images,
   price,
   title,
@@ -124,7 +126,7 @@ export default function PropertyCard({
         </div>
 
         <Link
-          href={`/properties/${id}`}
+          href={slug ? `/properties/${slug}` : `/properties/${id}`}
           className="mt-7 block rounded-2xl bg-[#C9A227] py-3.5 text-center text-base font-semibold text-white transition-all duration-300 hover:bg-[#A67C00] hover:shadow-lg"
         >
           View listing

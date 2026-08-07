@@ -4,9 +4,10 @@ import { useState } from "react";
 
 type Props = {
   images: string[];
+  altText?: string;
 };
 
-export default function PropertyGallery({ images }: Props) {
+export default function PropertyGallery({ images, altText = "Property image" }: Props) {
   const [current, setCurrent] = useState(0);
 
   const next = () => {
@@ -26,7 +27,7 @@ export default function PropertyGallery({ images }: Props) {
 
         <img
           src={images[current]}
-          alt=""
+          alt={altText}
           className="w-full h-[550px] object-cover rounded-3xl shadow-xl"
         />
 

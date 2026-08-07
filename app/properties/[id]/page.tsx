@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { createPropertySlug, getPropertyIdFromSlug } from "@/lib/property-slug";
 import Link from "next/link";
 import PropertyGallery from "@/app/components/PropertyGallery";
 import PropertyMap from "@/app/components/PropertyMap";
@@ -12,47 +14,74 @@ type Props = {
   }>;
 };
 
+async function getPropertyBySlugOrId(slug: string) {
+  const numericId = getPropertyIdFromSlug(slug);
+
+  const query = supabase
+    .from("properties")
+    .select("*")
+    .eq("id", numericId ?? -1)
+    .maybeSingle();
+
+  const { data: property, error } = await query;
+
+  if (error) {
+    console.error("Property fetch error", error);
+    return null;
+  }
+
+  if (property) {
+    return property;
+  }
+
+  return null;
+}
+
 export async function generateMetadata({
   params,
 }: Props): Promise<Metadata> {
   const { id } = await params;
-
-  const { data: property } = await supabase
-    .from("properties")
-    .select("*")
-    .eq("id", Number(id))
-    .single();
+  const property = await getPropertyBySlugOrId(id);
 
   if (!property) {
     return {
       title: "Property Not Found | HomeLinker",
       description: "The requested property could not be found.",
+      alternates: {
+        canonical: "https://homelinker.co.za/properties",
+      },
     };
   }
 
   const title = `${property.title} in ${property.city} | HomeLinker`;
-
   const description =
-    property.description?.substring(0, 160) ||
-    `Browse this ${property.property_type} in ${property.city}, ${property.province}.`;
-
+    property.description?.trim() ||
+    `View this ${property.property_type} in ${property.city}, ${property.province}. See photos, price and contact details on HomeLinker.`;
   const image =
     property.image_urls?.length > 0
       ? property.image_urls[0]
       : property.image_url || "/og-image.jpg";
+  const canonicalSlug = createPropertySlug(property.title, property.city, property.id);
+  const canonicalUrl = `https://homelinker.co.za/properties/${canonicalSlug}`;
 
   return {
     title,
     description,
-
+    keywords: [
+      property.title,
+      property.city,
+      property.province,
+      property.property_type,
+      "HomeLinker",
+      "South Africa property",
+    ],
     alternates: {
-      canonical: `https://homelinker.co.za/properties/${property.id}`,
+      canonical: canonicalUrl,
     },
-
     openGraph: {
       title,
       description,
-      url: `https://homelinker.co.za/properties/${property.id}`,
+      url: canonicalUrl,
       siteName: "HomeLinker",
       type: "article",
       images: [
@@ -64,7 +93,6 @@ export async function generateMetadata({
         },
       ],
     },
-
     twitter: {
       card: "summary_large_image",
       title,
@@ -76,19 +104,15 @@ export async function generateMetadata({
 
 export default async function PropertyDetails({ params }: Props) {
   const { id } = await params;
-
-  const { data: property } = await supabase
-    .from("properties")
-    .select("*")
-    .eq("id", Number(id))
-    .single();
+  const property = await getPropertyBySlugOrId(id);
 
   if (!property) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <h1 className="text-4xl font-bold text-black">
-          Property not found
-        </h1>
+      <main className="min-h-screen flex items-center justify-center bg-[#F8F6F1]">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-black">Property not found</h1>
+          <p className="mt-3 text-slate-600">The listing you requested could not be found.</p>
+        </div>
       </main>
     );
   }
@@ -100,44 +124,79 @@ export default async function PropertyDetails({ params }: Props) {
           property.image_url ||
             "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
         ];
-const schema = {
-  "@context": "https://schema.org",
-  "@type": "Residence",
-  name: property.title,
-  description: property.description,
-  image: images,
-  address: {
-    "@type": "PostalAddress",
-    streetAddress: property.street_address,
-    addressLocality: property.city,
-    addressRegion: property.province,
-    addressCountry: "ZA",
-  },
-  geo:
-    property.latitude && property.longitude
-      ? {
-          "@type": "GeoCoordinates",
-          latitude: property.latitude,
-          longitude: property.longitude,
-        }
-      : undefined,
-  offers: {
-    "@type": "Offer",
-    price: property.price,
-    priceCurrency: "ZAR",
-    availability: "https://schema.org/InStock",
-  },
-};
+  const canonicalSlug = createPropertySlug(property.title, property.city, property.id);
+  const canonicalUrl = `https://homelinker.co.za/properties/${canonicalSlug}`;
+
+  if (id !== canonicalSlug) {
+    redirect(canonicalUrl);
+  }
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: "https://homelinker.co.za",
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "Properties",
+            item: "https://homelinker.co.za/properties",
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: property.title,
+            item: canonicalUrl,
+          },
+        ],
+      },
+      {
+        "@type": "Residence",
+        name: property.title,
+        description: property.description,
+        image: images,
+        url: canonicalUrl,
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: property.street_address,
+          addressLocality: property.city,
+          addressRegion: property.province,
+          addressCountry: "ZA",
+        },
+        geo:
+          property.latitude && property.longitude
+            ? {
+                "@type": "GeoCoordinates",
+                latitude: property.latitude,
+                longitude: property.longitude,
+              }
+            : undefined,
+        offers: {
+          "@type": "Offer",
+          price: property.price,
+          priceCurrency: "ZAR",
+          availability: "https://schema.org/InStock",
+        },
+      },
+    ],
+  };
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
-  <script
-    type="application/ld+json"
-    dangerouslySetInnerHTML={{
-      __html: JSON.stringify(schema),
-    }}
-  />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(schema),
+        }}
+      />
       <div className="max-w-7xl mx-auto px-6 pt-10">
-        <PropertyGallery images={images} />
+        <PropertyGallery images={images} altText={property.title} />
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-12">
@@ -245,9 +304,11 @@ const schema = {
           </Link>
         </div>
 
-        <p className="text-red-600 font-bold mt-6">
-          Latitude: {String(property.latitude)} | Longitude: {String(property.longitude)}
-        </p>
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+          <p className="font-semibold text-[#1B1B1B]">Property details</p>
+          <p className="mt-2">Location: {property.city}, {property.province}</p>
+          <p className="mt-1">Property type: {property.property_type}</p>
+        </div>
 
         {property.latitude && property.longitude && (
           <PropertyMap

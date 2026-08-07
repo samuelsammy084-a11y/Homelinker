@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { createPropertySlug } from "./property-slug";
 
 export async function getProperties() {
   const { data, error } = await supabase
@@ -13,6 +14,8 @@ export async function getProperties() {
 
   return (data || []).map((property: any) => ({
     ...property,
+
+    slug: createPropertySlug(property.title, property.city, property.id),
 
     image_urls:
       property.image_urls?.length
