@@ -16,7 +16,7 @@ export async function getProperties() {
   return (data || []).map((property: Property) => ({
     ...property,
 
-    slug: createPropertySlug(property.title, property.city, property.id),
+    slug: createPropertySlug(property.title, property.city ?? "", property.id),
 
     image_urls:
       property.image_urls?.length

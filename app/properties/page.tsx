@@ -112,9 +112,9 @@ export default async function PropertiesPage({
                 price={property.price}
                 title={property.title}
                 location={`${property.city}, ${property.province}`}
-                bedrooms={property.bedrooms}
-                bathrooms={property.bathrooms}
-                parking={property.parking}
+                bedrooms={property.bedrooms ?? 0}
+                bathrooms={property.bathrooms ?? 0}
+                parking={property.parking ?? 0}
                 featured={property.featured}
                 verified={property.verified}
               />

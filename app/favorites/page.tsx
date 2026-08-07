@@ -34,8 +34,14 @@ export default function FavoritesPage() {
       return;
     }
 
-    const props =
-      (data?.map((item: { properties?: Property }) => item.properties).filter(Boolean) as Property[]) || [];
+    type FavoriteRow = {
+      property_id: number;
+      properties?: Property[];
+    };
+
+    const props = (data || [])
+      .map((item: FavoriteRow) => item.properties?.[0])
+      .filter((property): property is Property => Boolean(property));
 
     setProperties(props);
     setLoading(false);
@@ -106,9 +112,9 @@ export default function FavoritesPage() {
                 price={property.price}
                 title={property.title}
                 location={`${property.city}, ${property.province}`}
-                bedrooms={property.bedrooms}
-                bathrooms={property.bathrooms}
-                parking={property.parking}
+                bedrooms={property.bedrooms ?? 0}
+                bathrooms={property.bathrooms ?? 0}
+                parking={property.parking ?? 0}
                 featured={property.featured}
                 verified={property.verified}
               />
