@@ -69,7 +69,7 @@ export default function PaymentSuccessPage() {
 
         {!loading && !success && (
           <p className="mt-6 text-red-600 text-lg">
-            We couldn't activate your listing.
+            We couldn&apos;t activate your listing.
           </p>
         )}
 

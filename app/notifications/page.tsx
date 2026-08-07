@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -17,11 +17,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadNotifications();
-  }, []);
-
-  async function loadNotifications() {
+  const loadNotifications = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -42,7 +38,12 @@ export default function NotificationsPage() {
     }
 
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(loadNotifications, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadNotifications]);
 
   async function markAllAsRead() {
     const {
@@ -56,7 +57,7 @@ export default function NotificationsPage() {
       .update({ is_read: true })
       .eq("user_id", user.id);
 
-    loadNotifications();
+    void loadNotifications();
   }
 
   return (
@@ -95,7 +96,7 @@ export default function NotificationsPage() {
             </h2>
 
             <p className="mt-3 text-gray-400">
-              We'll let you know when something happens.
+              We&apos;ll let you know when something happens.
             </p>
 
             <Link

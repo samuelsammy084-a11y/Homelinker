@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -87,9 +88,11 @@ export default function LoginContent() {
           className="mt-8 w-full flex items-center justify-center gap-3 rounded-xl bg-[#C9A227] py-4 text-white font-bold transition-all duration-300 hover:bg-[#A67C00] hover:shadow-xl"
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white">
-            <img
+            <Image
               src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
               alt="Google"
+              width={20}
+              height={20}
               className="h-5 w-5"
             />
           </div>
@@ -137,7 +140,7 @@ export default function LoginContent() {
         </form>
 
         <p className="mt-8 text-center text-slate-600">
-          Don't have an account?{" "}
+          Don&apos;t have an account?&nbsp;
           <Link href="/register" className="font-semibold text-[#C9A227] hover:underline">
             Register
           </Link>

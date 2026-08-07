@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -23,11 +23,7 @@ export default function EditListingPage() {
   const inputClass =
     "w-full rounded-xl border border-gray-300 bg-white p-4 text-black placeholder:text-black outline-none focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/20";
 
-  useEffect(() => {
-    loadProperty();
-  }, []);
-
-  async function loadProperty() {
+  const loadProperty = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -60,7 +56,11 @@ export default function EditListingPage() {
     setBathrooms(String(data.bathrooms));
     setParking(String(data.parking));
     setContactNumber(data.contact_number);
-  }
+  }, [id, router]);
+
+  useEffect(() => {
+    Promise.resolve().then(loadProperty);
+  }, [loadProperty]);
 
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();

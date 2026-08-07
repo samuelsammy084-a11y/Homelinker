@@ -109,7 +109,7 @@ export default function PropertyTypeStep({
         </h2>
 
         <p className="mt-3 text-lg text-[#555555]">
-          Choose the property you're listing.
+          Choose the property you&apos;re listing.
         </p>
 
       </div>

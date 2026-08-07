@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
         </h1>
 
         <p className="mt-3 text-center text-slate-600">
-          Enter your email address and we'll send you a password reset link.
+          Enter your email address and we&apos;ll send you a password reset link.
         </p>
 
         <form onSubmit={handleReset} className="mt-8 space-y-5">
@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
         </form>
 
         <p className="mt-8 text-center text-slate-600">
-          Remember your password?{" "}
+          Remember your password?&nbsp;
           <Link
             href="/login"
             className="font-semibold text-[#C9A227] hover:underline"

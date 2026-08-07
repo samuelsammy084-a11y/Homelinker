@@ -1,3 +1,4 @@
+import type { Property } from "@/app/types/property";
 import { supabase } from "./supabase";
 import { createPropertySlug } from "./property-slug";
 
@@ -12,7 +13,7 @@ export async function getProperties() {
     return [];
   }
 
-  return (data || []).map((property: any) => ({
+  return (data || []).map((property: Property) => ({
     ...property,
 
     slug: createPropertySlug(property.title, property.city, property.id),

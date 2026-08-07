@@ -1,13 +1,18 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { BedDouble, Bath, CarFront, House, Plus, ArrowLeft, LoaderCircle, Pencil, Trash2, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import type { Property } from "@/app/types/property";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
-  const [properties, setProperties] = useState<any[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,7 +34,7 @@ export default function DashboardPage() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      setProperties(data || []);
+      setProperties((data ?? []) as Property[]);
       setLoading(false);
     }
 
@@ -38,25 +43,28 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#F8F6F1]">
-        <h1 className="text-3xl font-bold text-[#1B1B1B]">
-          Loading your listings...
-        </h1>
+      <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-6">
+        <div className="rounded-[32px] border border-[#F0E7CF] bg-white/80 px-10 py-12 text-center shadow-[0_20px_70px_-30px_rgba(0,0,0,0.25)] backdrop-blur">
+          <LoaderCircle className="mx-auto h-10 w-10 animate-spin text-[#C9A227]" />
+          <h1 className="mt-6 text-3xl font-black text-[#1B1B1B]">Loading your listings...</h1>
+          <p className="mt-3 text-slate-600">We’re gathering your properties now.</p>
+        </div>
       </main>
     );
   }
 
   if (!user) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#F8F6F1]">
-        <div className="bg-white rounded-3xl shadow-xl p-10 text-center">
-          <h1 className="text-4xl font-bold text-[#1B1B1B]">
-            Please login first
-          </h1>
-
+      <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-6">
+        <div className="max-w-md rounded-[32px] border border-[#F0E7CF] bg-white p-10 text-center shadow-[0_20px_70px_-30px_rgba(0,0,0,0.25)]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#C9A227]/10 text-[#C9A227]">
+            <House size={24} />
+          </div>
+          <h1 className="mt-6 text-3xl font-black text-[#1B1B1B]">Please login first</h1>
+          <p className="mt-3 text-slate-600">Sign in to view and manage your listings.</p>
           <Link
             href="/login"
-            className="inline-block mt-6 bg-[#C9A227] hover:bg-[#A67C00] text-white px-8 py-4 rounded-xl font-bold transition"
+            className="mt-8 inline-flex items-center justify-center rounded-2xl bg-[#C9A227] px-8 py-3 font-semibold text-white transition hover:bg-[#A67C00]"
           >
             Login
           </Link>
@@ -66,157 +74,157 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F8F6F1] py-16">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-12">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] py-16">
+      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="mb-10 flex flex-col gap-6 rounded-[32px] border border-[#F0E7CF] bg-white/80 p-8 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)] backdrop-blur md:flex-row md:items-end md:justify-between"
+        >
           <div>
-            <h1 className="text-5xl font-extrabold text-[#1B1B1B]">
-              My Listings
-            </h1>
-
-            <p className="text-gray-600 mt-3 text-lg">
-              You have{" "}
-              <span className="font-bold text-[#C9A227]">
-                {properties.length}
-              </span>{" "}
-              properties listed.
+            <p className="inline-flex items-center gap-2 rounded-full border border-[#C9A227]/20 bg-[#C9A227]/10 px-3 py-1 text-sm font-semibold uppercase tracking-[0.3em] text-[#C9A227]">
+              <Sparkles size={14} /> Dashboard
+            </p>
+            <h1 className="mt-4 text-4xl font-black text-[#1B1B1B] sm:text-5xl">My Listings</h1>
+            <p className="mt-3 text-lg text-slate-600">
+              You have <span className="font-bold text-[#C9A227]">{properties.length}</span> properties listed.
             </p>
           </div>
 
-          <Link
-            href="/post-listing"
-            className="mt-6 md:mt-0 bg-[#C9A227] hover:bg-[#A67C00] text-white px-8 py-4 rounded-xl font-bold transition hover:shadow-xl"
-          >
-            + Post New Property
-          </Link>
-        </div>
-
-        {properties.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow-xl p-16 text-center">
-            <div className="text-7xl mb-6">??</div>
-
-            <h2 className="text-4xl font-bold text-[#1B1B1B]">
-              No Properties Yet
-            </h2>
-
-            <p className="text-gray-600 mt-4 text-lg">
-              Post your first property and start receiving enquiries.
-            </p>
-
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 font-semibold text-[#1B1B1B] transition hover:bg-slate-50"
+            >
+              <ArrowLeft size={16} /> Back to home
+            </Link>
             <Link
               href="/post-listing"
-              className="inline-block mt-8 bg-[#C9A227] hover:bg-[#A67C00] text-white px-8 py-4 rounded-xl font-bold transition"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-3 font-semibold text-white transition hover:bg-[#A67C00]"
             >
-              Post Property
+              <Plus size={16} /> Post new property
             </Link>
           </div>
+        </motion.div>
+
+        {properties.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="rounded-[32px] border border-[#F0E7CF] bg-white p-16 text-center shadow-[0_20px_70px_-30px_rgba(0,0,0,0.2)]"
+          >
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#C9A227]/10 text-[#C9A227]">
+              <House size={28} />
+            </div>
+            <h2 className="mt-6 text-3xl font-black text-[#1B1B1B]">No properties yet</h2>
+            <p className="mt-3 text-lg text-slate-600">Post your first property and start receiving enquiries.</p>
+            <Link
+              href="/post-listing"
+              className="mt-8 inline-flex items-center justify-center rounded-2xl bg-[#C9A227] px-8 py-3 font-semibold text-white transition hover:bg-[#A67C00]"
+            >
+              Post property
+            </Link>
+          </motion.div>
         ) : (
-          <div className="grid lg:grid-cols-2 gap-8">
+          <div className="grid gap-8 lg:grid-cols-2">
             {properties.map((property) => {
               const image =
                 property.image_urls?.length
                   ? property.image_urls[0]
-                  : property.image_url ||
-                    "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d";
+                  : property.image_url || "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d";
 
               return (
-                <div
+                <motion.div
                   key={property.id}
-                  className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)]"
                 >
-                  <img
-                    src={image}
-                    alt={property.title}
-                    className="w-full h-64 object-cover"
-                  />
+                  <div className="relative h-64 w-full">
+                    <Image
+                      src={image}
+                      alt={property.title}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
 
                   <div className="p-7">
-                    <div className="flex justify-between items-start">
+                    <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h2 className="text-3xl font-bold text-[#1B1B1B]">
-                          {property.title}
-                        </h2>
-
-                        <p className="text-gray-500 mt-2">
-                          ?? {property.city}, {property.province}
-                        </p>
+                        <h2 className="text-2xl font-bold text-[#1B1B1B]">{property.title}</h2>
+                        <p className="mt-2 text-sm text-slate-600">📍 {property.city}, {property.province}</p>
                       </div>
 
                       <div className="flex flex-col gap-2">
                         {property.featured && (
-                          <span className="bg-[#C9A227] text-white px-3 py-1 rounded-full text-xs font-bold">
-                            ? Featured
+                          <span className="rounded-full bg-[#C9A227] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white">
+                            Featured
                           </span>
                         )}
-
                         {property.verified && (
-                          <span className="bg-green-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                            ? Verified
+                          <span className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white">
+                            Verified
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <p className="text-[#C9A227] text-4xl font-extrabold mt-6">
+                    <p className="mt-6 text-4xl font-black text-[#C9A227]">
                       R{Number(property.price).toLocaleString("en-ZA")}
                     </p>
 
-                    <div className="grid grid-cols-3 gap-3 mt-6">
-                      <div className="bg-[#F8F6F1] rounded-xl py-3 text-center">
-                        ??<br />
-                        <span className="font-bold">{property.bedrooms}</span>
+                    <div className="mt-6 grid grid-cols-3 gap-3">
+                      <div className="rounded-2xl bg-[#F8F6F1] py-3 text-center">
+                        <BedDouble size={16} className="mx-auto text-[#C9A227]" />
+                        <p className="mt-2 font-bold text-[#1B1B1B]">{property.bedrooms}</p>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Beds</p>
                       </div>
-
-                      <div className="bg-[#F8F6F1] rounded-xl py-3 text-center">
-                        ??<br />
-                        <span className="font-bold">{property.bathrooms}</span>
+                      <div className="rounded-2xl bg-[#F8F6F1] py-3 text-center">
+                        <Bath size={16} className="mx-auto text-[#C9A227]" />
+                        <p className="mt-2 font-bold text-[#1B1B1B]">{property.bathrooms}</p>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Baths</p>
                       </div>
-
-                      <div className="bg-[#F8F6F1] rounded-xl py-3 text-center">
-                        ??<br />
-                        <span className="font-bold">{property.parking}</span>
+                      <div className="rounded-2xl bg-[#F8F6F1] py-3 text-center">
+                        <CarFront size={16} className="mx-auto text-[#C9A227]" />
+                        <p className="mt-2 font-bold text-[#1B1B1B]">{property.parking}</p>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Parking</p>
                       </div>
                     </div>
 
-                    <div className="flex gap-4 mt-8">
+                    <div className="mt-8 flex gap-3">
                       <Link
-                        href={`/edit-listing/${property.id}`}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-center font-bold transition"
+                        href={/edit-listing/}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-700"
                       >
-                        ?? Edit
+                        <Pencil size={16} /> Edit
                       </Link>
-
                       <button
                         onClick={async () => {
-                          const confirmDelete = confirm(
-                            "Are you sure you want to delete this property?"
-                          );
-
+                          const confirmDelete = confirm("Are you sure you want to delete this property?");
                           if (!confirmDelete) return;
 
-                          const { error } = await supabase
-                            .from("properties")
-                            .delete()
-                            .eq("id", property.id);
+                          const { error } = await supabase.from("properties").delete().eq("id", property.id);
 
                           if (error) {
                             toast.error(error.message);
                             return;
                           }
 
-                          setProperties(
-                            properties.filter((p) => p.id !== property.id)
-                          );
-
+                          setProperties(properties.filter((p) => p.id !== property.id));
                           toast.success("Property deleted successfully!");
                         }}
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition"
+                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 font-semibold text-white transition hover:bg-red-700"
                       >
-                        ?? Delete
+                        <Trash2 size={16} /> Delete
                       </button>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>

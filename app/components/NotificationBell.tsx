@@ -20,24 +20,6 @@ export default function NotificationBell() {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    loadNotifications();
-
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   async function loadNotifications() {
     const {
       data: { user },
@@ -56,6 +38,24 @@ export default function NotificationBell() {
       setCount(data.filter((n) => !n.is_read).length);
     }
   }
+
+  useEffect(() => {
+    Promise.resolve().then(loadNotifications);
+
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <div className="relative" ref={dropdownRef}>

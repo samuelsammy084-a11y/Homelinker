@@ -95,7 +95,7 @@ export default function PostListingPage() {
 
     try {
       let imageUrl = "";
-      let imageUrls: string[] = [];
+      const imageUrls: string[] = [];
 
       // Upload Images
       if (images.length > 0) {
@@ -126,7 +126,7 @@ export default function PostListingPage() {
         imageUrl = imageUrls[0];
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("properties")
         .insert([
           {
@@ -203,12 +203,15 @@ export default function PostListingPage() {
       setTimeout(() => {
        router.push("/dashboard");
       }, 1800);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setPopup({
         show: true,
         type: "error",
         title: "Unexpected Error",
-        message: err.message,
+        message:
+          err instanceof Error
+            ? err.message
+            : String(err),
       });
     }
   }

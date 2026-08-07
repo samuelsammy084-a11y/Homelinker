@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { BedDouble, Bath, CarFront, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 
@@ -47,11 +48,13 @@ export default function PropertyCard({
 
   return (
     <div className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_12px_40px_-20px_rgba(17,17,17,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-20px_rgba(17,17,17,0.35)]">
-      <div className="relative overflow-hidden">
-        <img
+      <div className="relative h-72 w-full overflow-hidden">
+        <Image
           src={images[currentImage] || "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d"}
           alt={title}
-          className="h-72 w-full object-cover transition duration-500 group-hover:scale-105"
+          fill
+          className="object-cover transition duration-500 group-hover:scale-105"
+          unoptimized
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
 

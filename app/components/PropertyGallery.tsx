@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 
 type Props = {
@@ -23,12 +24,13 @@ export default function PropertyGallery({ images, altText = "Property image" }: 
   return (
     <div>
 
-      <div className="relative">
-
-        <img
+      <div className="relative h-[550px] w-full overflow-hidden rounded-3xl shadow-xl">
+        <Image
           src={images[current]}
           alt={altText}
-          className="w-full h-[550px] object-cover rounded-3xl shadow-xl"
+          fill
+          className="object-cover"
+          unoptimized
         />
 
         {images.length > 1 && (
@@ -55,16 +57,24 @@ export default function PropertyGallery({ images, altText = "Property image" }: 
         <div className="grid grid-cols-4 gap-4 mt-6">
 
           {images.map((image, index) => (
-            <img
+            <button
               key={index}
-              src={image}
+              type="button"
               onClick={() => setCurrent(index)}
-              className={`h-28 w-full object-cover rounded-xl cursor-pointer border-4 ${
+              className={`relative h-28 w-full overflow-hidden rounded-xl border-4 ${
                 current === index
                   ? "border-[#C9A227]"
                   : "border-transparent"
               }`}
-            />
+            >
+              <Image
+                src={image}
+                alt={`${altText} ${index + 1}`}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </button>
           ))}
 
         </div>

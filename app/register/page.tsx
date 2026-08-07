@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -87,11 +88,13 @@ export default function RegisterPage() {
           onClick={handleGoogleLogin}
           className="mt-8 w-full flex items-center justify-center gap-3 rounded-xl bg-[#C9A227] py-4 text-white font-bold hover:bg-[#A67C00]"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white">
-            <img
+          <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white">
+            <Image
               src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
               alt="Google"
-              className="h-5 w-5"
+              fill
+              className="h-5 w-5 p-1"
+              unoptimized
             />
           </div>
 

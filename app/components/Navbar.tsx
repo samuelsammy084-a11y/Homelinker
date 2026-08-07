@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -11,7 +12,7 @@ import NotificationBell from "./NotificationBell";
 export default function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     async function getUser() {
@@ -34,7 +35,11 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    setMenuOpen(false);
+    const timer = window.setTimeout(() => {
+      setMenuOpen(false);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [pathname]);
 
   async function handleLogout() {

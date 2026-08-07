@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { Heart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -12,7 +13,7 @@ type FavoriteButtonProps = {
 export default function FavoriteButton({ propertyId, className }: FavoriteButtonProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     async function loadState() {

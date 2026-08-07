@@ -1,31 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import type { Property } from "@/app/types/property";
 import { supabase } from "@/lib/supabase";
 import PropertyCard from "../components/PropertyCard";
 
 export default function FavoritesPage() {
-  const [properties, setProperties] = useState<any[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadFavorites();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        loadFavorites();
-      } else {
-        setProperties([]);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  async function loadFavorites() {
+  const loadFavorites = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -51,11 +35,28 @@ export default function FavoritesPage() {
     }
 
     const props =
-      data?.map((item: any) => item.properties).filter(Boolean) || [];
+      (data?.map((item: { properties?: Property }) => item.properties).filter(Boolean) as Property[]) || [];
 
     setProperties(props);
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    Promise.resolve().then(loadFavorites);
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        void loadFavorites();
+      } else {
+        setProperties([]);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadFavorites]);
 
   if (loading) {
     return (
@@ -89,7 +90,7 @@ export default function FavoritesPage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-3 gap-8">
-            {properties.map((property: any) => (
+            {properties.map((property: Property) => (
               <PropertyCard
                 key={property.id}
                 id={property.id}

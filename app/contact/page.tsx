@@ -9,7 +9,7 @@ export default function ContactPage() {
           </h1>
 
           <p className="text-slate-600 mt-4 text-lg">
-            We'd love to hear from you. Get in touch with our team.
+            We&apos;d love to hear from you. Get in touch with our team.
           </p>
         </div>
 

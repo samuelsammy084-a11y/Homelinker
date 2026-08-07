@@ -1,6 +1,24 @@
+import type { Metadata } from "next";
+import type { Property } from "@/app/types/property";
 import PropertyCard from "../components/PropertyCard";
 import PropertySearchBar from "../components/PropertySearchBar";
 import { getProperties } from "@/lib/getProperties";
+
+export const metadata: Metadata = {
+  title: "Browse Properties",
+  description:
+    "Browse rooms, apartments, houses and properties to rent or buy across South Africa on HomeLinker.",
+  alternates: {
+    canonical: "https://homelinker.co.za/properties",
+  },
+  openGraph: {
+    title: "Browse Properties | HomeLinker",
+    description:
+      "Browse rooms, apartments, houses and properties to rent or buy across South Africa.",
+    url: "https://homelinker.co.za/properties",
+    images: ["/og-image.jpg"],
+  },
+};
 
 type Props = {
   searchParams: Promise<{
@@ -10,7 +28,6 @@ type Props = {
     maxPrice?: string;
   }>;
 };
-
 export default async function PropertiesPage({
   searchParams,
 }: Props) {
@@ -21,7 +38,7 @@ export default async function PropertiesPage({
   // Filter by Province
   if (params.province) {
     properties = properties.filter(
-      (p: any) => p.province === params.province
+      (p: Property) => p.province === params.province
     );
   }
 
@@ -29,7 +46,7 @@ export default async function PropertiesPage({
   if (params.city) {
     const search = params.city.toLowerCase();
 
-    properties = properties.filter((p: any) =>
+    properties = properties.filter((p: Property) =>
       p.city?.toLowerCase().includes(search)
     );
   }
@@ -37,14 +54,14 @@ export default async function PropertiesPage({
   // Filter by Property Type
   if (params.type) {
     properties = properties.filter(
-      (p: any) => p.property_type === params.type
+      (p: Property) => p.property_type === params.type
     );
   }
 
   // Filter by Maximum Price
   if (params.maxPrice) {
     properties = properties.filter(
-      (p: any) => Number(p.price) <= Number(params.maxPrice)
+      (p: Property) => Number(p.price) <= Number(params.maxPrice)
     );
   }
 
@@ -80,7 +97,7 @@ export default async function PropertiesPage({
           </div>
         ) : (
           <div className="grid md:grid-cols-3 gap-8">
-            {properties.map((property: any) => (
+            {properties.map((property: Property) => (
               <PropertyCard
                 key={property.id}
                 id={property.id}

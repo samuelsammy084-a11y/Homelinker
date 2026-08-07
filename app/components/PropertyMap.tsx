@@ -4,7 +4,12 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+type LeafletIconPrototype = typeof L.Icon.Default.prototype & {
+  _getIconUrl?: () => void;
+};
+
+const defaultIcon = L.Icon.Default.prototype as LeafletIconPrototype;
+delete defaultIcon._getIconUrl;
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:

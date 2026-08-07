@@ -10,7 +10,12 @@ import {
 import { useEffect } from "react";
 import L from "leaflet";
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+type LeafletIconPrototype = typeof L.Icon.Default.prototype & {
+  _getIconUrl?: string;
+};
+
+const defaultIcon = L.Icon.Default.prototype as LeafletIconPrototype;
+delete defaultIcon._getIconUrl;
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:

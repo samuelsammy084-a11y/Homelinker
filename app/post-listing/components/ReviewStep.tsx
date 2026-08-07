@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
+import Image from "next/image";
+
 type Props = {
   listingType: string;
   propertyType: string;
@@ -41,6 +44,17 @@ export default function ReviewStep({
   onBack,
   onPublish,
 }: Props) {
+  const imageUrls = useMemo(
+    () => images.map((image) => URL.createObjectURL(image)),
+    [images]
+  );
+
+  useEffect(() => {
+    return () => {
+      imageUrls.forEach(URL.revokeObjectURL);
+    };
+  }, [imageUrls]);
+
   return (
     <div className="rounded-[32px] border border-[#E8D9A8] bg-white p-10 shadow-xl">
 
@@ -150,14 +164,18 @@ export default function ReviewStep({
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
 
             {images.map((image, index) => (
-
-              <img
+              <div
                 key={index}
-                src={URL.createObjectURL(image)}
-                alt={`Property ${index + 1}`}
-                className="h-40 w-full rounded-2xl border border-[#E8D9A8] object-cover shadow-md"
-              />
-
+                className="relative h-40 w-full overflow-hidden rounded-2xl border border-[#E8D9A8] shadow-md"
+              >
+                <Image
+                  src={imageUrls[index]}
+                  alt={`Property ${index + 1}`}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
             ))}
 
           </div>

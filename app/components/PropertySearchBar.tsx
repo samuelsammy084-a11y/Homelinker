@@ -52,42 +52,29 @@ function PropertySearchBarContent({
 
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  const initialListingType =
+    (searchParams.get("listingType") as "rent" | "sale") || "rent";
+  const initialProvince = searchParams.get("province") ?? "";
+  const initialCity = searchParams.get("city") ?? "";
+  const initialType = searchParams.get("type") ?? "";
+  const initialBudget = searchParams.get("maxPrice") ?? "";
+
   const [listingType, setListingType] = useState<"rent" | "sale">(
-    (searchParams.get("listingType") as "rent" | "sale") || "rent"
+    initialListingType
   );
 
-  const [province, setProvince] = useState(
-    searchParams.get("province") ?? ""
-  );
-
-  const [city, setCity] = useState(
-    searchParams.get("city") ?? ""
-  );
-
-  const [type, setType] = useState(
-    searchParams.get("type") ?? ""
-  );
-
-  const [budget, setBudget] = useState(
-    searchParams.get("maxPrice") ?? ""
-  );
+  const [province, setProvince] = useState(initialProvince);
+  const [city, setCity] = useState(initialCity);
+  const [type, setType] = useState(initialType);
+  const [budget, setBudget] = useState(initialBudget);
 
   const [showSuggestions, setShowSuggestions] =
     useState(false);
-const suggestions = southAfricanCities.filter((item) =>
-  item.city.toLowerCase().includes(city.toLowerCase())
-);
-  useEffect(() => {
-    setListingType(
-      (searchParams.get("listingType") as "rent" | "sale") ||
-        "rent"
-    );
 
-    setProvince(searchParams.get("province") ?? "");
-    setCity(searchParams.get("city") ?? "");
-    setType(searchParams.get("type") ?? "");
-    setBudget(searchParams.get("maxPrice") ?? "");
-  }, [searchParams]);
+  const suggestions = southAfricanCities.filter((item) =>
+    item.city.toLowerCase().includes(city.toLowerCase())
+  );
+
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

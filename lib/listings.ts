@@ -1,3 +1,4 @@
+import type { Property } from "@/app/types/property";
 import { supabase } from "./supabase";
 
 export async function uploadImages(images: File[]) {
@@ -22,7 +23,7 @@ export async function uploadImages(images: File[]) {
   return imageUrls;
 }
 
-export async function createDraftListing(data: any) {
+export async function createDraftListing(data: Partial<Property>) {
   const {
     data: { user },
   } = await supabase.auth.getUser();

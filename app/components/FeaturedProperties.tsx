@@ -1,11 +1,12 @@
 import PropertyCard from "./PropertyCard";
 import { getProperties } from "@/lib/getProperties";
+import type { Property } from "@/app/types/property";
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 export default async function FeaturedProperties() {
   const properties = await getProperties();
-  const featured = properties.filter((p: any) => p.featured);
+  const featured = properties.filter((p: Property) => Boolean(p.featured));
   const displayProperties = featured.length > 0 ? featured : properties.slice(0, 6);
 
   return (
@@ -34,7 +35,7 @@ export default async function FeaturedProperties() {
 
       <div className="rounded-[36px] border border-[#F0E7CF] bg-[#FFFDF8] p-4 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.18)] md:p-6">
         <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-          {displayProperties.map((property: any) => (
+          {displayProperties.map((property: Property) => (
             <PropertyCard
               key={property.id}
               id={property.id}
