@@ -9,9 +9,10 @@ type Notification = {
   id: string;
   title: string;
   message: string;
+  type: string;
   is_read: boolean;
   created_at: string;
-  conversation_id: string | null;
+  conversation_id?: string | null;
 };
 
 export default function NotificationBell() {
@@ -35,58 +36,28 @@ export default function NotificationBell() {
     const { data, error } = await supabase
       .from("notifications")
       .select(
-        "id, title, message, is_read, created_at, conversation_id"
+        "id, title, message, type, is_read, created_at, conversation_id"
       )
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (error) {
-      console.error(
-        "HomeLinker notification error:",
-        error
-      );
+      console.error("HomeLinker notification fetch error:", error);
       return;
     }
 
-    const notificationList = data ?? [];
-
-    setNotifications(notificationList);
+    setNotifications(data ?? []);
     setCount(
-      notificationList.filter(
+      (data ?? []).filter(
         (notification) => !notification.is_read
       ).length
     );
   }
 
-  async function markAsRead(notificationId: string) {
-    const { error } = await supabase
-      .from("notifications")
-      .update({ is_read: true })
-      .eq("id", notificationId);
-
-    if (error) {
-      console.error(
-        "HomeLinker mark notification read error:",
-        error
-      );
-      return;
-    }
-
-    setNotifications((current) =>
-      current.map((notification) =>
-        notification.id === notificationId
-          ? { ...notification, is_read: true }
-          : notification
-      )
-    );
-
-    setCount((current) => Math.max(0, current - 1));
-  }
-
   useEffect(() => {
-    let channel:
-      | ReturnType<typeof supabase.channel>
-      | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     async function setup() {
       const {
@@ -97,6 +68,10 @@ export default function NotificationBell() {
 
       await loadNotifications();
 
+      /*
+       * IMPORTANT:
+       * .on() MUST come BEFORE .subscribe()
+       */
       channel = supabase
         .channel(`notifications-${user.id}`)
         .on(
@@ -119,7 +94,12 @@ export default function NotificationBell() {
             setCount((current) => current + 1);
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log(
+            "HomeLinker notifications realtime:",
+            status
+          );
+        });
     }
 
     setup();
@@ -152,6 +132,28 @@ export default function NotificationBell() {
     };
   }, []);
 
+  async function markAsRead(notificationId: string) {
+    await supabase
+      .from("notifications")
+      .update({
+        is_read: true,
+      })
+      .eq("id", notificationId);
+
+    setNotifications((current) =>
+      current.map((notification) =>
+        notification.id === notificationId
+          ? {
+              ...notification,
+              is_read: true,
+            }
+          : notification
+      )
+    );
+
+    setCount((current) => Math.max(0, current - 1));
+  }
+
   return (
     <div
       ref={dropdownRef}
@@ -159,7 +161,7 @@ export default function NotificationBell() {
     >
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => setOpen((value) => !value)}
         className="relative rounded-full p-2 text-white transition hover:bg-[#222]"
         aria-label="Notifications"
       >
@@ -167,23 +169,17 @@ export default function NotificationBell() {
 
         {count > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-            {count > 9 ? "9+" : count}
+            {count > 99 ? "99+" : count}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-3 w-[calc(100vw-2rem)] max-w-96 overflow-hidden rounded-xl border border-gray-700 bg-[#111111] shadow-2xl">
-          <div className="flex items-center justify-between border-b border-gray-700 px-5 py-4">
+        <div className="absolute right-0 z-50 mt-3 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-gray-700 bg-[#111111] shadow-2xl">
+          <div className="border-b border-gray-700 px-5 py-4">
             <h3 className="text-lg font-bold text-white">
               Notifications
             </h3>
-
-            {count > 0 && (
-              <span className="rounded-full bg-red-500 px-2 py-1 text-xs font-bold text-white">
-                {count} new
-              </span>
-            )}
           </div>
 
           <div className="max-h-96 overflow-y-auto">
@@ -192,79 +188,51 @@ export default function NotificationBell() {
                 🎉 No notifications yet.
               </div>
             ) : (
-              notifications.map((notification) => {
-                const content = (
-                  <div
-                    className={`border-b border-gray-800 p-4 transition hover:bg-[#1a1a1a] ${
-                      !notification.is_read
-                        ? "bg-[#181818]"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1">
-                        <Bell
-                          size={18}
-                          className="text-[#C9A227]"
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-white">
-                          {notification.title}
-                        </p>
-
-                        <p className="mt-1 text-sm text-gray-300">
-                          {notification.message}
-                        </p>
-
-                        <p className="mt-2 text-xs text-gray-500">
-                          {new Date(
-                            notification.created_at
-                          ).toLocaleString("en-ZA")}
-                        </p>
-                      </div>
-
-                      {!notification.is_read && (
-                        <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#C9A227]" />
-                      )}
-                    </div>
-                  </div>
-                );
-
-                if (notification.conversation_id) {
-                  return (
-                    <Link
-                      key={notification.id}
-                      href={`/messages/${notification.conversation_id}`}
-                      onClick={() => {
-                        if (!notification.is_read) {
-                          markAsRead(notification.id);
-                        }
-
-                        setOpen(false);
-                      }}
-                    >
-                      {content}
-                    </Link>
-                  );
-                }
-
-                return (
+              notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`border-b border-gray-800 p-4 transition hover:bg-[#1a1a1a] ${
+                    !notification.is_read
+                      ? "bg-[#181818]"
+                      : ""
+                  }`}
+                >
                   <button
                     type="button"
-                    key={notification.id}
-                    className="block w-full text-left"
-                    onClick={() => {
-                      if (!notification.is_read) {
-                        markAsRead(notification.id);
-                      }
-                    }}
+                    onClick={() =>
+                      markAsRead(notification.id)
+                    }
+                    className="w-full text-left"
                   >
-                    {content}
+                    <p className="font-semibold text-white">
+                      {notification.title}
+                    </p>
+
+                    <p className="mt-1 text-sm text-gray-300">
+                      {notification.message}
+                    </p>
+
+                    <p className="mt-2 text-xs text-gray-500">
+                      {new Date(
+                        notification.created_at
+                      ).toLocaleString("en-ZA")}
+                    </p>
                   </button>
-                );
-              })
+
+                  {notification.type === "message" &&
+                    notification.conversation_id && (
+                      <Link
+                        href={`/messages/${notification.conversation_id}`}
+                        onClick={() =>
+                          markAsRead(notification.id)
+                        }
+                        className="mt-3 inline-block text-sm font-semibold text-[#C9A227] hover:underline"
+                      >
+                        Open message →
+                      </Link>
+                    )}
+                </div>
+              ))
             )}
           </div>
 
