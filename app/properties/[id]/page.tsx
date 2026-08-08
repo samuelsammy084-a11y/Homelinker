@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Property } from "@/app/types/property";
 import { redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { createPropertySlug, getPropertyIdFromSlug } from "@/lib/property-slug";
@@ -7,6 +8,7 @@ import PropertyGallery from "@/app/components/PropertyGallery";
 import PropertyMap from "@/app/components/PropertyMap";
 import FavoriteButton from "@/app/components/FavoriteButton";
 import ReportListingButton from "@/app/components/ReportListingButton";
+import ContactOwner from "@/app/components/ContactOwner";
 
 type Props = {
   params: Promise<{
@@ -14,7 +16,7 @@ type Props = {
   }>;
 };
 
-async function getPropertyBySlugOrId(slug: string) {
+async function getPropertyBySlugOrId(slug: string): Promise<Property | null> {
   const numericId = getPropertyIdFromSlug(slug);
 
   const query = supabase
@@ -30,11 +32,7 @@ async function getPropertyBySlugOrId(slug: string) {
     return null;
   }
 
-  if (property) {
-    return property;
-  }
-
-  return null;
+  return property as Property | null;
 }
 
 export async function generateMetadata({
@@ -268,34 +266,16 @@ export default async function PropertyDetails({ params }: Props) {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-4 mt-12">
-          {property.contact_number ? (
-            <>
-              <a
-                href={`tel:${property.contact_number}`}
-                className="bg-[#C9A227] text-white px-8 py-4 rounded-xl font-semibold"
-              >
-                📞 Call
-              </a>
+        <ContactOwner
+          propertyId={property.id}
+          title={property.title}
+          contactNumber={property.contact_number ?? null}
+          contactName={property.contact_name ?? property.owner_name ?? null}
+          ownerId={property.user_id ?? null}
+          createdAt={property.created_at ?? null}
+        />
 
-              <a
-                href={`https://wa.me/27${property.contact_number.replace(
-                  /^0/,
-                  ""
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-green-600 text-white px-8 py-4 rounded-xl font-semibold"
-              >
-                💬 WhatsApp
-              </a>
-            </>
-          ) : (
-            <div className="rounded-xl bg-yellow-100 px-8 py-4 font-semibold text-yellow-800">
-              Contact number not available yet
-            </div>
-          )}
-
+        <div className="mt-4">
           <Link
             href="/properties"
             className="border border-black text-black px-8 py-4 rounded-xl"
