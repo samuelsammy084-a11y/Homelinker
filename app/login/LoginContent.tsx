@@ -19,12 +19,13 @@ export default function LoginContent() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /**
-   * Redirect the user according to their HomeLinker role.
-   */
+  // --------------------------------------------------
+  // Redirect user according to their HomeLinker role
+  // --------------------------------------------------
+
   async function redirectByRole(
     userId: string,
-    requestedNext: string = "/dashboard"
+    requestedNext?: string
   ) {
     const { data: profile, error } = await supabase
       .from("profiles")
@@ -46,27 +47,21 @@ export default function LoginContent() {
 
     const role = profile?.role as Role | null;
 
-    /**
-     * Only allow safe internal paths.
-     */
+    // Only allow safe internal paths
     const safeNext =
+      requestedNext &&
       requestedNext.startsWith("/") &&
       !requestedNext.startsWith("//")
         ? requestedNext
-        : "/dashboard";
+        : null;
 
-    /**
-     * If another page specifically requested
-     * where the user should go, use that page.
-     */
-    if (safeNext !== "/dashboard") {
+    // If another page requested a specific destination
+    if (safeNext && safeNext !== "/dashboard") {
       router.replace(safeNext);
       return;
     }
 
-    /**
-     * Otherwise redirect based on account type.
-     */
+    // Otherwise redirect according to role
     switch (role) {
       case "home_seeker":
         router.replace("/properties");
@@ -86,35 +81,37 @@ export default function LoginContent() {
     }
   }
 
-  /**
-   * Complete Google OAuth login.
-   */
-  useEffect(() => {
-    const codeValue = searchParams.get("code");
+  // --------------------------------------------------
+  // Complete Google OAuth login
+  // --------------------------------------------------
 
-    // IMPORTANT:
-    // searchParams.get() can return null.
-    // We stop here before passing it anywhere.
-    if (typeof codeValue !== "string" || codeValue.length === 0) {
+  useEffect(() => {
+    /*
+     * IMPORTANT:
+     * searchParams.get() returns string | null.
+     *
+     * We convert it into a guaranteed string here.
+     */
+    const oauthCode = String(
+      searchParams.get("code") ?? ""
+    );
+
+    if (!oauthCode) {
       return;
     }
 
-    // From this point onward, code is guaranteed to be a string.
-    const code: string = codeValue;
-
-    const nextValue = searchParams.get("next");
-
-    const next: string =
-      typeof nextValue === "string" && nextValue.length > 0
-        ? nextValue
-        : "/dashboard";
+    const nextParam = String(
+      searchParams.get("next") ?? "/dashboard"
+    );
 
     async function completeOAuthLogin() {
       setLoading(true);
 
       try {
         const { data, error } =
-          await supabase.auth.exchangeCodeForSession(code);
+          await supabase.auth.exchangeCodeForSession(
+            oauthCode
+          );
 
         if (error) {
           console.error(
@@ -133,7 +130,10 @@ export default function LoginContent() {
           return;
         }
 
-        await redirectByRole(data.user.id, next);
+        await redirectByRole(
+          data.user.id,
+          nextParam
+        );
       } catch (error) {
         console.error(
           "HomeLinker OAuth completion error:",
@@ -153,9 +153,10 @@ export default function LoginContent() {
     void completeOAuthLogin();
   }, [searchParams]);
 
-  /**
-   * Start Google login.
-   */
+  // --------------------------------------------------
+  // Google login
+  // --------------------------------------------------
+
   async function handleGoogleLogin() {
     if (loading) {
       return;
@@ -208,9 +209,10 @@ export default function LoginContent() {
     }
   }
 
-  /**
-   * Email/password login.
-   */
+  // --------------------------------------------------
+  // Email/password login
+  // --------------------------------------------------
+
   async function handleLogin(
     e: React.FormEvent<HTMLFormElement>
   ) {
@@ -220,12 +222,24 @@ export default function LoginContent() {
       return;
     }
 
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail) {
+      alert("Please enter your email address.");
+      return;
+    }
+
+    if (!password) {
+      alert("Please enter your password.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { data, error } =
         await supabase.auth.signInWithPassword({
-          email: email.trim(),
+          email: cleanEmail,
           password,
         });
 
@@ -266,10 +280,14 @@ export default function LoginContent() {
     }
   }
 
+  // --------------------------------------------------
+  // Page
+  // --------------------------------------------------
+
   return (
     <main className="min-h-screen bg-[#F8F6F1] px-4 py-12">
-      <div className="mx-auto max-w-md">
-        <div className="rounded-3xl bg-white p-8 shadow-xl">
+      <div className="mx-auto flex min-h-[80vh] max-w-md items-center justify-center">
+        <div className="w-full rounded-[32px] border border-[#F0E7CF] bg-white p-8 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.25)]">
 
           {/* Logo */}
           <div className="flex justify-center">
@@ -305,6 +323,7 @@ export default function LoginContent() {
                 width={20}
                 height={20}
                 className="h-5 w-5"
+                unoptimized
               />
             </div>
 
@@ -390,7 +409,6 @@ export default function LoginContent() {
           {/* Register */}
           <p className="mt-8 text-center text-slate-600">
             Don&apos;t have an account?{" "}
-
             <Link
               href="/register"
               className="font-semibold text-[#C9A227] hover:underline"
@@ -398,7 +416,6 @@ export default function LoginContent() {
               Register
             </Link>
           </p>
-
         </div>
       </div>
     </main>
