@@ -6,6 +6,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+type Role =
+  | "home_seeker"
+  | "property_owner"
+  | "estate_agent";
+
 export default function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -14,137 +19,387 @@ export default function LoginContent() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const code = searchParams.get("code");
-    const next = searchParams.get("next") || "/dashboard";
+  /**
+   * Redirect the user according to their HomeLinker role.
+   */
+  async function redirectByRole(
+    userId: string,
+    requestedNext: string = "/dashboard"
+  ) {
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
 
-    if (!code) return;
+    if (error) {
+      console.error("HomeLinker role lookup error:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+
+      router.replace("/dashboard");
+      return;
+    }
+
+    const role = profile?.role as Role | null;
+
+    /**
+     * Only allow safe internal paths.
+     */
+    const safeNext =
+      requestedNext.startsWith("/") &&
+      !requestedNext.startsWith("//")
+        ? requestedNext
+        : "/dashboard";
+
+    /**
+     * If another page specifically requested
+     * where the user should go, use that page.
+     */
+    if (safeNext !== "/dashboard") {
+      router.replace(safeNext);
+      return;
+    }
+
+    /**
+     * Otherwise redirect based on account type.
+     */
+    switch (role) {
+      case "home_seeker":
+        router.replace("/properties");
+        break;
+
+      case "property_owner":
+        router.replace("/dashboard");
+        break;
+
+      case "estate_agent":
+        router.replace("/dashboard");
+        break;
+
+      default:
+        router.replace("/properties");
+        break;
+    }
+  }
+
+  /**
+   * Complete Google OAuth login.
+   */
+  useEffect(() => {
+    const codeValue = searchParams.get("code");
+
+    // IMPORTANT:
+    // searchParams.get() can return null.
+    // We stop here before passing it anywhere.
+    if (typeof codeValue !== "string" || codeValue.length === 0) {
+      return;
+    }
+
+    // From this point onward, code is guaranteed to be a string.
+    const code: string = codeValue;
+
+    const nextValue = searchParams.get("next");
+
+    const next: string =
+      typeof nextValue === "string" && nextValue.length > 0
+        ? nextValue
+        : "/dashboard";
 
     async function completeOAuthLogin() {
-      if (!code) {
-        return;
-      }
-
       setLoading(true);
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      setLoading(false);
+
+      try {
+        const { data, error } =
+          await supabase.auth.exchangeCodeForSession(code);
+
+        if (error) {
+          console.error(
+            "HomeLinker Google OAuth error:",
+            error
+          );
+
+          alert(error.message);
+          return;
+        }
+
+        if (!data.user) {
+          alert(
+            "Google login completed, but your account could not be found."
+          );
+          return;
+        }
+
+        await redirectByRole(data.user.id, next);
+      } catch (error) {
+        console.error(
+          "HomeLinker OAuth completion error:",
+          error
+        );
+
+        alert(
+          error instanceof Error
+            ? error.message
+            : "Unable to complete Google login."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void completeOAuthLogin();
+  }, [searchParams]);
+
+  /**
+   * Start Google login.
+   */
+  async function handleGoogleLogin() {
+    if (loading) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const next = "/dashboard";
+
+      const redirectTo =
+        process.env.NODE_ENV === "development"
+          ? `http://localhost:3000/auth/callback?next=${encodeURIComponent(
+              next
+            )}`
+          : `https://homelinker.co.za/auth/callback?next=${encodeURIComponent(
+              next
+            )}`;
+
+      const { error } =
+        await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo,
+          },
+        });
 
       if (error) {
+        console.error(
+          "HomeLinker Google login error:",
+          error
+        );
+
+        alert(error.message);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error(
+        "HomeLinker Google login exception:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to start Google login."
+      );
+
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Email/password login.
+   */
+  async function handleLogin(
+    e: React.FormEvent<HTMLFormElement>
+  ) {
+    e.preventDefault();
+
+    if (loading) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+      if (error) {
+        console.error(
+          "HomeLinker login error:",
+          error
+        );
+
         alert(error.message);
         return;
       }
 
-      router.replace(next);
+      if (!data.user) {
+        alert(
+          "Login succeeded, but your account could not be found."
+        );
+        return;
+      }
+
+      await redirectByRole(
+        data.user.id,
+        "/dashboard"
+      );
+    } catch (error) {
+      console.error(
+        "HomeLinker login exception:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while signing in."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    void completeOAuthLogin();
-  }, [router, searchParams]);
-
-  async function handleGoogleLogin() {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo:
-          process.env.NODE_ENV === "development"
-            ? "http://localhost:3000/auth/callback?next=/dashboard"
-            : "https://homelinker.co.za/auth/callback?next=/dashboard",
-      },
-    });
-
-    if (error) {
-      alert(error.message);
-    }
-  }
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-
-    setLoading(true);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    router.push("/dashboard");
   }
 
   return (
-    <main className="min-h-screen bg-[#F8F6F1] flex items-center justify-center px-6 py-16">
-      <div className="w-full max-w-lg rounded-3xl bg-white p-10 shadow-2xl">
-        <h1 className="text-4xl font-bold text-center text-slate-900">Welcome Back</h1>
-        <p className="mt-3 text-center text-slate-600">Sign in to your HomeLinker account.</p>
+    <main className="min-h-screen bg-[#F8F6F1] px-4 py-12">
+      <div className="mx-auto max-w-md">
+        <div className="rounded-3xl bg-white p-8 shadow-xl">
 
-        <button
-          type="button"
-          onClick={handleGoogleLogin}
-          className="mt-8 w-full flex items-center justify-center gap-3 rounded-xl bg-[#C9A227] py-4 text-white font-bold transition-all duration-300 hover:bg-[#A67C00] hover:shadow-xl"
-        >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white">
+          {/* Logo */}
+          <div className="flex justify-center">
             <Image
-              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-              alt="Google"
-              width={20}
-              height={20}
-              className="h-5 w-5"
+              src="/images/logo/logo.png"
+              alt="HomeLinker Logo"
+              width={70}
+              height={70}
+              priority
             />
           </div>
-          Continue with Google
-        </button>
 
-        <div className="my-6 flex items-center">
-          <div className="flex-1 border-t border-gray-300"></div>
-          <span className="px-4 text-sm font-medium text-gray-500">OR</span>
-          <div className="flex-1 border-t border-gray-300"></div>
-        </div>
+          {/* Heading */}
+          <h1 className="mt-5 text-center text-4xl font-bold text-slate-900">
+            Welcome Back
+          </h1>
 
-        <form onSubmit={handleLogin} className="space-y-5">
-          <input
-            type="email"
-            placeholder="Email Address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-gray-300 p-4 text-black outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/20"
-            required
-          />
+          <p className="mt-3 text-center text-slate-600">
+            Sign in to your HomeLinker account.
+          </p>
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-gray-300 p-4 text-black outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/20"
-            required
-          />
+          {/* Google */}
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="mt-8 flex w-full items-center justify-center gap-3 rounded-xl bg-[#C9A227] py-4 font-bold text-white transition-all duration-300 hover:bg-[#A67C00] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white">
+              <Image
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                alt="Google"
+                width={20}
+                height={20}
+                className="h-5 w-5"
+              />
+            </div>
 
-          <div className="flex justify-end">
-            <Link href="/forgot-password" className="text-sm font-semibold text-[#C9A227] hover:underline">
-              Forgot Password?
-            </Link>
+            {loading
+              ? "Signing In..."
+              : "Continue with Google"}
+          </button>
+
+          {/* Divider */}
+          <div className="my-6 flex items-center">
+            <div className="flex-1 border-t border-gray-300" />
+
+            <span className="px-4 text-sm font-medium text-gray-500">
+              OR
+            </span>
+
+            <div className="flex-1 border-t border-gray-300" />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-slate-900 py-4 font-bold text-white transition hover:bg-black disabled:opacity-50"
+          {/* Login form */}
+          <form
+            onSubmit={handleLogin}
+            className="space-y-5"
           >
-            {loading ? "Signing In..." : "Sign In"}
-          </button>
-        </form>
+            {/* Email */}
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Email Address
+              </label>
 
-        <p className="mt-8 text-center text-slate-600">
-          Don&apos;t have an account?&nbsp;
-          <Link href="/register" className="font-semibold text-[#C9A227] hover:underline">
-            Register
-          </Link>
-        </p>
+              <input
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
+                className="w-full rounded-xl border border-gray-300 p-4 text-black outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/20"
+                required
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Password
+              </label>
+
+              <input
+                type="password"
+                placeholder="Your password"
+                value={password}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
+                className="w-full rounded-xl border border-gray-300 p-4 text-black outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/20"
+                required
+              />
+            </div>
+
+            {/* Forgot password */}
+            <div className="flex justify-end">
+              <Link
+                href="/forgot-password"
+                className="text-sm font-semibold text-[#C9A227] hover:underline"
+              >
+                Forgot Password?
+              </Link>
+            </div>
+
+            {/* Sign in */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-xl bg-slate-900 py-4 font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading
+                ? "Signing In..."
+                : "Sign In"}
+            </button>
+          </form>
+
+          {/* Register */}
+          <p className="mt-8 text-center text-slate-600">
+            Don&apos;t have an account?{" "}
+
+            <Link
+              href="/register"
+              className="font-semibold text-[#C9A227] hover:underline"
+            >
+              Register
+            </Link>
+          </p>
+
+        </div>
       </div>
     </main>
   );

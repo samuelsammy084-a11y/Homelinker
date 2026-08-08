@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import MessageThread from "@/app/components/MessageThread";
 import Link from "next/link";
+import { ArrowLeft, Home, ShieldCheck } from "lucide-react";
 
 type Message = {
   id: string;
@@ -27,31 +28,28 @@ export default function MessagesPageClient({
 }: {
   conversationId: string;
 }) {
-  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [conversation, setConversation] =
+    useState<Conversation | null>(null);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [loggedOut, setLoggedOut] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     async function loadConversation() {
       setLoading(true);
 
-      console.log(
-        "HomeLinker: Loading conversation:",
-        conversationId
-      );
-
       if (!conversationId || conversationId === "undefined") {
-        console.error(
-          "HomeLinker: Invalid conversation ID:",
-          conversationId
-        );
+        toast.error("Invalid conversation.");
         setLoading(false);
         return;
       }
 
       // --------------------------------------------------
-      // 1. Check logged-in user
+      // 1. Get logged-in user
       // --------------------------------------------------
 
       const {
@@ -60,10 +58,7 @@ export default function MessagesPageClient({
       } = await supabase.auth.getUser();
 
       if (authError) {
-        console.error(
-          "HomeLinker auth error:",
-          authError.message
-        );
+        console.error("HomeLinker auth error:", authError);
 
         toast.error("Unable to verify your login.");
         setLoading(false);
@@ -78,13 +73,10 @@ export default function MessagesPageClient({
         return;
       }
 
-      console.log(
-        "HomeLinker: Current user:",
-        user.id
-      );
+      setCurrentUserId(user.id);
 
       // --------------------------------------------------
-      // 2. Fetch conversation
+      // 2. Load conversation
       // --------------------------------------------------
 
       const {
@@ -101,12 +93,7 @@ export default function MessagesPageClient({
       if (conversationError) {
         console.error(
           "HomeLinker conversation fetch error:",
-          {
-            message: conversationError.message,
-            details: conversationError.details,
-            hint: conversationError.hint,
-            code: conversationError.code,
-          }
+          conversationError
         );
 
         toast.error(
@@ -119,23 +106,13 @@ export default function MessagesPageClient({
       }
 
       if (!conversationData) {
-        console.error(
-          "HomeLinker: Conversation does not exist or you do not have access:",
-          conversationId
-        );
-
         setConversation(null);
         setLoading(false);
         return;
       }
 
-      console.log(
-        "HomeLinker: Conversation loaded:",
-        conversationData
-      );
-
       // --------------------------------------------------
-      // 3. Verify participant
+      // 3. Make sure user belongs to conversation
       // --------------------------------------------------
 
       const isParticipant =
@@ -144,7 +121,7 @@ export default function MessagesPageClient({
 
       if (!isParticipant) {
         console.error(
-          "HomeLinker: User is not a participant in this conversation."
+          "HomeLinker: User is not a participant."
         );
 
         setConversation(null);
@@ -153,7 +130,7 @@ export default function MessagesPageClient({
       }
 
       // --------------------------------------------------
-      // 4. Fetch messages separately
+      // 4. Load messages
       // --------------------------------------------------
 
       const {
@@ -172,12 +149,7 @@ export default function MessagesPageClient({
       if (messageError) {
         console.error(
           "HomeLinker messages fetch error:",
-          {
-            message: messageError.message,
-            details: messageError.details,
-            hint: messageError.hint,
-            code: messageError.code,
-          }
+          messageError
         );
 
         toast.error(
@@ -188,11 +160,6 @@ export default function MessagesPageClient({
         setLoading(false);
         return;
       }
-
-      console.log(
-        "HomeLinker: Messages loaded:",
-        messageData
-      );
 
       setConversation(conversationData);
       setMessages(messageData ?? []);
@@ -208,11 +175,15 @@ export default function MessagesPageClient({
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#F8F6F1] px-6 py-16">
-        <div className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-          <p className="text-lg font-semibold text-black">
-            Loading conversation...
-          </p>
+      <main className="min-h-screen bg-[#F8F6F1] px-4 py-10">
+        <div className="mx-auto flex min-h-[60vh] max-w-4xl items-center justify-center">
+          <div className="rounded-2xl border border-slate-200 bg-white px-8 py-6 text-center shadow-sm">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#C9A227]" />
+
+            <p className="mt-4 font-semibold text-black">
+              Loading conversation...
+            </p>
+          </div>
         </div>
       </main>
     );
@@ -224,84 +195,112 @@ export default function MessagesPageClient({
 
   if (loggedOut) {
     return (
-      <main className="min-h-screen bg-[#F8F6F1] px-6 py-16">
-        <div className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-          <h1 className="text-3xl font-bold text-black">
-            Please log in
-          </h1>
+      <main className="min-h-screen bg-[#F8F6F1] px-4 py-10">
+        <div className="mx-auto flex min-h-[60vh] max-w-lg items-center justify-center">
+          <div className="w-full rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <h1 className="text-2xl font-bold text-black">
+              Please log in
+            </h1>
 
-          <p className="mt-3 text-slate-600">
-            You must be logged in to view your conversations.
-          </p>
+            <p className="mt-3 text-slate-600">
+              You must be logged in to view your conversations.
+            </p>
 
-          <Link
-            href="/login"
-            className="mt-6 inline-flex rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black"
-          >
-            Log in
-          </Link>
+            <Link
+              href="/login"
+              className="mt-6 inline-flex rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black transition hover:bg-[#b89520]"
+            >
+              Log in
+            </Link>
+          </div>
         </div>
       </main>
     );
   }
 
   // --------------------------------------------------
-  // Conversation not found / inaccessible
+  // Conversation not found
   // --------------------------------------------------
 
   if (!conversation) {
     return (
-      <main className="min-h-screen bg-[#F8F6F1] px-6 py-16">
-        <div className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-          <h1 className="text-3xl font-bold text-black">
-            Conversation not found
-          </h1>
+      <main className="min-h-screen bg-[#F8F6F1] px-4 py-10">
+        <div className="mx-auto flex min-h-[60vh] max-w-lg items-center justify-center">
+          <div className="w-full rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <h1 className="text-2xl font-bold text-black">
+              Conversation not found
+            </h1>
 
-          <p className="mt-3 text-slate-600">
-            You can only view conversations you are part of.
-          </p>
+            <p className="mt-3 text-slate-600">
+              You can only view conversations you are part of.
+            </p>
 
-          <Link
-            href="/properties"
-            className="mt-6 inline-flex rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black"
-          >
-            Back to properties
-          </Link>
+            <Link
+              href="/properties"
+              className="mt-6 inline-flex rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black transition hover:bg-[#b89520]"
+            >
+              Back to properties
+            </Link>
+          </div>
         </div>
       </main>
     );
   }
 
-  // --------------------------------------------------
-  // Conversation
-  // --------------------------------------------------
+  const isOwner = currentUserId === conversation.owner_id;
+
+  const otherPersonLabel = isOwner
+    ? "Buyer"
+    : "Property Owner";
 
   return (
-    <main className="min-h-screen bg-[#F8F6F1] px-6 py-10">
+    <main className="min-h-screen bg-[#F8F6F1] px-3 py-6 sm:px-6">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6">
-          <Link
-            href="/dashboard"
-            className="text-sm font-semibold text-[#C9A227] hover:underline"
-          >
-            ← Back to dashboard
-          </Link>
+        {/* Back button */}
+        <Link
+          href="/messages"
+          className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-[#9F7D0A] transition hover:text-black"
+        >
+          <ArrowLeft size={17} />
+          Back to messages
+        </Link>
+
+        {/* Chat header */}
+        <div className="overflow-hidden rounded-t-3xl border border-slate-200 bg-black shadow-sm">
+          <div className="flex items-center gap-4 px-5 py-4 sm:px-6">
+            {/* Icon */}
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#C9A227] text-black">
+              <Home size={22} />
+            </div>
+
+            {/* Conversation details */}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-[#C9A227]">
+                Property enquiry
+              </p>
+
+              <h1 className="truncate text-lg font-bold text-white sm:text-xl">
+                {conversation.property_title ||
+                  "Property conversation"}
+              </h1>
+
+              <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                <ShieldCheck size={13} />
+
+                <span>
+                  Chatting with {otherPersonLabel}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-medium text-slate-500">
-            Conversation about
-          </p>
-
-          <h1 className="mt-1 text-2xl font-bold text-black">
-            {conversation.property_title ||
-              "Property conversation"}
-          </h1>
-        </div>
-
+        {/* Chat */}
         <MessageThread
           conversationId={conversation.id}
           initialMessages={messages}
+          currentUserId={currentUserId}
+          otherPersonLabel={otherPersonLabel}
         />
       </div>
     </main>

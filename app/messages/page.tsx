@@ -1,5 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Conversation = {
@@ -13,71 +15,245 @@ type Conversation = {
   last_message_at?: string | null;
 };
 
-export default async function MessagesPage() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function MessagesPage() {
+  const [userId, setUserId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  if (!user) {
-    redirect("/login");
-  }
+  useEffect(() => {
+    let mounted = true;
 
-  const { data: conversations, error } = await supabase
-    .from("conversations")
-    .select(
-      "id, property_id, property_title, owner_id, buyer_id, created_at, last_message, last_message_at"
-    )
-    .or(`buyer_id.eq.${user.id},owner_id.eq.${user.id}`)
-    .order("last_message_at", {
-      ascending: false,
-      nullsFirst: false,
-    })
-    .order("created_at", {
-      ascending: false,
+    async function loadMessages() {
+      setLoading(true);
+      setErrorMessage("");
+
+      try {
+        // --------------------------------------------------
+        // 1. Get the currently logged-in browser user
+        // --------------------------------------------------
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) {
+          console.error("HomeLinker messages auth error:", authError);
+          throw new Error("Unable to verify your login.");
+        }
+
+        if (!user) {
+          if (mounted) {
+            setUserId(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (mounted) {
+          setUserId(user.id);
+        }
+
+        console.log(
+          "HomeLinker Messages - logged in user:",
+          user.id
+        );
+
+        // --------------------------------------------------
+        // 2. Get conversations where user is buyer OR owner
+        // --------------------------------------------------
+
+        const { data, error } = await supabase
+          .from("conversations")
+          .select(
+            "id, property_id, property_title, owner_id, buyer_id, created_at, last_message, last_message_at"
+          )
+          .or(
+            `buyer_id.eq.${user.id},owner_id.eq.${user.id}`
+          )
+          .order("last_message_at", {
+            ascending: false,
+            nullsFirst: false,
+          })
+          .order("created_at", {
+            ascending: false,
+          });
+
+        if (error) {
+          console.error(
+            "HomeLinker messages inbox error:",
+            {
+              message: error.message,
+              details: error.details,
+              hint: error.hint,
+              code: error.code,
+            }
+          );
+
+          throw new Error(
+            error.message || "Unable to load your messages."
+          );
+        }
+
+        console.log(
+          "HomeLinker Messages - conversations:",
+          data
+        );
+
+        if (mounted) {
+          setConversations(data ?? []);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error(
+          "HomeLinker Messages - unexpected error:",
+          error
+        );
+
+        if (mounted) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Unable to load messages."
+          );
+          setLoading(false);
+        }
+      }
+    }
+
+    loadMessages();
+
+    // --------------------------------------------------
+    // 3. Keep inbox updated when auth changes
+    // --------------------------------------------------
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      loadMessages();
     });
 
-  if (error) {
-    console.error("HomeLinker messages inbox error:", {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-    });
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // --------------------------------------------------
+  // Loading
+  // --------------------------------------------------
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#F8F6F1] px-4 py-12">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+            <div className="text-lg font-semibold text-slate-700">
+              Loading your messages...
+            </div>
+          </div>
+        </div>
+      </main>
+    );
   }
 
-  const conversationList: Conversation[] = conversations ?? [];
+  // --------------------------------------------------
+  // Not logged in
+  // --------------------------------------------------
 
-  return (
-    <main className="min-h-screen bg-[#F8F6F1]">
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-6 rounded-3xl border border-[#E8D8A5] bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-[#C9A227]">
-                HomeLinker
-              </p>
-
-              <h1 className="mt-1 text-4xl font-bold text-black">
-                Messages
-              </h1>
-
-              <p className="mt-2 text-slate-600">
-                All your property enquiries and conversations in one place.
-              </p>
+  if (!userId) {
+    return (
+      <main className="min-h-screen bg-[#F8F6F1] px-4 py-12">
+        <div className="mx-auto max-w-2xl">
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#C9A227]/10 text-3xl">
+              💬
             </div>
 
+            <h1 className="mt-5 text-3xl font-bold text-black">
+              Please log in
+            </h1>
+
+            <p className="mt-3 text-slate-600">
+              You must be logged in to view your messages.
+            </p>
+
             <Link
-              href="/properties"
-              className="inline-flex items-center justify-center rounded-xl bg-[#C9A227] px-5 py-3 font-semibold text-white transition hover:bg-[#b89520]"
+              href="/login"
+              className="mt-6 inline-flex rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black transition hover:bg-[#b89520]"
             >
-              Browse Properties
+              Log in
             </Link>
           </div>
         </div>
+      </main>
+    );
+  }
 
-        {/* Conversation list */}
-        {conversationList.length === 0 ? (
+  // --------------------------------------------------
+  // Error
+  // --------------------------------------------------
+
+  if (errorMessage) {
+    return (
+      <main className="min-h-screen bg-[#F8F6F1] px-4 py-12">
+        <div className="mx-auto max-w-2xl">
+          <div className="rounded-3xl border border-red-200 bg-white p-10 text-center shadow-sm">
+            <h1 className="text-2xl font-bold text-black">
+              Unable to load messages
+            </h1>
+
+            <p className="mt-3 text-red-600">
+              {errorMessage}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-6 rounded-xl bg-black px-6 py-3 font-semibold text-white"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // --------------------------------------------------
+  // Inbox
+  // --------------------------------------------------
+
+  return (
+    <main className="min-h-screen bg-[#F8F6F1] px-4 py-10">
+      <div className="mx-auto max-w-5xl">
+        {/* Header */}
+        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wider text-[#C9A227]">
+              HomeLinker
+            </p>
+
+            <h1 className="mt-1 text-4xl font-bold text-black">
+              Messages
+            </h1>
+
+            <p className="mt-2 text-slate-600">
+              All your property enquiries and conversations in one place.
+            </p>
+          </div>
+
+          <Link
+            href="/properties"
+            className="inline-flex items-center justify-center rounded-xl bg-[#C9A227] px-5 py-3 font-semibold text-black transition hover:bg-[#b89520]"
+          >
+            Browse Properties
+          </Link>
+        </div>
+
+        {/* Empty state */}
+        {conversations.length === 0 ? (
           <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#C9A227]/10 text-3xl">
               💬
@@ -88,13 +264,13 @@ export default async function MessagesPage() {
             </h2>
 
             <p className="mx-auto mt-2 max-w-md text-slate-600">
-              When you contact a property owner about a listing, your
+              When someone contacts you about a property, the
               conversation will appear here.
             </p>
 
             <Link
               href="/properties"
-              className="mt-6 inline-flex rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-white transition hover:bg-[#b89520]"
+              className="mt-6 inline-flex rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black transition hover:bg-[#b89520]"
             >
               Find a Property
             </Link>
@@ -103,32 +279,21 @@ export default async function MessagesPage() {
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             {/* List header */}
             <div className="border-b border-slate-200 px-6 py-5">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-bold text-black">
-                    Your Conversations
-                  </h2>
+              <h2 className="text-xl font-bold text-black">
+                Your Conversations
+              </h2>
 
-                  <p className="mt-1 text-sm text-slate-500">
-                    {conversationList.length} conversation
-                    {conversationList.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-
-                <Link
-                  href="/properties"
-                  className="hidden rounded-lg border border-[#C9A227] px-4 py-2 text-sm font-semibold text-[#9F7D0A] transition hover:bg-[#FFFDF8] sm:inline-flex"
-                >
-                  Find a Property
-                </Link>
-              </div>
+              <p className="mt-1 text-sm text-slate-500">
+                {conversations.length} conversation
+                {conversations.length === 1 ? "" : "s"}
+              </p>
             </div>
 
-            {/* Conversations */}
+            {/* Conversation list */}
             <div className="divide-y divide-slate-200">
-              {conversationList.map((conversation) => {
+              {conversations.map((conversation) => {
                 const isBuyer =
-                  conversation.buyer_id === user.id;
+                  conversation.buyer_id === userId;
 
                 const title =
                   conversation.property_title ||
@@ -154,7 +319,7 @@ export default async function MessagesPage() {
                         💬
                       </div>
 
-                      {/* Conversation information */}
+                      {/* Conversation */}
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                           <h3 className="truncate text-lg font-bold text-black">
@@ -164,28 +329,24 @@ export default async function MessagesPage() {
                           </h3>
 
                           <span className="shrink-0 text-xs font-medium text-slate-500">
-                            {new Date(messageDate).toLocaleString(
-                              "en-ZA",
-                              {
-                                dateStyle: "short",
-                                timeStyle: "short",
-                              }
-                            )}
+                            {new Date(
+                              messageDate
+                            ).toLocaleString("en-ZA", {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })}
                           </span>
                         </div>
 
-                        {/* Property */}
                         <p className="mt-1 truncate font-semibold text-[#C9A227]">
                           {title}
                         </p>
 
-                        {/* Message preview */}
                         <p className="mt-1 truncate text-sm text-slate-600">
                           {preview}
                         </p>
                       </div>
 
-                      {/* Arrow */}
                       <span className="mt-2 shrink-0 text-xl text-slate-400">
                         →
                       </span>
