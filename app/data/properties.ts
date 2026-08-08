@@ -1,6 +1,20 @@
-import { Property } from "../types/property";
+export type LegacyProperty = {
+  id: number;
+  title: string;
+  price: number;
+  location: string;
+  province: string;
+  city: string;
+  type: string;
+  images: string[];
+  bedrooms: number;
+  bathrooms: number;
+  parking: number;
+  featured: boolean;
+  verified: boolean;
+};
 
-const properties: Property[] = [
+const properties: LegacyProperty[] = [
   {
     id: 1,
     title: "Bachelor Apartment",
@@ -21,7 +35,6 @@ const properties: Property[] = [
     featured: true,
     verified: true,
   },
-
   {
     id: 2,
     title: "Modern Family Home",
@@ -42,7 +55,6 @@ const properties: Property[] = [
     featured: true,
     verified: true,
   },
-
   {
     id: 3,
     title: "Student Room",
@@ -63,7 +75,6 @@ const properties: Property[] = [
     featured: false,
     verified: true,
   },
-
   {
     id: 4,
     title: "Townhouse",
@@ -84,7 +95,6 @@ const properties: Property[] = [
     featured: true,
     verified: true,
   },
-
   {
     id: 5,
     title: "Luxury Apartment",
@@ -105,7 +115,6 @@ const properties: Property[] = [
     featured: true,
     verified: true,
   },
-
   {
     id: 6,
     title: "2 Bedroom House",

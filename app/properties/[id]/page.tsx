@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import type { Property } from "@/app/types/property";
 import { redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { createPropertySlug, getPropertyIdFromSlug } from "@/lib/property-slug";
+import {
+  createPropertySlug,
+  getPropertyIdFromSlug,
+} from "@/lib/property-slug";
 import Link from "next/link";
-import PropertyGallery from "@/app/components/PropertyGallery";
 import PropertyMap from "@/app/components/PropertyMap";
 import FavoriteButton from "@/app/components/FavoriteButton";
 import ReportListingButton from "@/app/components/ReportListingButton";
@@ -16,19 +18,19 @@ type Props = {
   }>;
 };
 
-async function getPropertyBySlugOrId(slug: string): Promise<Property | null> {
+async function getPropertyBySlugOrId(
+  slug: string
+): Promise<Property | null> {
   const numericId = getPropertyIdFromSlug(slug);
 
-  const query = supabase
+  const { data: property, error } = await supabase
     .from("properties")
     .select("*")
     .eq("id", numericId ?? -1)
     .maybeSingle();
 
-  const { data: property, error } = await query;
-
   if (error) {
-    console.error("Property fetch error", error);
+    console.error("Property fetch error:", error);
     return null;
   }
 
@@ -52,19 +54,34 @@ export async function generateMetadata({
   }
 
   const title = `${property.title} in ${property.city} | HomeLinker`;
+
   const description =
     property.description?.trim() ||
     `View this ${property.property_type} in ${property.city}, ${property.province}. See photos, price and contact details on HomeLinker.`;
+
+  const images = Array.isArray(property.image_urls)
+    ? property.image_urls.filter(
+        (url): url is string => typeof url === "string" && url.length > 0
+      )
+    : [];
+
   const image =
-    property.image_urls?.length > 0
-      ? property.image_urls[0]
+    images.length > 0
+      ? images[0]
       : property.image_url || "/og-image.jpg";
-  const canonicalSlug = createPropertySlug(property.title, property.city, property.id);
+
+  const canonicalSlug = createPropertySlug(
+    property.title,
+    property.city,
+    property.id
+  );
+
   const canonicalUrl = `https://homelinker.co.za/properties/${canonicalSlug}`;
 
   return {
     title,
     description,
+
     keywords: [
       property.title,
       property.city,
@@ -72,10 +89,15 @@ export async function generateMetadata({
       property.property_type,
       "HomeLinker",
       "South Africa property",
+      "property for rent South Africa",
+      "houses for rent South Africa",
+      "apartments for rent South Africa",
     ],
+
     alternates: {
       canonical: canonicalUrl,
     },
+
     openGraph: {
       title,
       description,
@@ -91,6 +113,7 @@ export async function generateMetadata({
         },
       ],
     },
+
     twitter: {
       card: "summary_large_image",
       title,
@@ -102,38 +125,74 @@ export async function generateMetadata({
 
 export default async function PropertyDetails({ params }: Props) {
   const { id } = await params;
+
   const property = await getPropertyBySlugOrId(id);
 
   if (!property) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#F8F6F1]">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-black">Property not found</h1>
-          <p className="mt-3 text-slate-600">The listing you requested could not be found.</p>
+      <main className="min-h-screen bg-[#F8F6F1] px-6 py-20">
+        <div className="mx-auto max-w-4xl text-center">
+          <h1 className="text-4xl font-bold text-black">
+            Property not found
+          </h1>
+
+          <p className="mt-4 text-lg text-gray-600">
+            The listing you requested could not be found.
+          </p>
+
+          <Link
+            href="/properties"
+            className="mt-8 inline-flex rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black transition hover:scale-105"
+          >
+            Browse Properties
+          </Link>
         </div>
       </main>
     );
   }
 
+  /*
+   * Property images
+   */
+  const propertyImages = Array.isArray(property.image_urls)
+    ? property.image_urls.filter(
+        (url): url is string => typeof url === "string" && url.length > 0
+      )
+    : [];
+
   const images =
-    property.image_urls?.length
-      ? property.image_urls
-      : [
-          property.image_url ||
-            "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
-        ];
-  const canonicalSlug = createPropertySlug(property.title, property.city, property.id);
+    propertyImages.length > 0
+      ? propertyImages
+      : [property.image_url || "/og-image.jpg"];
+
+  /*
+   * Canonical property URL
+   */
+  const canonicalSlug = createPropertySlug(
+    property.title,
+    property.city,
+    property.id
+  );
+
   const canonicalUrl = `https://homelinker.co.za/properties/${canonicalSlug}`;
 
+  /*
+   * Redirect old numeric/incorrect URLs to the canonical slug.
+   */
   if (id !== canonicalSlug) {
     redirect(canonicalUrl);
   }
 
+  /*
+   * Structured data for Google.
+   */
   const schema = {
     "@context": "https://schema.org",
+
     "@graph": [
       {
         "@type": "BreadcrumbList",
+
         itemListElement: [
           {
             "@type": "ListItem",
@@ -141,12 +200,14 @@ export default async function PropertyDetails({ params }: Props) {
             name: "Home",
             item: "https://homelinker.co.za",
           },
+
           {
             "@type": "ListItem",
             position: 2,
             name: "Properties",
             item: "https://homelinker.co.za/properties",
           },
+
           {
             "@type": "ListItem",
             position: 3,
@@ -155,12 +216,18 @@ export default async function PropertyDetails({ params }: Props) {
           },
         ],
       },
+
       {
         "@type": "Residence",
+
         name: property.title,
+
         description: property.description,
+
         image: images,
+
         url: canonicalUrl,
+
         address: {
           "@type": "PostalAddress",
           streetAddress: property.street_address,
@@ -168,14 +235,18 @@ export default async function PropertyDetails({ params }: Props) {
           addressRegion: property.province,
           addressCountry: "ZA",
         },
-        geo:
-          property.latitude && property.longitude
-            ? {
+
+        ...(property.latitude != null &&
+        property.longitude != null
+          ? {
+              geo: {
                 "@type": "GeoCoordinates",
                 latitude: property.latitude,
                 longitude: property.longitude,
-              }
-            : undefined,
+              },
+            }
+          : {}),
+
         offers: {
           "@type": "Offer",
           price: property.price,
@@ -185,6 +256,7 @@ export default async function PropertyDetails({ params }: Props) {
       },
     ],
   };
+
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
       <script
@@ -193,11 +265,9 @@ export default async function PropertyDetails({ params }: Props) {
           __html: JSON.stringify(schema),
         }}
       />
-      <div className="max-w-7xl mx-auto px-6 pt-10">
-        <PropertyGallery images={images} altText={property.title} />
-      </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-12">
+      <div className="mx-auto max-w-6xl px-6 py-12">
+        {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <h1 className="text-5xl font-bold text-black">
             {property.title}
@@ -213,6 +283,7 @@ export default async function PropertyDetails({ params }: Props) {
           </div>
         </div>
 
+        {/* Verification */}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           {property.verification_status === "verified" ? (
             <span className="rounded-full bg-green-600 px-3 py-1 text-sm font-semibold text-white">
@@ -231,72 +302,98 @@ export default async function PropertyDetails({ params }: Props) {
           ) : null}
         </div>
 
-        <p className="text-[#C9A227] text-4xl font-bold mt-4">
-          R{property.price.toLocaleString("en-ZA")} / month
+        {/* Price */}
+        <p className="mt-4 text-4xl font-bold text-[#C9A227]">
+          R{Number(property.price).toLocaleString("en-ZA")} / month
         </p>
 
+        {/* Location */}
         <div className="mt-3 space-y-1">
           <p className="text-lg font-medium text-[#1B1B1B]">
             📍 {property.street_address}
           </p>
 
-          <p className="text-[#1B1B1B]">
-            {property.suburb}
-          </p>
+          {property.suburb ? (
+            <p className="text-[#1B1B1B]">
+              {property.suburb}
+            </p>
+          ) : null}
 
           <p className="text-[#1B1B1B]">
             {property.city}, {property.province}
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-8 mt-10 text-lg text-black">
+        {/* Property details */}
+        <div className="mt-10 flex flex-wrap gap-8 text-lg text-black">
           <div>🛏 {property.bedrooms} Bedrooms</div>
+
           <div>🛁 {property.bathrooms} Bathrooms</div>
+
           <div>🚗 {property.parking} Parking</div>
+
           <div>🏠 {property.property_type}</div>
         </div>
 
+        {/* Description */}
         <div className="mt-12">
-          <h2 className="text-3xl font-bold text-black mb-4">
+          <h2 className="mb-4 text-3xl font-bold text-black">
             Description
           </h2>
 
-          <p className="text-black leading-8 text-lg">
+          <p className="text-lg leading-8 text-black">
             {property.description}
           </p>
         </div>
 
+        {/* Contact Owner */}
         <ContactOwner
           propertyId={property.id}
           title={property.title}
           contactNumber={property.contact_number ?? null}
-          contactName={property.contact_name ?? property.owner_name ?? null}
+          contactName={
+            property.contact_name ??
+            property.owner_name ??
+            null
+          }
           ownerId={property.user_id ?? null}
           createdAt={property.created_at ?? null}
         />
 
+        {/* Back */}
         <div className="mt-4">
           <Link
             href="/properties"
-            className="border border-black text-black px-8 py-4 rounded-xl"
+            className="inline-flex rounded-xl border border-black px-8 py-4 text-black transition hover:bg-black hover:text-white"
           >
             ← Back
           </Link>
         </div>
 
+        {/* Property details box */}
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-          <p className="font-semibold text-[#1B1B1B]">Property details</p>
-          <p className="mt-2">Location: {property.city}, {property.province}</p>
-          <p className="mt-1">Property type: {property.property_type}</p>
+          <p className="font-semibold text-[#1B1B1B]">
+            Property details
+          </p>
+
+          <p className="mt-2">
+            Location: {property.city}, {property.province}
+          </p>
+
+          <p className="mt-1">
+            Property type: {property.property_type}
+          </p>
         </div>
 
-        {property.latitude && property.longitude && (
+        {/* Map */}
+        {property.latitude != null &&
+        property.longitude != null ? (
           <PropertyMap
             latitude={property.latitude}
             longitude={property.longitude}
             title={property.title}
           />
-        )}
+        ) : null}
       </div>
     </main>
   );
