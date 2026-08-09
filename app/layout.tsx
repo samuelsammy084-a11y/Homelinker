@@ -79,7 +79,7 @@ export const metadata: Metadata = {
     siteName: "HomeLinker",
     title: "HomeLinker | South Africa's Property Marketplace",
     description:
-      "Find rooms, apartments, houses and properties to rent or buy across South Africa.",
+      "Find rooms, apartments, houses, flats and properties to rent or buy across South Africa.",
     images: [
       {
         url: "https://homelinker.co.za/og-image.png",
@@ -94,14 +94,21 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "HomeLinker | South Africa's Property Marketplace",
     description:
-      "Find rooms, apartments, houses and properties to rent or buy across South Africa.",
+      "Find rooms, apartments, houses, flats and properties to rent or buy across South Africa.",
     images: ["https://homelinker.co.za/og-image.png"],
   },
 
+  // HomeLinker logo / favicon
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
+    icon: [
+      {
+        url: "/icon.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
+    ],
+    shortcut: "/icon.png",
+    apple: "/icon.png",
   },
 
   category: "Real Estate",
@@ -117,7 +124,7 @@ export default function RootLayout({
       lang="en-ZA"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-screen bg-[#F8F6F1]">
         <Navbar />
 
         <main className="flex-1">{children}</main>
@@ -128,11 +135,11 @@ export default function RootLayout({
           closeButton
           duration={3000}
         />
-      </body>
 
-      <GoogleAnalytics
-        gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!}
-      />
+        <GoogleAnalytics
+          gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!}
+        />
+      </body>
     </html>
   );
 }
