@@ -18,15 +18,32 @@ type Props = {
   }>;
 };
 
+/*
+ * Some of these fields may exist in Supabase even though
+ * they are not currently included in the main Property type.
+ */
+type PropertyDetails = Property & {
+  street_address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  verification_status?: string | null;
+  contact_number?: string | null;
+  contact_name?: string | null;
+};
+
 async function getPropertyBySlugOrId(
   slug: string
-): Promise<Property | null> {
+): Promise<PropertyDetails | null> {
   const numericId = getPropertyIdFromSlug(slug);
+
+  if (numericId == null) {
+    return null;
+  }
 
   const { data: property, error } = await supabase
     .from("properties")
     .select("*")
-    .eq("id", numericId ?? -1)
+    .eq("id", numericId)
     .maybeSingle();
 
   if (error) {
@@ -34,7 +51,7 @@ async function getPropertyBySlugOrId(
     return null;
   }
 
-  return property as Property | null;
+  return property as PropertyDetails | null;
 }
 
 export async function generateMetadata({
@@ -57,11 +74,14 @@ export async function generateMetadata({
 
   const description =
     property.description?.trim() ||
-    `View this ${property.property_type} in ${property.city}, ${property.province}. See photos, price and contact details on HomeLinker.`;
+    `View this ${
+      property.property_type || "property"
+    } in ${property.city}, ${property.province}. See photos, price and contact details on HomeLinker.`;
 
   const images = Array.isArray(property.image_urls)
     ? property.image_urls.filter(
-        (url): url is string => typeof url === "string" && url.length > 0
+        (url): url is string =>
+          typeof url === "string" && url.length > 0
       )
     : [];
 
@@ -78,21 +98,23 @@ export async function generateMetadata({
 
   const canonicalUrl = `https://homelinker.co.za/properties/${canonicalSlug}`;
 
+  const keywords = [
+    property.title,
+    property.city,
+    property.province,
+    property.property_type,
+    "HomeLinker",
+    "South Africa property",
+    "property for rent South Africa",
+    "houses for rent South Africa",
+    "apartments for rent South Africa",
+  ].filter((keyword): keyword is string => Boolean(keyword));
+
   return {
     title,
     description,
 
-    keywords: [
-      property.title,
-      property.city,
-      property.province,
-      property.property_type,
-      "HomeLinker",
-      "South Africa property",
-      "property for rent South Africa",
-      "houses for rent South Africa",
-      "apartments for rent South Africa",
-    ],
+    keywords,
 
     alternates: {
       canonical: canonicalUrl,
@@ -123,7 +145,9 @@ export async function generateMetadata({
   };
 }
 
-export default async function PropertyDetails({ params }: Props) {
+export default async function PropertyDetails({
+  params,
+}: Props) {
   const { id } = await params;
 
   const property = await getPropertyBySlugOrId(id);
@@ -131,8 +155,8 @@ export default async function PropertyDetails({ params }: Props) {
   if (!property) {
     return (
       <main className="min-h-screen bg-[#F8F6F1] px-6 py-20">
-        <div className="mx-auto max-w-4xl text-center">
-          <h1 className="text-4xl font-bold text-black">
+        <div className="mx-auto max-w-4xl rounded-3xl bg-white p-12 text-center shadow-lg">
+          <h1 className="text-4xl font-black text-black">
             Property not found
           </h1>
 
@@ -154,16 +178,21 @@ export default async function PropertyDetails({ params }: Props) {
   /*
    * Property images
    */
-  const propertyImages = Array.isArray(property.image_urls)
+  const propertyImages = Array.isArray(
+    property.image_urls
+  )
     ? property.image_urls.filter(
-        (url): url is string => typeof url === "string" && url.length > 0
+        (url): url is string =>
+          typeof url === "string" && url.length > 0
       )
     : [];
 
   const images =
     propertyImages.length > 0
       ? propertyImages
-      : [property.image_url || "/og-image.jpg"];
+      : [
+          property.image_url || "/og-image.jpg",
+        ];
 
   /*
    * Canonical property URL
@@ -177,14 +206,30 @@ export default async function PropertyDetails({ params }: Props) {
   const canonicalUrl = `https://homelinker.co.za/properties/${canonicalSlug}`;
 
   /*
-   * Redirect old numeric/incorrect URLs to the canonical slug.
+   * Redirect old numeric/incorrect URLs
    */
   if (id !== canonicalSlug) {
     redirect(canonicalUrl);
   }
 
   /*
-   * Structured data for Google.
+   * Optional fields
+   */
+  const streetAddress =
+    property.street_address ||
+    property.address ||
+    "";
+
+  const contactNumber =
+    property.contact_number ?? null;
+
+  const contactName =
+    property.contact_name ??
+    property.owner_name ??
+    null;
+
+  /*
+   * Structured data for Google
    */
   const schema = {
     "@context": "https://schema.org",
@@ -222,7 +267,8 @@ export default async function PropertyDetails({ params }: Props) {
 
         name: property.title,
 
-        description: property.description,
+        description:
+          property.description || undefined,
 
         image: images,
 
@@ -230,7 +276,7 @@ export default async function PropertyDetails({ params }: Props) {
 
         address: {
           "@type": "PostalAddress",
-          streetAddress: property.street_address,
+          streetAddress: streetAddress,
           addressLocality: property.city,
           addressRegion: property.province,
           addressCountry: "ZA",
@@ -251,7 +297,8 @@ export default async function PropertyDetails({ params }: Props) {
           "@type": "Offer",
           price: property.price,
           priceCurrency: "ZAR",
-          availability: "https://schema.org/InStock",
+          availability:
+            "https://schema.org/InStock",
         },
       },
     ],
@@ -267,6 +314,7 @@ export default async function PropertyDetails({ params }: Props) {
       />
 
       <div className="mx-auto max-w-6xl px-6 py-12">
+
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <h1 className="text-5xl font-bold text-black">
@@ -279,13 +327,17 @@ export default async function PropertyDetails({ params }: Props) {
               className="rounded-full border border-[#E8D8A5] bg-white p-3 text-[#C9A227] shadow-sm transition hover:scale-105"
             />
 
-            <ReportListingButton propertyId={property.id} />
+            <ReportListingButton
+              propertyId={property.id}
+            />
           </div>
         </div>
 
         {/* Verification */}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          {property.verification_status === "verified" ? (
+          {property.verified ||
+          property.verification_status ===
+            "verified" ? (
             <span className="rounded-full bg-green-600 px-3 py-1 text-sm font-semibold text-white">
               ✔ Verified Property
             </span>
@@ -304,14 +356,22 @@ export default async function PropertyDetails({ params }: Props) {
 
         {/* Price */}
         <p className="mt-4 text-4xl font-bold text-[#C9A227]">
-          R{Number(property.price).toLocaleString("en-ZA")} / month
+          R
+          {Number(property.price).toLocaleString(
+            "en-ZA"
+          )}
+          {property.listing_type === "sale"
+            ? ""
+            : " / month"}
         </p>
 
         {/* Location */}
         <div className="mt-3 space-y-1">
-          <p className="text-lg font-medium text-[#1B1B1B]">
-            📍 {property.street_address}
-          </p>
+          {streetAddress ? (
+            <p className="text-lg font-medium text-[#1B1B1B]">
+              📍 {streetAddress}
+            </p>
+          ) : null}
 
           {property.suburb ? (
             <p className="text-[#1B1B1B]">
@@ -320,19 +380,30 @@ export default async function PropertyDetails({ params }: Props) {
           ) : null}
 
           <p className="text-[#1B1B1B]">
-            {property.city}, {property.province}
+            {property.city},{" "}
+            {property.province}
           </p>
         </div>
 
         {/* Property details */}
         <div className="mt-10 flex flex-wrap gap-8 text-lg text-black">
-          <div>🛏 {property.bedrooms} Bedrooms</div>
+          <div>
+            🛏 {property.bedrooms ?? 0} Bedrooms
+          </div>
 
-          <div>🛁 {property.bathrooms} Bathrooms</div>
+          <div>
+            🛁 {property.bathrooms ?? 0} Bathrooms
+          </div>
 
-          <div>🚗 {property.parking} Parking</div>
+          <div>
+            🚗 {property.parking ?? 0} Parking
+          </div>
 
-          <div>🏠 {property.property_type}</div>
+          <div>
+            🏠{" "}
+            {property.property_type ||
+              "Property"}
+          </div>
         </div>
 
         {/* Description */}
@@ -342,7 +413,8 @@ export default async function PropertyDetails({ params }: Props) {
           </h2>
 
           <p className="text-lg leading-8 text-black">
-            {property.description}
+            {property.description ||
+              "No description provided."}
           </p>
         </div>
 
@@ -350,18 +422,14 @@ export default async function PropertyDetails({ params }: Props) {
         <ContactOwner
           propertyId={property.id}
           title={property.title}
-          contactNumber={property.contact_number ?? null}
-          contactName={
-            property.contact_name ??
-            property.owner_name ??
-            null
-          }
+          contactNumber={contactNumber}
+          contactName={contactName}
           ownerId={property.user_id ?? null}
           createdAt={property.created_at ?? null}
         />
 
         {/* Back */}
-        <div className="mt-4">
+        <div className="mt-8">
           <Link
             href="/properties"
             className="inline-flex rounded-xl border border-black px-8 py-4 text-black transition hover:bg-black hover:text-white"
@@ -377,11 +445,14 @@ export default async function PropertyDetails({ params }: Props) {
           </p>
 
           <p className="mt-2">
-            Location: {property.city}, {property.province}
+            Location: {property.city},{" "}
+            {property.province}
           </p>
 
           <p className="mt-1">
-            Property type: {property.property_type}
+            Property type:{" "}
+            {property.property_type ||
+              "Property"}
           </p>
         </div>
 
@@ -394,6 +465,7 @@ export default async function PropertyDetails({ params }: Props) {
             title={property.title}
           />
         ) : null}
+
       </div>
     </main>
   );

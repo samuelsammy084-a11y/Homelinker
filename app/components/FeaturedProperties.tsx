@@ -9,11 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function FeaturedProperties() {
   const properties = await getProperties();
 
-  /*
-   * Only use real, valid properties.
-   * This prevents test listings or broken listings
-   * from appearing in the Popular Listings section.
-   */
+  // Only valid listings can appear here.
   const validProperties = properties.filter(
     (property: Property) =>
       property.id &&
@@ -21,18 +17,12 @@ export default async function FeaturedProperties() {
       Number(property.price) > 0
   );
 
-  /*
-   * Popular Listings are paid/promoted listings.
-   * Only properties marked as featured will appear here.
-   */
+  // Popular Listings = promoted/paid listings.
   const popularListings = validProperties.filter(
-    (property: Property) => Boolean(property.featured)
+    (property: Property) => property.is_promoted === true
   );
 
-  /*
-   * If nobody has paid/promoted a listing yet,
-   * don't show an empty section.
-   */
+  // Don't show the section if there are no promoted listings.
   if (popularListings.length === 0) {
     return null;
   }
@@ -71,10 +61,10 @@ export default async function FeaturedProperties() {
           </Link>
         </div>
 
-        {/* Popular Listings */}
+        {/* Popular listings container */}
         <div className="rounded-[28px] border border-[#F0E7CF] bg-[#FFFDF8] p-3 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.18)] sm:rounded-[36px] sm:p-6">
 
-          {/* MOBILE: 2 cards side-by-side + horizontal swipe */}
+          {/* Mobile */}
           <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
             {popularListings.map((property: Property) => (
               <div
@@ -98,7 +88,7 @@ export default async function FeaturedProperties() {
                   bedrooms={property.bedrooms ?? 0}
                   bathrooms={property.bathrooms ?? 0}
                   parking={property.parking ?? 0}
-                  featured={property.featured}
+                  featured={false}
                   verified={property.verified}
                 />
               </div>
@@ -114,7 +104,7 @@ export default async function FeaturedProperties() {
             </div>
           )}
 
-          {/* TABLET / DESKTOP */}
+          {/* Desktop */}
           <div className="hidden gap-6 sm:grid sm:grid-cols-2 xl:grid-cols-3">
             {popularListings.map((property: Property) => (
               <PropertyCard
@@ -135,7 +125,7 @@ export default async function FeaturedProperties() {
                 bedrooms={property.bedrooms ?? 0}
                 bathrooms={property.bathrooms ?? 0}
                 parking={property.parking ?? 0}
-                featured={property.featured}
+                featured={false}
                 verified={property.verified}
               />
             ))}
