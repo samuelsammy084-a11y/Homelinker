@@ -5,10 +5,14 @@ import { createPropertySlug } from "@/lib/property-slug";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://homelinker.co.za";
 
-  const { data: properties } = await supabase
+  const { data: properties, error } = await supabase
     .from("properties")
-    .select("id, title, city, updated_at")
-    .order("updated_at", { ascending: false });
+    .select("id, title, city, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Sitemap property fetch error:", error);
+  }
 
   const staticPages: MetadataRoute.Sitemap = [
     {
@@ -45,9 +49,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const propertyPages: MetadataRoute.Sitemap =
     properties?.map((property) => ({
-      url: `${baseUrl}/properties/${createPropertySlug(property.title, property.city, property.id)}`,
-      lastModified: property.updated_at
-        ? new Date(property.updated_at)
+      url: `${baseUrl}/properties/${createPropertySlug(
+        property.title,
+        property.city,
+        property.id
+      )}`,
+      lastModified: property.created_at
+        ? new Date(property.created_at)
         : new Date(),
       changeFrequency: "daily",
       priority: 0.8,
