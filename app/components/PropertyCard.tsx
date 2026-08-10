@@ -48,6 +48,10 @@ export default function PropertyCard({
           "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
         ];
 
+  const listingUrl = slug
+    ? `/properties/${slug}`
+    : `/properties/${id}`;
+
   const nextImage = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -67,41 +71,50 @@ export default function PropertyCard({
   };
 
   return (
-    <article className="group overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:rounded-[28px]">
+    <article className="group overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_10px_35px_-20px_rgba(0,0,0,0.35)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-22px_rgba(0,0,0,0.3)]">
       {/* IMAGE */}
-      <div className="relative aspect-[1.05/1] overflow-hidden bg-slate-100 sm:aspect-[4/3]">
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
+        <Image
+          src={safeImages[currentImage]}
+          alt={title}
+          fill
+          className="object-cover transition duration-500 group-hover:scale-[1.03]"
+          unoptimized
+        />
+
+        {/* Clickable image */}
         <Link
-          href={slug ? `/properties/${slug}` : `/properties/${id}`}
+          href={listingUrl}
           className="absolute inset-0 z-0"
+          aria-label={`View ${title}`}
         >
-          <Image
-            src={safeImages[currentImage]}
-            alt={title}
-            fill
-            sizes="(max-width: 639px) 50vw, (max-width: 1023px) 50vw, 33vw"
-            className="object-cover transition duration-500 group-hover:scale-105"
-            unoptimized
-          />
+          <span className="sr-only">
+            View {title}
+          </span>
         </Link>
 
+        {/* IMAGE OVERLAY */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+
         {/* BADGES */}
-        <div className="absolute left-2.5 top-2.5 z-10 flex max-w-[85%] flex-wrap gap-1.5 sm:left-4 sm:top-4 sm:gap-2">
+        <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-2">
           {featured && (
-            <span className="rounded-full bg-[#C9A227] px-2 py-1 text-[8px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.15em]">
+            <span className="rounded-full bg-[#C9A227] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-lg">
               Featured
             </span>
           )}
 
           {verified && (
-            <span className="rounded-full bg-emerald-600 px-2 py-1 text-[8px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.15em]">
+            <span className="rounded-full bg-emerald-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-lg">
               Verified
             </span>
           )}
         </div>
 
         {/* PHOTO COUNT */}
-        <div className="absolute bottom-2.5 right-2.5 z-10 rounded-full bg-white/90 px-2 py-1 text-[9px] font-bold text-[#1B1B1B] shadow backdrop-blur sm:bottom-4 sm:right-4 sm:px-3 sm:py-1.5 sm:text-sm">
-          {safeImages.length} photos
+        <div className="absolute bottom-3 right-3 z-10 rounded-full bg-black/65 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
+          {safeImages.length}{" "}
+          {safeImages.length === 1 ? "photo" : "photos"}
         </div>
 
         {/* IMAGE CONTROLS */}
@@ -110,95 +123,122 @@ export default function PropertyCard({
             <button
               type="button"
               onClick={prevImage}
-              className="absolute left-2 top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#1B1B1B] shadow transition hover:scale-110 sm:left-3 sm:h-9 sm:w-9"
+              className="absolute left-3 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-[#1B1B1B] shadow-lg transition hover:scale-110"
               aria-label="Show previous image"
             >
-              <ChevronLeft size={15} className="sm:h-[18px] sm:w-[18px]" />
+              <ChevronLeft size={18} />
             </button>
 
             <button
               type="button"
               onClick={nextImage}
-              className="absolute right-2 top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#1B1B1B] shadow transition hover:scale-110 sm:right-3 sm:h-9 sm:w-9"
+              className="absolute right-3 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-[#1B1B1B] shadow-lg transition hover:scale-110"
               aria-label="Show next image"
             >
-              <ChevronRight size={15} className="sm:h-[18px] sm:w-[18px]" />
+              <ChevronRight size={18} />
             </button>
           </>
+        )}
+
+        {/* IMAGE DOTS */}
+        {safeImages.length > 1 && (
+          <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1.5">
+            {safeImages.slice(0, 5).map((_, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCurrentImage(index);
+                }}
+                aria-label={`Show photo ${index + 1}`}
+                className={`h-1.5 rounded-full transition-all ${
+                  currentImage === index
+                    ? "w-5 bg-white"
+                    : "w-1.5 bg-white/60"
+                }`}
+              />
+            ))}
+          </div>
         )}
       </div>
 
       {/* CONTENT */}
-      <div className="p-2.5 sm:p-5 lg:p-6">
+      <div className="p-4 sm:p-5">
         {/* PRICE */}
-        <div>
-          <p className="text-lg font-black leading-tight text-[#C9A227] sm:text-2xl lg:text-3xl">
-            R{price.toLocaleString("en-ZA")}
-          </p>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-2xl font-black leading-none text-[#C9A227]">
+              R{Number(price).toLocaleString("en-ZA")}
+            </p>
 
-          <p className="mt-0.5 text-[9px] text-slate-500 sm:mt-1 sm:text-sm">
-            per month
-          </p>
+            <p className="mt-1 text-xs text-slate-500">
+              per month
+            </p>
+          </div>
         </div>
 
         {/* TITLE */}
-        <h2 className="mt-2 line-clamp-2 text-xs font-bold leading-4 text-[#1B1B1B] sm:mt-4 sm:text-lg sm:leading-6 lg:text-xl">
+        <h2 className="mt-4 line-clamp-2 min-h-[48px] text-lg font-bold leading-6 text-[#1B1B1B]">
           {title}
         </h2>
 
         {/* LOCATION */}
-        <p className="mt-1.5 flex min-w-0 items-center gap-1 text-[9px] leading-3 text-slate-600 sm:mt-2 sm:gap-2 sm:text-sm sm:leading-5">
+        <p className="mt-2 flex min-w-0 items-center gap-1.5 text-sm leading-5 text-slate-600">
           <MapPin
-            size={11}
-            className="shrink-0 text-[#C9A227] sm:h-[14px] sm:w-[14px]"
+            size={15}
+            className="shrink-0 text-[#C9A227]"
           />
 
-          <span className="line-clamp-1">{location}</span>
+          <span className="line-clamp-1">
+            {location}
+          </span>
         </p>
 
         {/* FEATURES */}
-        <div className="mt-2.5 grid grid-cols-3 gap-1.5 sm:mt-5 sm:gap-2.5">
-          <div className="rounded-xl bg-[#F8F6F1] py-2 text-center sm:rounded-2xl sm:py-3">
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-[#F8F6F1] px-2 py-3 text-center">
             <BedDouble
-              size={13}
-              className="mx-auto text-[#C9A227] sm:h-4 sm:w-4"
+              size={17}
+              className="mx-auto text-[#C9A227]"
             />
 
-            <p className="mt-1 text-xs font-bold text-[#1B1B1B] sm:mt-2 sm:text-base">
+            <p className="mt-1 text-sm font-bold text-[#1B1B1B]">
               {bedrooms}
             </p>
 
-            <p className="text-[7px] uppercase tracking-wide text-slate-500 sm:text-[10px] sm:tracking-[0.15em]">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Beds
             </p>
           </div>
 
-          <div className="rounded-xl bg-[#F8F6F1] py-2 text-center sm:rounded-2xl sm:py-3">
+          <div className="rounded-xl bg-[#F8F6F1] px-2 py-3 text-center">
             <Bath
-              size={13}
-              className="mx-auto text-[#C9A227] sm:h-4 sm:w-4"
+              size={17}
+              className="mx-auto text-[#C9A227]"
             />
 
-            <p className="mt-1 text-xs font-bold text-[#1B1B1B] sm:mt-2 sm:text-base">
+            <p className="mt-1 text-sm font-bold text-[#1B1B1B]">
               {bathrooms}
             </p>
 
-            <p className="text-[7px] uppercase tracking-wide text-slate-500 sm:text-[10px] sm:tracking-[0.15em]">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Baths
             </p>
           </div>
 
-          <div className="rounded-xl bg-[#F8F6F1] py-2 text-center sm:rounded-2xl sm:py-3">
+          <div className="rounded-xl bg-[#F8F6F1] px-2 py-3 text-center">
             <CarFront
-              size={13}
-              className="mx-auto text-[#C9A227] sm:h-4 sm:w-4"
+              size={17}
+              className="mx-auto text-[#C9A227]"
             />
 
-            <p className="mt-1 text-xs font-bold text-[#1B1B1B] sm:mt-2 sm:text-base">
+            <p className="mt-1 text-sm font-bold text-[#1B1B1B]">
               {parking}
             </p>
 
-            <p className="text-[7px] uppercase tracking-wide text-slate-500 sm:text-[10px] sm:tracking-[0.15em]">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Parking
             </p>
           </div>
@@ -206,8 +246,8 @@ export default function PropertyCard({
 
         {/* VIEW LISTING */}
         <Link
-          href={slug ? `/properties/${slug}` : `/properties/${id}`}
-          className="mt-2.5 block rounded-xl bg-[#C9A227] py-2.5 text-center text-[10px] font-bold text-white transition-all duration-300 hover:bg-[#A67C00] hover:shadow-lg sm:mt-5 sm:rounded-2xl sm:py-3.5 sm:text-sm lg:text-base"
+          href={listingUrl}
+          className="mt-5 flex items-center justify-center rounded-xl bg-[#C9A227] py-3 text-sm font-bold text-white transition hover:bg-[#A67C00] hover:shadow-lg"
         >
           View listing
         </Link>
