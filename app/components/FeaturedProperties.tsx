@@ -7,14 +7,29 @@ import { ArrowRight, Sparkles } from "lucide-react";
 export default async function FeaturedProperties() {
   const properties = await getProperties();
 
-  // Only show listings that you have marked as promoted.
-  // Maximum of 6 promoted listings are used in the carousel.
-  const promotedProperties = properties
-    .filter((property: Property) => property.is_promoted === true)
-    .slice(0, 6);
+  /*
+   * POPULAR LISTINGS
+   *
+   * If promoted listings exist, they get priority.
+   * Otherwise, use the existing listings so the section
+   * ALWAYS appears on the homepage.
+   *
+   * Maximum: 6 listings in the carousel.
+   */
+  const promotedProperties = properties.filter(
+    (property: Property) => property.is_promoted === true
+  );
 
-  // Nothing promoted = don't show the section.
-  if (promotedProperties.length === 0) {
+  const popularListings =
+    promotedProperties.length > 0
+      ? promotedProperties.slice(0, 6)
+      : properties.slice(0, 6);
+
+  /*
+   * Don't show an empty section if the database
+   * genuinely has no properties at all.
+   */
+  if (popularListings.length === 0) {
     return null;
   }
 
@@ -37,8 +52,7 @@ export default async function FeaturedProperties() {
             </h2>
 
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base sm:leading-7">
-              Discover selected properties promoted by HomeLinker.
-              These listings are placed here to help them get noticed faster.
+              Discover popular properties available on HomeLinker.
             </p>
           </div>
 
@@ -46,52 +60,57 @@ export default async function FeaturedProperties() {
             href="/properties"
             className="inline-flex w-fit items-center gap-2 text-sm font-bold text-[#C9A227] transition hover:gap-3 sm:text-base"
           >
-            View more listings
+            View more
             <ArrowRight size={17} />
           </Link>
         </div>
 
-        {/* Horizontal carousel */}
-        <div className="relative">
+        {/* HORIZONTAL LISTINGS */}
+        <div className="rounded-[28px] border border-[#F0E7CF] bg-[#FFFDF8] p-3 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.18)] sm:rounded-[36px] sm:p-6">
           <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {promotedProperties.map((property: Property) => (
-              <div
-                key={property.id}
-                className="
-                  w-[calc(33.333%-11px)]
-                  min-w-[calc(33.333%-11px)]
-                  shrink-0
-                  snap-start
-                  max-md:w-[calc(50%-8px)]
-                  max-md:min-w-[calc(50%-8px)]
-                  max-sm:w-[calc(50%-8px)]
-                  max-sm:min-w-[calc(50%-8px)]
-                "
-              >
-                <PropertyCard
-                  id={property.id}
-                  slug={property.slug}
-                  images={
-                    property.image_urls?.length
-                      ? property.image_urls
-                      : [
-                          property.image_url ||
-                            "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
-                        ]
-                  }
-                  price={property.price}
-                  title={property.title}
-                  location={`${property.city}, ${property.province}`}
-                  bedrooms={property.bedrooms ?? 0}
-                  bathrooms={property.bathrooms ?? 0}
-                  parking={property.parking ?? 0}
-                  featured={property.featured}
-                  verified={property.verified}
-                />
-              </div>
-            ))}
+            
+            {/* PROPERTY CARDS */}
+            {popularListings.map((property: Property) => {
+              const images =
+                property.image_urls?.length
+                  ? property.image_urls
+                  : [
+                      property.image_url ||
+                        "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
+                    ];
 
-            {/* View More card at the end */}
+              return (
+                <div
+                  key={property.id}
+                  className="
+                    w-[calc(33.333%-11px)]
+                    min-w-[calc(33.333%-11px)]
+                    shrink-0
+                    snap-start
+                    max-md:w-[calc(50%-8px)]
+                    max-md:min-w-[calc(50%-8px)]
+                    max-sm:w-[calc(50%-8px)]
+                    max-sm:min-w-[calc(50%-8px)]
+                  "
+                >
+                  <PropertyCard
+                    id={property.id}
+                    slug={property.slug}
+                    images={images}
+                    price={property.price}
+                    title={property.title}
+                    location={`${property.city}, ${property.province}`}
+                    bedrooms={property.bedrooms ?? 0}
+                    bathrooms={property.bathrooms ?? 0}
+                    parking={property.parking ?? 0}
+                    featured={property.featured}
+                    verified={property.verified}
+                  />
+                </div>
+              );
+            })}
+
+            {/* VIEW MORE CARD — ALWAYS AT THE END */}
             <div
               className="
                 w-[calc(33.333%-11px)]
@@ -117,22 +136,22 @@ export default async function FeaturedProperties() {
                 </h3>
 
                 <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">
-                  Browse all available properties on HomeLinker.
+                  See all available properties on HomeLinker.
                 </p>
 
                 <span className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#C9A227] px-5 py-3 font-bold text-black">
-                  View All Listings
+                  View Properties
                   <ArrowRight size={17} />
                 </span>
               </Link>
             </div>
           </div>
 
-          {/* Swipe hint */}
-          {promotedProperties.length > 3 && (
+          {/* SWIPE HINT */}
+          {popularListings.length > 3 && (
             <div className="mt-2 flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">
               <span>←</span>
-              Swipe to explore
+              Swipe right to see more
               <span>→</span>
             </div>
           )}
