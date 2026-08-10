@@ -10,23 +10,17 @@ type Props = {
   }>;
 };
 
-const cityNames: Record<string, string> = {
-  florida: "Florida",
-  roodepoort: "Roodepoort",
-  soweto: "Soweto",
-  johannesburg: "Johannesburg",
-  randburg: "Randburg",
-  pretoria: "Pretoria",
-};
+const BASE_URL = "https://homelinker.co.za";
 
 function getCityName(slug: string) {
-  return (
-    cityNames[slug.toLowerCase()] ||
-    slug
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
-  );
+  return slug
+    .trim()
+    .split("-")
+    .filter(Boolean)
+    .map(
+      (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    )
+    .join(" ");
 }
 
 export async function generateMetadata({
@@ -38,13 +32,15 @@ export async function generateMetadata({
   return {
     title: `Properties to Rent in ${cityName} | HomeLinker`,
     description: `Find rooms, apartments, houses and other properties to rent in ${cityName}, South Africa on HomeLinker.`,
+
     alternates: {
-      canonical: `https://homelinker.co.za/rent/${city.toLowerCase()}`,
+      canonical: `${BASE_URL}/rent/${city.toLowerCase()}`,
     },
+
     openGraph: {
       title: `Properties to Rent in ${cityName} | HomeLinker`,
       description: `Find rooms, apartments, houses and properties to rent in ${cityName}, South Africa.`,
-      url: `https://homelinker.co.za/rent/${city.toLowerCase()}`,
+      url: `${BASE_URL}/rent/${city.toLowerCase()}`,
       siteName: "HomeLinker",
       type: "website",
     },
@@ -58,19 +54,19 @@ export default async function CityRentPage({ params }: Props) {
   const allProperties = await getProperties();
 
   const properties = allProperties.filter((property: Property) => {
-    return (
-      property.city?.trim().toLowerCase() === cityName.trim().toLowerCase()
-    );
+    const propertyCity = property.city?.trim().toLowerCase();
+
+    return propertyCity === cityName.trim().toLowerCase();
   });
 
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
       {/* HERO */}
-      <section className="border-b border-[#E8D8A5] bg-[#FFFDF8]">
-        <div className="mx-auto max-w-7xl px-6 py-14 sm:py-20">
+      <section className="border-b border-[#E8D8A5] bg-gradient-to-b from-[#FFFDF8] to-[#F8F6F1]">
+        <div className="mx-auto max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
           <Link
             href="/properties"
-            className="text-sm font-semibold text-[#A67C00] hover:text-[#C9A227]"
+            className="inline-flex items-center text-sm font-bold text-[#A67C00] transition hover:text-[#C9A227]"
           >
             ← Browse all properties
           </Link>
