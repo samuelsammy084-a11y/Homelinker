@@ -16,9 +16,13 @@ export default function Hero() {
         }}
       />
 
-      <div className="absolute inset-0 bg-slate-950/35" />
+      {/* Dark overlay */}
+      <div className="absolute inset-0 bg-slate-950/45" />
 
-      <div className="relative z-10 mx-auto flex min-h-[92vh] max-w-7xl items-center justify-center px-4 py-12 text-center sm:px-6 sm:py-20 lg:px-8 lg:py-24">
+      {/* Extra mobile readability */}
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/20 via-slate-950/45 to-slate-950/80" />
+
+      <div className="relative z-10 mx-auto flex min-h-[78vh] max-w-7xl items-center justify-center px-4 py-10 text-center sm:min-h-[92vh] sm:px-6 sm:py-20 lg:px-8 lg:py-24">
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -26,53 +30,77 @@ export default function Hero() {
           className="w-full max-w-5xl"
         >
           {/* Trust badge */}
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#C9A227]/40 bg-[#C9A227]/10 px-3 py-1.5 text-xs font-semibold text-[#F8D36A] shadow-lg backdrop-blur sm:px-4 sm:py-2 sm:text-sm">
-            <ShieldCheck size={15} />
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#C9A227]/40 bg-black/25 px-3 py-1.5 text-[11px] font-semibold text-[#F8D36A] shadow-lg backdrop-blur-md sm:px-4 sm:py-2 sm:text-sm">
+            <ShieldCheck size={14} />
             Trusted rental marketplace in South Africa
           </div>
 
           {/* Heading */}
-          <h1 className="mt-5 text-4xl font-black leading-[1.05] tracking-tight text-white sm:mt-8 sm:text-6xl lg:text-7xl">
+          <h1 className="mx-auto mt-5 max-w-[360px] text-[2.45rem] font-black leading-[0.98] tracking-[-0.04em] text-white sm:mt-8 sm:max-w-4xl sm:text-6xl lg:text-7xl">
             Find your next home
-            <span className="mt-1 block text-[#F3C94B] sm:mt-3">
+            <span className="mt-2 block text-[#F3C94B] sm:mt-3">
               with confidence
             </span>
           </h1>
 
           {/* Description */}
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-200 sm:mt-6 sm:text-lg sm:leading-8">
-            Explore verified homes, rooms, and apartments that suit your budget
-            and lifestyle.
+          <p className="mx-auto mt-4 max-w-[340px] text-sm leading-6 text-slate-200 sm:mt-6 sm:max-w-2xl sm:text-lg sm:leading-8">
+            Find rooms, apartments and houses that match your budget and
+            lifestyle.
           </p>
 
-          {/* Feature pills */}
-          <div className="mt-5 flex gap-2 overflow-x-auto px-1 pb-1 sm:mt-8 sm:flex-wrap sm:justify-center sm:overflow-visible">
-            <span className="shrink-0 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-slate-100 backdrop-blur sm:px-3 sm:py-2 sm:text-sm">
+          {/* Mobile trust points */}
+          <div className="mx-auto mt-5 grid max-w-[360px] grid-cols-3 gap-2 sm:hidden">
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-2 py-2.5 backdrop-blur-md">
+              <ShieldCheck className="mx-auto mb-1.5 h-4 w-4 text-[#F3C94B]" />
+              <p className="text-[9px] font-semibold leading-3 text-white">
+                Trusted
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-2 py-2.5 backdrop-blur-md">
+              <MapPin className="mx-auto mb-1.5 h-4 w-4 text-[#F3C94B]" />
+              <p className="text-[9px] font-semibold leading-3 text-white">
+                South Africa
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-2 py-2.5 backdrop-blur-md">
+              <Sparkles className="mx-auto mb-1.5 h-4 w-4 text-[#F3C94B]" />
+              <p className="text-[9px] font-semibold leading-3 text-white">
+                Quality
+              </p>
+            </div>
+          </div>
+
+          {/* Desktop feature pills */}
+          <div className="mt-5 hidden gap-2 sm:mt-8 sm:flex sm:flex-wrap sm:justify-center">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-slate-100 backdrop-blur">
               Verified listings
             </span>
 
-            <span className="shrink-0 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-slate-100 backdrop-blur sm:px-3 sm:py-2 sm:text-sm">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-slate-100 backdrop-blur">
               Flexible budgets
             </span>
 
-            <span className="shrink-0 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-slate-100 backdrop-blur sm:px-3 sm:py-2 sm:text-sm">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-slate-100 backdrop-blur">
               Fast, simple search
             </span>
           </div>
 
           {/* Search */}
-          <div className="mt-6 rounded-2xl border border-white/15 bg-white/95 p-2.5 shadow-[0_25px_60px_-20px_rgba(0,0,0,0.55)] backdrop-blur sm:mt-10 sm:rounded-[30px] sm:p-4">
+          <div className="mx-auto mt-6 max-w-4xl rounded-[22px] border border-white/20 bg-white p-2 shadow-[0_25px_70px_-20px_rgba(0,0,0,0.65)] sm:mt-10 sm:rounded-[30px] sm:bg-white/95 sm:p-4">
             <PropertySearchBar />
           </div>
 
-          {/* Location / trust info */}
-          <div className="mt-5 flex gap-2 overflow-x-auto px-1 pb-1 text-xs text-slate-300 sm:mt-8 sm:flex-wrap sm:justify-center sm:overflow-visible sm:text-sm">
-            <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 backdrop-blur sm:py-2">
+          {/* Desktop location / trust information */}
+          <div className="mt-5 hidden gap-2 text-sm text-slate-300 sm:mt-8 sm:flex sm:flex-wrap sm:justify-center">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 backdrop-blur">
               <MapPin size={14} />
               Available across South Africa
             </span>
 
-            <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 backdrop-blur sm:py-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 backdrop-blur">
               <Sparkles size={14} />
               Curated by quality and trust
             </span>
