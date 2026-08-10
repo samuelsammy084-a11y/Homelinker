@@ -4,22 +4,48 @@ import type { Property } from "@/app/types/property";
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function FeaturedProperties() {
   const properties = await getProperties();
 
-  const featured = properties.filter((p: Property) => Boolean(p.featured));
+  /*
+   * Only show valid properties.
+   * This prevents old/test listings with invalid data
+   * such as R0 or empty titles from appearing.
+   */
+  const validProperties = properties.filter(
+    (property: Property) =>
+      property.id &&
+      property.title?.trim() &&
+      Number(property.price) > 0
+  );
 
-  const displayProperties =
-    featured.length > 0 ? featured : properties.slice(0, 6);
+  /*
+   * Featured section:
+   * ONLY properties explicitly marked as featured.
+   */
+  const featured = validProperties.filter(
+    (property: Property) => Boolean(property.featured)
+  );
+
+  /*
+   * Do NOT fall back to random properties here.
+   * If there are no featured properties, the section
+   * simply won't display any property cards.
+   */
+  if (featured.length === 0) {
+    return null;
+  }
 
   return (
-    <section className="bg-[#F8F6F1] px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-      <div className="mx-auto max-w-7xl">
+    <section className="py-10 sm:py-14 lg:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section heading */}
-        <div className="mb-7 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-7 flex flex-col gap-5 sm:mb-10 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#C9A227]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.15em] text-[#A67C00]">
-              <Sparkles size={14} />
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#C9A227]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-[#A67C00] sm:text-xs">
+              <Sparkles size={13} />
               Featured
             </div>
 
@@ -47,10 +73,10 @@ export default async function FeaturedProperties() {
 
         {/* Properties */}
         <div className="rounded-[28px] border border-[#F0E7CF] bg-[#FFFDF8] p-3 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.18)] sm:rounded-[36px] sm:p-6">
-          
-          {/* MOBILE: horizontal carousel, 2 cards visible */}
+
+          {/* MOBILE: horizontal carousel */}
           <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
-            {displayProperties.map((property: Property) => (
+            {featured.map((property: Property) => (
               <div
                 key={property.id}
                 className="w-[calc(50%-6px)] min-w-[calc(50%-6px)] shrink-0 snap-start"
@@ -66,7 +92,7 @@ export default async function FeaturedProperties() {
                             "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
                         ]
                   }
-                  price={property.price}
+                  price={Number(property.price)}
                   title={property.title}
                   location={`${property.city}, ${property.province}`}
                   bedrooms={property.bedrooms ?? 0}
@@ -80,7 +106,7 @@ export default async function FeaturedProperties() {
           </div>
 
           {/* MOBILE swipe hint */}
-          {displayProperties.length > 2 && (
+          {featured.length > 2 && (
             <div className="mt-2 flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400 sm:hidden">
               <span>←</span>
               Swipe to explore
@@ -90,7 +116,7 @@ export default async function FeaturedProperties() {
 
           {/* TABLET / DESKTOP */}
           <div className="hidden gap-6 sm:grid sm:grid-cols-2 xl:grid-cols-3">
-            {displayProperties.map((property: Property) => (
+            {featured.map((property: Property) => (
               <PropertyCard
                 key={property.id}
                 id={property.id}
@@ -103,7 +129,7 @@ export default async function FeaturedProperties() {
                           "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
                       ]
                 }
-                price={property.price}
+                price={Number(property.price)}
                 title={property.title}
                 location={`${property.city}, ${property.province}`}
                 bedrooms={property.bedrooms ?? 0}
