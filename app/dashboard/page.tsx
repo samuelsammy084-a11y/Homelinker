@@ -67,30 +67,29 @@ export default function DashboardPage() {
 
         setRole(userRole);
 
-        // 3. Load only this user's properties
-        if (
-          userRole === "property_owner" ||
-          userRole === "estate_agent"
-        ) {
-          const { data, error } = await supabase
-            .from("properties")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", {
-              ascending: false,
-            });
+        // 3. Load this user's properties regardless of profile role.
+        //
+        // This is important because a Home Seeker can now post a property.
+        // If they have at least one property, the dashboard below will
+        // automatically switch to the existing Property Owner dashboard.
+        const { data, error } = await supabase
+          .from("properties")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", {
+            ascending: false,
+          });
 
-          if (error) {
-            console.error(
-              "HomeLinker properties error:",
-              error
-            );
+        if (error) {
+          console.error(
+            "HomeLinker properties error:",
+            error
+          );
 
-            toast.error("Unable to load your properties.");
-            setProperties([]);
-          } else {
-            setProperties((data ?? []) as Property[]);
-          }
+          toast.error("Unable to load your properties.");
+          setProperties([]);
+        } else {
+          setProperties((data ?? []) as Property[]);
         }
       } catch (error) {
         console.error(
@@ -112,7 +111,6 @@ export default function DashboardPage() {
   /*
    * DELETE PROPERTY
    *
-   * Important:
    * We delete using BOTH the property ID and the logged-in
    * user's ID. Then we use .select("id") to confirm that
    * Supabase actually deleted a row.
@@ -171,7 +169,9 @@ export default function DashboardPage() {
 
       // Remove it immediately from the dashboard UI
       setProperties((current) =>
-        current.filter((property) => property.id !== propertyId)
+        current.filter(
+          (property) => property.id !== propertyId
+        )
       );
 
       toast.success("Property deleted successfully!");
@@ -181,7 +181,9 @@ export default function DashboardPage() {
         error
       );
 
-      toast.error("Something went wrong deleting the property.");
+      toast.error(
+        "Something went wrong deleting the property."
+      );
     } finally {
       setDeletingId(null);
     }
@@ -244,8 +246,17 @@ export default function DashboardPage() {
 
   /*
    * HOME SEEKER DASHBOARD
+   *
+   * IMPORTANT:
+   *
+   * A normal Home Seeker with NO listings sees this dashboard.
+   *
+   * Once a Home Seeker posts at least one property,
+   * properties.length becomes greater than 0 and this
+   * section is skipped. The existing Property Owner
+   * dashboard below is then displayed automatically.
    */
-  if (role === "home_seeker") {
+  if (role === "home_seeker" && properties.length === 0) {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
         <div className="mx-auto max-w-7xl">
@@ -358,6 +369,12 @@ export default function DashboardPage() {
     );
   }
 
+  /*
+   * PROPERTY OWNER / ESTATE AGENT DASHBOARD
+   *
+   * This section is now also automatically shown when
+   * a Home Seeker has posted one or more properties.
+   */
   const isAgent = role === "estate_agent";
 
   return (

@@ -78,7 +78,12 @@ export default function PostListingPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] =
     useState("");
-      async function publishListing() {
+
+  // CONTACT / WHATSAPP
+  const [phoneNumber, setPhoneNumber] =
+    useState("");
+
+  async function publishListing() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -88,7 +93,19 @@ export default function PostListingPage() {
         show: true,
         type: "error",
         title: "Login Required",
-        message: "Please login before posting a property.",
+        message:
+          "Please login before posting a property.",
+      });
+      return;
+    }
+
+    if (!phoneNumber.trim()) {
+      setPopup({
+        show: true,
+        type: "error",
+        title: "Phone Number Required",
+        message:
+          "Please enter a phone number so people can contact you through WhatsApp.",
       });
       return;
     }
@@ -102,9 +119,10 @@ export default function PostListingPage() {
         for (const image of images) {
           const fileName = `${Date.now()}-${Math.random()}-${image.name}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from("property-images")
-            .upload(fileName, image);
+          const { error: uploadError } =
+            await supabase.storage
+              .from("property-images")
+              .upload(fileName, image);
 
           if (uploadError) {
             setPopup({
@@ -153,8 +171,12 @@ export default function PostListingPage() {
             bathrooms: Number(bathrooms),
             parking: Number(parking),
 
-            deposit: deposit ? Number(deposit) : null,
-            available_from: availableFrom || null,
+            deposit: deposit
+              ? Number(deposit)
+              : null,
+
+            available_from:
+              availableFrom || null,
 
             floor_size: floorSize
               ? Number(floorSize)
@@ -166,9 +188,13 @@ export default function PostListingPage() {
 
             condition: condition || null,
 
-            rates: rates ? Number(rates) : null,
+            rates: rates
+              ? Number(rates)
+              : null,
 
-            levies: levies ? Number(levies) : null,
+            levies: levies
+              ? Number(levies)
+              : null,
 
             furnished,
 
@@ -177,10 +203,14 @@ export default function PostListingPage() {
             image_url: imageUrl,
 
             image_urls: imageUrls,
+
+            // Contact / WhatsApp number
+            contact_phone: phoneNumber.trim(),
           },
         ])
-.select()
-.single();
+        .select()
+        .single();
+
       if (error) {
         setPopup({
           show: true,
@@ -201,7 +231,7 @@ export default function PostListingPage() {
       });
 
       setTimeout(() => {
-       router.push("/dashboard");
+        router.push("/dashboard");
       }, 1800);
     } catch (err: unknown) {
       setPopup({
@@ -217,7 +247,7 @@ export default function PostListingPage() {
   }
 
   return (
-        <main className="min-h-screen bg-[#F8F6F1] py-12 px-6">
+    <main className="min-h-screen bg-[#F8F6F1] px-6 py-12">
 
       {/* Success / Error Popup */}
       {popup.show && (
@@ -232,7 +262,9 @@ export default function PostListingPage() {
                   : "bg-red-100"
               }`}
             >
-              {popup.type === "success" ? "✅" : "❌"}
+              {popup.type === "success"
+                ? "✅"
+                : "❌"}
             </div>
 
             <h2 className="mt-6 text-center text-3xl font-black text-[#111111]">
@@ -320,6 +352,7 @@ export default function PostListingPage() {
                 </div>
               );
             })}
+
           </div>
 
           <div className="relative h-4 overflow-hidden rounded-full bg-[#EFE6C9]">
@@ -335,16 +368,22 @@ export default function PostListingPage() {
 
           <div className="mt-3 flex justify-between text-sm font-medium text-[#666666]">
 
-            <span>Step {step} of 7</span>
+            <span>
+              Step {step} of 7
+            </span>
 
             <span>
-              {Math.round(((step - 1) / 6) * 100)}% Complete
+              {Math.round(
+                ((step - 1) / 6) * 100
+              )}
+              % Complete
             </span>
 
           </div>
 
         </div>
-                {step === 1 && (
+
+        {step === 1 && (
           <ListingTypeStep
             listingType={listingType}
             setListingType={setListingType}
@@ -354,7 +393,9 @@ export default function PostListingPage() {
 
         {step === 2 && (
           <PropertyTypeStep
-            listingType={listingType as "rent" | "sale"}
+            listingType={
+              listingType as "rent" | "sale"
+            }
             propertyType={propertyType}
             setPropertyType={setPropertyType}
             onBack={() => setStep(1)}
@@ -383,7 +424,9 @@ export default function PostListingPage() {
 
         {step === 4 && (
           <PropertyDetailsStep
-            listingType={listingType as "rent" | "sale"}
+            listingType={
+              listingType as "rent" | "sale"
+            }
             price={price}
             setPrice={setPrice}
             bedrooms={bedrooms}
@@ -430,6 +473,8 @@ export default function PostListingPage() {
             setTitle={setTitle}
             description={description}
             setDescription={setDescription}
+            phoneNumber={phoneNumber}
+            setPhoneNumber={setPhoneNumber}
             onBack={() => setStep(5)}
             onNext={() => setStep(7)}
           />
@@ -449,12 +494,14 @@ export default function PostListingPage() {
             bedrooms={bedrooms}
             bathrooms={bathrooms}
             parking={parking}
+            phoneNumber={phoneNumber}
             images={images}
             onBack={() => setStep(6)}
             onPublish={publishListing}
           />
         )}
-              </div>
+
+      </div>
     </main>
   );
 }
