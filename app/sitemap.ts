@@ -2,85 +2,20 @@ import type { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
 import { createPropertySlug } from "@/lib/property-slug";
 
+const BASE_URL = "https://homelinker.co.za";
+
+function createCitySlug(city: string) {
+  return city
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://homelinker.co.za";
+  const now = new Date();
 
-  // Main HomeLinker pages
-  const staticPages: MetadataRoute.Sitemap = [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: "daily",
-      priority: 1,
-    },
-    {
-      url: `${baseUrl}/properties`,
-      lastModified: new Date(),
-      changeFrequency: "hourly",
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/about`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/contact`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/pricing`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/register`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/login`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/privacy`,
-      lastModified: new Date(),
-      changeFrequency: "yearly",
-      priority: 0.4,
-    },
-    {
-      url: `${baseUrl}/terms`,
-      lastModified: new Date(),
-      changeFrequency: "yearly",
-      priority: 0.4,
-    },
-  ];
-
-  // SEO location pages
-  const cities = [
-    "florida",
-    "roodepoort",
-    "soweto",
-    "johannesburg",
-    "randburg",
-    "pretoria",
-  ];
-
-  const locationPages: MetadataRoute.Sitemap = cities.map((city) => ({
-    url: `${baseUrl}/rent/${city}`,
-    lastModified: new Date(),
-    changeFrequency: "daily",
-    priority: 0.8,
-  }));
-
-  // Real property pages from Supabase
   const { data: properties, error } = await supabase
     .from("properties")
     .select("id, title, city, created_at")
@@ -90,23 +25,144 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("Sitemap property fetch error:", error);
   }
 
-  const propertyPages: MetadataRoute.Sitemap =
-    properties?.map((property) => ({
-      url: `${baseUrl}/properties/${createPropertySlug(
+  const safeProperties = properties ?? [];
+
+  /*
+   * ---------------------------------------------------------
+   * STATIC PAGES
+   * ---------------------------------------------------------
+   */
+
+  const staticPages: MetadataRoute.Sitemap = [
+    {
+      url: BASE_URL,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 1,
+    },
+    {
+      url: `${BASE_URL}/properties`,
+      lastModified: now,
+      changeFrequency: "hourly",
+      priority: 0.9,
+    },
+    {
+      url: `${BASE_URL}/about`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}/contact`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}/pricing`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}/register`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}/login`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${BASE_URL}/privacy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.4,
+    },
+    {
+      url: `${BASE_URL}/terms`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.4,
+    },
+  ];
+
+  /*
+   * ---------------------------------------------------------
+   * SOUTH AFRICAN CITY RENTAL PAGES
+   *
+   * Automatically generated from cities that actually
+   * have properties in the database.
+   * ---------------------------------------------------------
+   */
+
+  const cityMap = new Map<
+    string,
+    {
+      city: string;
+      lastModified: Date;
+    }
+  >();
+
+  for (const property of safeProperties) {
+    const city = property.city?.trim();
+
+    if (!city) continue;
+
+    const slug = createCitySlug(city);
+
+    if (!slug) continue;
+
+    const createdAt = property.created_at
+      ? new Date(property.created_at)
+      : now;
+
+    const existing = cityMap.get(slug);
+
+    if (!existing || createdAt > existing.lastModified) {
+      cityMap.set(slug, {
+        city,
+        lastModified: createdAt,
+      });
+    }
+  }
+
+  const cityPages: MetadataRoute.Sitemap = Array.from(
+    cityMap.entries()
+  ).map(([slug, city]) => ({
+    url: `${BASE_URL}/rent/${slug}`,
+    lastModified: city.lastModified,
+    changeFrequency: "daily",
+    priority: 0.8,
+  }));
+
+  /*
+   * ---------------------------------------------------------
+   * INDIVIDUAL PROPERTY PAGES
+   * ---------------------------------------------------------
+   */
+
+  const propertyPages: MetadataRoute.Sitemap = safeProperties
+    .filter((property) => property.id && property.title && property.city)
+    .map((property) => ({
+      url: `${BASE_URL}/properties/${createPropertySlug(
         property.title,
         property.city,
         property.id
       )}`,
       lastModified: property.created_at
         ? new Date(property.created_at)
-        : new Date(),
+        : now,
       changeFrequency: "daily",
       priority: 0.8,
-    })) ?? [];
+    }));
 
   return [
     ...staticPages,
-    ...locationPages,
+    ...cityPages,
     ...propertyPages,
   ];
 }
