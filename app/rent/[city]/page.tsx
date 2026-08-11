@@ -10,11 +10,8 @@ type Props = {
   }>;
 };
 
-const BASE_URL = "https://homelinker.co.za";
-
-function getCityName(slug: string) {
+function slugToCityName(slug: string) {
   return slug
-    .trim()
     .split("-")
     .filter(Boolean)
     .map(
@@ -23,24 +20,30 @@ function getCityName(slug: string) {
     .join(" ");
 }
 
+function cityToSlug(city: string) {
+  return city
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export async function generateMetadata({
   params,
 }: Props): Promise<Metadata> {
   const { city } = await params;
-  const cityName = getCityName(city);
+  const cityName = slugToCityName(city);
 
   return {
     title: `Properties to Rent in ${cityName} | HomeLinker`,
-    description: `Find rooms, apartments, houses and other properties to rent in ${cityName}, South Africa on HomeLinker.`,
-
+    description: `Find rooms, apartments, houses and rental properties in ${cityName}, South Africa on HomeLinker.`,
     alternates: {
-      canonical: `${BASE_URL}/rent/${city.toLowerCase()}`,
+      canonical: `https://homelinker.co.za/rent/${city.toLowerCase()}`,
     },
-
     openGraph: {
       title: `Properties to Rent in ${cityName} | HomeLinker`,
-      description: `Find rooms, apartments, houses and properties to rent in ${cityName}, South Africa.`,
-      url: `${BASE_URL}/rent/${city.toLowerCase()}`,
+      description: `Find rooms, apartments, houses and rental properties in ${cityName}, South Africa on HomeLinker.`,
+      url: `https://homelinker.co.za/rent/${city.toLowerCase()}`,
       siteName: "HomeLinker",
       type: "website",
     },
@@ -49,24 +52,24 @@ export async function generateMetadata({
 
 export default async function CityRentPage({ params }: Props) {
   const { city } = await params;
-  const cityName = getCityName(city);
+  const cityName = slugToCityName(city);
 
   const allProperties = await getProperties();
 
   const properties = allProperties.filter((property: Property) => {
-    const propertyCity = property.city?.trim().toLowerCase();
+    if (!property.city) return false;
 
-    return propertyCity === cityName.trim().toLowerCase();
+    return cityToSlug(property.city) === city.toLowerCase();
   });
 
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
       {/* HERO */}
-      <section className="border-b border-[#E8D8A5] bg-gradient-to-b from-[#FFFDF8] to-[#F8F6F1]">
-        <div className="mx-auto max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
+      <section className="border-b border-[#E8D8A5] bg-[#F8F6F1]">
+        <div className="mx-auto max-w-7xl px-6 py-12 sm:py-16">
           <Link
             href="/properties"
-            className="inline-flex items-center text-sm font-bold text-[#A67C00] transition hover:text-[#C9A227]"
+            className="inline-flex items-center font-bold text-[#A67C00] transition hover:text-[#C9A227]"
           >
             ← Browse all properties
           </Link>
@@ -82,8 +85,8 @@ export default async function CityRentPage({ params }: Props) {
 
             <p className="mt-5 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
               Discover rooms, apartments, houses and other rental properties
-              available in {cityName}. Browse HomeLinker listings and find a
-              place that fits your budget and lifestyle.
+              available in {cityName}, South Africa. Browse HomeLinker
+              listings and find a place that fits your budget and lifestyle.
             </p>
           </div>
         </div>
@@ -141,8 +144,9 @@ export default async function CityRentPage({ params }: Props) {
             </h2>
 
             <p className="mx-auto mt-3 max-w-xl text-slate-600">
-              There are currently no properties listed in {cityName}. Check
-              back soon or browse all HomeLinker properties.
+              There are currently no properties listed in {cityName}.
+              Check back soon or browse all HomeLinker properties across
+              South Africa.
             </p>
 
             <Link
@@ -163,16 +167,23 @@ export default async function CityRentPage({ params }: Props) {
           </h2>
 
           <p className="mt-4 leading-8 text-slate-600">
-            Looking for a place to rent in {cityName}? HomeLinker makes it
-            easier to discover rental accommodation across South Africa.
-            Explore available rooms, apartments and houses, compare prices
-            and view property details before contacting the owner.
+            Looking for a place to rent in {cityName}, South Africa?
+            HomeLinker makes it easier to discover rental accommodation
+            across the country. Explore available rooms, apartments and
+            houses, compare prices and view property details before
+            contacting the owner.
           </p>
 
           <p className="mt-4 leading-8 text-slate-600">
-            Whether you are looking for an affordable room, an apartment for
-            yourself or a family home, browse the latest properties available
-            in {cityName} on HomeLinker.
+            Whether you are looking for an affordable room, an apartment
+            for yourself or a family home, browse the latest properties
+            available in {cityName} on HomeLinker.
+          </p>
+
+          <p className="mt-4 leading-8 text-slate-600">
+            HomeLinker is a South African property marketplace where
+            property owners can list homes, rooms and other properties
+            for people looking to rent or buy across South Africa.
           </p>
         </div>
       </section>

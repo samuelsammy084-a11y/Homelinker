@@ -28,9 +28,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const safeProperties = properties ?? [];
 
   /*
-   * ---------------------------------------------------------
+   * --------------------------------------------------
    * STATIC PAGES
-   * ---------------------------------------------------------
+   * --------------------------------------------------
    */
 
   const staticPages: MetadataRoute.Sitemap = [
@@ -91,12 +91,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   /*
-   * ---------------------------------------------------------
+   * --------------------------------------------------
    * SOUTH AFRICAN CITY RENTAL PAGES
    *
-   * Automatically generated from cities that actually
-   * have properties in the database.
-   * ---------------------------------------------------------
+   * Automatically generated from cities that
+   * actually have properties in HomeLinker.
+   * --------------------------------------------------
    */
 
   const cityMap = new Map<
@@ -140,13 +140,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   /*
-   * ---------------------------------------------------------
+   * --------------------------------------------------
    * INDIVIDUAL PROPERTY PAGES
-   * ---------------------------------------------------------
+   * --------------------------------------------------
    */
 
   const propertyPages: MetadataRoute.Sitemap = safeProperties
-    .filter((property) => property.id && property.title && property.city)
+    .filter(
+      (property) =>
+        property.id &&
+        property.title &&
+        property.city
+    )
     .map((property) => ({
       url: `${BASE_URL}/properties/${createPropertySlug(
         property.title,
@@ -159,6 +164,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.8,
     }));
+
+  /*
+   * --------------------------------------------------
+   * FINAL SITEMAP
+   * --------------------------------------------------
+   */
 
   return [
     ...staticPages,
