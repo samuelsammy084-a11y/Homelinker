@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -15,9 +16,15 @@ type Conversation = {
   last_message_at?: string | null;
 };
 
+type Profile = {
+  full_name: string;
+  avatar_url: string;
+};
+
 export default function MessagesPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -30,7 +37,7 @@ export default function MessagesPage() {
 
       try {
         // --------------------------------------------------
-        // 1. Get the currently logged-in browser user
+        // 1. Get logged-in user
         // --------------------------------------------------
 
         const {
@@ -55,13 +62,8 @@ export default function MessagesPage() {
           setUserId(user.id);
         }
 
-        console.log(
-          "HomeLinker Messages - logged in user:",
-          user.id
-        );
-
         // --------------------------------------------------
-        // 2. Get conversations where user is buyer OR owner
+        // 2. Get conversations
         // --------------------------------------------------
 
         const { data, error } = await supabase
@@ -69,9 +71,7 @@ export default function MessagesPage() {
           .select(
             "id, property_id, property_title, owner_id, buyer_id, created_at, last_message, last_message_at"
           )
-          .or(
-            `buyer_id.eq.${user.id},owner_id.eq.${user.id}`
-          )
+          .or(`buyer_id.eq.${user.id},owner_id.eq.${user.id}`)
           .order("last_message_at", {
             ascending: false,
             nullsFirst: false,
@@ -81,28 +81,75 @@ export default function MessagesPage() {
           });
 
         if (error) {
-          console.error(
-            "HomeLinker messages inbox error:",
-            {
-              message: error.message,
-              details: error.details,
-              hint: error.hint,
-              code: error.code,
-            }
-          );
+          console.error("HomeLinker messages inbox error:", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
 
           throw new Error(
             error.message || "Unable to load your messages."
           );
         }
 
-        console.log(
-          "HomeLinker Messages - conversations:",
-          data
+        const conversationData = (data ?? []) as Conversation[];
+
+        if (!mounted) return;
+
+        setConversations(conversationData);
+
+        // --------------------------------------------------
+        // 3. Find the OTHER person in every conversation
+        // --------------------------------------------------
+
+        const otherUserIds = Array.from(
+          new Set(
+            conversationData
+              .map((conversation) =>
+                conversation.buyer_id === user.id
+                  ? conversation.owner_id
+                  : conversation.buyer_id
+              )
+              .filter(Boolean)
+          )
         );
 
+        // --------------------------------------------------
+        // 4. Load their profiles
+        // --------------------------------------------------
+
+        if (otherUserIds.length > 0) {
+          const { data: profileData, error: profileError } =
+            await supabase
+              .from("profiles")
+              .select("id, full_name, avatar_url")
+              .in("id", otherUserIds);
+
+          if (profileError) {
+            console.error(
+              "HomeLinker message profiles error:",
+              profileError
+            );
+          } else {
+            const profileMap: Record<string, Profile> = {};
+
+            for (const profile of profileData ?? []) {
+              profileMap[profile.id] = {
+                full_name: profile.full_name ?? "",
+                avatar_url: profile.avatar_url ?? "",
+              };
+            }
+
+            if (mounted) {
+              setProfiles(profileMap);
+            }
+          }
+        } else {
+          setProfiles({});
+        }
+
         if (mounted) {
-          setConversations(data ?? []);
           setLoading(false);
         }
       } catch (error) {
@@ -117,21 +164,22 @@ export default function MessagesPage() {
               ? error.message
               : "Unable to load messages."
           );
+
           setLoading(false);
         }
       }
     }
 
-    loadMessages();
+    void loadMessages();
 
     // --------------------------------------------------
-    // 3. Keep inbox updated when auth changes
+    // 5. Refresh inbox when authentication changes
     // --------------------------------------------------
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      loadMessages();
+      void loadMessages();
     });
 
     return () => {
@@ -139,6 +187,23 @@ export default function MessagesPage() {
       subscription.unsubscribe();
     };
   }, []);
+
+  // --------------------------------------------------
+  // Helpers
+  // --------------------------------------------------
+
+  function getInitials(name: string) {
+    const initials = name
+      .trim()
+      .split(/\s+/)
+      .map((word) => word[0])
+      .filter(Boolean)
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+
+    return initials || "HL";
+  }
 
   // --------------------------------------------------
   // Loading
@@ -295,6 +360,19 @@ export default function MessagesPage() {
                 const isBuyer =
                   conversation.buyer_id === userId;
 
+                const otherUserId = isBuyer
+                  ? conversation.owner_id
+                  : conversation.buyer_id;
+
+                const otherProfile = profiles[otherUserId];
+
+                const otherName =
+                  otherProfile?.full_name?.trim() ||
+                  (isBuyer ? "Property Owner" : "Home Seeker");
+
+                const avatarUrl =
+                  otherProfile?.avatar_url || "";
+
                 const title =
                   conversation.property_title ||
                   "Property conversation";
@@ -314,19 +392,37 @@ export default function MessagesPage() {
                     className="block px-5 py-5 transition hover:bg-[#FFFDF8] sm:px-6"
                   >
                     <div className="flex items-start gap-4">
-                      {/* Avatar */}
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#C9A227]/15 text-xl">
-                        💬
+                      {/* Profile Avatar */}
+                      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#C9A227] bg-[#C9A227]/15">
+                        {avatarUrl ? (
+                          <Image
+                            src={avatarUrl}
+                            alt={otherName}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <span className="text-sm font-black text-[#A67C00]">
+                            {getInitials(otherName)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Conversation */}
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                          <h3 className="truncate text-lg font-bold text-black">
-                            {isBuyer
-                              ? "Property Owner"
-                              : "Buyer Enquiry"}
-                          </h3>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <h3 className="truncate text-lg font-bold text-black">
+                              {otherName}
+                            </h3>
+
+                            {otherProfile?.avatar_url && (
+                              <span className="shrink-0 text-xs font-semibold text-emerald-600">
+                                Profile
+                              </span>
+                            )}
+                          </div>
 
                           <span className="shrink-0 text-xs font-medium text-slate-500">
                             {new Date(
