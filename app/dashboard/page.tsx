@@ -19,12 +19,16 @@ import {
   Search,
   Bell,
   Building2,
+  UserCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import type { Property } from "@/app/types/property";
 
-type Role = "home_seeker" | "property_owner" | "estate_agent";
+type Role =
+  | "home_seeker"
+  | "property_owner"
+  | "estate_agent";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -38,7 +42,6 @@ export default function DashboardPage() {
       setLoading(true);
 
       try {
-        // 1. Get logged-in user
         const {
           data: { user },
           error: userError,
@@ -51,27 +54,26 @@ export default function DashboardPage() {
 
         setUser(user);
 
-        // 2. Get profile role
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .maybeSingle();
+        const { data: profile, error: profileError } =
+          await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .maybeSingle();
 
         if (profileError) {
-          console.error("HomeLinker profile error:", profileError);
+          console.error(
+            "HomeLinker profile error:",
+            profileError
+          );
         }
 
         const userRole =
-          (profile?.role as Role | null) ?? "home_seeker";
+          (profile?.role as Role | null) ??
+          "home_seeker";
 
         setRole(userRole);
 
-        // 3. Load this user's properties regardless of profile role.
-        //
-        // This is important because a Home Seeker can now post a property.
-        // If they have at least one property, the dashboard below will
-        // automatically switch to the existing Property Owner dashboard.
         const { data, error } = await supabase
           .from("properties")
           .select("*")
@@ -86,7 +88,10 @@ export default function DashboardPage() {
             error
           );
 
-          toast.error("Unable to load your properties.");
+          toast.error(
+            "Unable to load your properties."
+          );
+
           setProperties([]);
         } else {
           setProperties((data ?? []) as Property[]);
@@ -108,14 +113,9 @@ export default function DashboardPage() {
     void loadData();
   }, []);
 
-  /*
-   * DELETE PROPERTY
-   *
-   * We delete using BOTH the property ID and the logged-in
-   * user's ID. Then we use .select("id") to confirm that
-   * Supabase actually deleted a row.
-   */
-  async function handleDeleteProperty(propertyId: number) {
+  async function handleDeleteProperty(
+    propertyId: number
+  ) {
     if (!user) {
       toast.error("You must be logged in.");
       return;
@@ -150,11 +150,6 @@ export default function DashboardPage() {
         return;
       }
 
-      /*
-       * If data is empty, Supabase did not delete anything.
-       * This usually means RLS is blocking the delete or
-       * the property doesn't belong to this user.
-       */
       if (!data || data.length === 0) {
         console.error(
           "Delete returned zero rows. Check Supabase RLS DELETE policy."
@@ -167,14 +162,15 @@ export default function DashboardPage() {
         return;
       }
 
-      // Remove it immediately from the dashboard UI
       setProperties((current) =>
         current.filter(
           (property) => property.id !== propertyId
         )
       );
 
-      toast.success("Property deleted successfully!");
+      toast.success(
+        "Property deleted successfully!"
+      );
     } catch (error) {
       console.error(
         "Unexpected property deletion error:",
@@ -189,9 +185,6 @@ export default function DashboardPage() {
     }
   }
 
-  /*
-   * LOADING
-   */
   if (loading) {
     return (
       <main className="min-h-screen bg-[#F8F6F1] px-6 py-24">
@@ -212,9 +205,6 @@ export default function DashboardPage() {
     );
   }
 
-  /*
-   * NOT LOGGED IN
-   */
   if (!user) {
     return (
       <main className="min-h-screen bg-[#F8F6F1] px-6 py-24">
@@ -246,20 +236,37 @@ export default function DashboardPage() {
 
   /*
    * HOME SEEKER DASHBOARD
-   *
-   * IMPORTANT:
-   *
-   * A normal Home Seeker with NO listings sees this dashboard.
-   *
-   * Once a Home Seeker posts at least one property,
-   * properties.length becomes greater than 0 and this
-   * section is skipped. The existing Property Owner
-   * dashboard below is then displayed automatically.
    */
-  if (role === "home_seeker" && properties.length === 0) {
+  if (
+    role === "home_seeker" &&
+    properties.length === 0
+  ) {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
         <div className="mx-auto max-w-7xl">
+
+          {/* TOP NAVIGATION */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-[#C9A227]"
+            >
+              <ArrowLeft size={16} />
+              HomeLinker
+            </Link>
+
+            <Link
+              href="/profile"
+              className="inline-flex items-center gap-2 rounded-2xl border border-[#C9A227] bg-white px-5 py-3 font-bold text-[#1B1B1B] shadow-sm transition hover:bg-[#FFF9E8]"
+            >
+              <UserCircle
+                size={19}
+                className="text-[#C9A227]"
+              />
+              Profile
+            </Link>
+          </div>
+
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -293,7 +300,8 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+          {/* QUICK ACTIONS */}
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
             <DashboardAction
               href="/properties"
               icon={<Search size={22} />}
@@ -321,6 +329,13 @@ export default function DashboardPage() {
               icon={<Bell size={22} />}
               title="Notifications"
               description="See your updates"
+            />
+
+            <DashboardAction
+              href="/profile"
+              icon={<UserCircle size={22} />}
+              title="My Profile"
+              description="Edit your account"
             />
           </div>
 
@@ -354,16 +369,6 @@ export default function DashboardPage() {
               </Link>
             </div>
           </motion.div>
-
-          <div className="mt-8">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-[#C9A227]"
-            >
-              <ArrowLeft size={16} />
-              Back to HomeLinker
-            </Link>
-          </div>
         </div>
       </main>
     );
@@ -371,15 +376,36 @@ export default function DashboardPage() {
 
   /*
    * PROPERTY OWNER / ESTATE AGENT DASHBOARD
-   *
-   * This section is now also automatically shown when
-   * a Home Seeker has posted one or more properties.
    */
+
   const isAgent = role === "estate_agent";
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-7xl">
+
+        {/* TOP NAVIGATION */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-[#C9A227]"
+          >
+            <ArrowLeft size={16} />
+            HomeLinker
+          </Link>
+
+          <Link
+            href="/profile"
+            className="inline-flex items-center gap-2 rounded-2xl border border-[#C9A227] bg-white px-5 py-3 font-bold text-[#1B1B1B] shadow-sm transition hover:bg-[#FFF9E8]"
+          >
+            <UserCircle
+              size={19}
+              className="text-[#C9A227]"
+            />
+            Profile
+          </Link>
+        </div>
+
         {/* HEADER */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
@@ -394,7 +420,9 @@ export default function DashboardPage() {
                 <House size={14} />
               )}
 
-              {isAgent ? "Estate Agent" : "Property Owner"}
+              {isAgent
+                ? "Estate Agent"
+                : "Property Owner"}
             </div>
 
             <h1 className="mt-4 text-3xl font-black text-[#1B1B1B] sm:text-4xl">
@@ -410,14 +438,6 @@ export default function DashboardPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 font-semibold text-[#1B1B1B] transition hover:bg-slate-50"
-            >
-              <ArrowLeft size={16} />
-              Back to Home
-            </Link>
-
-            <Link
               href="/post-listing"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-3 font-semibold text-white transition hover:bg-[#A67C00]"
             >
@@ -428,7 +448,7 @@ export default function DashboardPage() {
         </motion.div>
 
         {/* QUICK ACTIONS */}
-        <div className="mb-8 grid grid-cols-2 gap-3 sm:mb-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:mb-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
           <DashboardAction
             href="/post-listing"
             icon={<Plus size={22} />}
@@ -454,8 +474,15 @@ export default function DashboardPage() {
           <DashboardAction
             href="/properties"
             icon={<House size={22} />}
-            title="View Marketplace"
-            description="See your public listings"
+            title="Marketplace"
+            description="See public listings"
+          />
+
+          <DashboardAction
+            href="/profile"
+            icon={<UserCircle size={22} />}
+            title="My Profile"
+            description="Edit your account"
           />
         </div>
 
@@ -521,9 +548,6 @@ export default function DashboardPage() {
             </Link>
           </motion.div>
         ) : (
-          /*
-           * TWO COLUMNS ON MOBILE TOO
-           */
           <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-2 lg:gap-8">
             {properties.map((property) => {
               const image =
@@ -532,7 +556,8 @@ export default function DashboardPage() {
                   : property.image_url ||
                     "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d";
 
-              const isDeleting = deletingId === property.id;
+              const isDeleting =
+                deletingId === property.id;
 
               return (
                 <motion.div
@@ -584,9 +609,9 @@ export default function DashboardPage() {
 
                     <p className="mt-3 text-xl font-black text-[#C9A227] sm:mt-6 sm:text-4xl">
                       R
-                      {Number(property.price).toLocaleString(
-                        "en-ZA"
-                      )}
+                      {Number(
+                        property.price
+                      ).toLocaleString("en-ZA")}
                     </p>
 
                     <div className="mt-3 grid grid-cols-3 gap-1.5 sm:mt-6 sm:gap-3">
@@ -623,7 +648,9 @@ export default function DashboardPage() {
                         type="button"
                         disabled={isDeleting}
                         onClick={() =>
-                          handleDeleteProperty(property.id)
+                          handleDeleteProperty(
+                            property.id
+                          )
                         }
                         className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2 py-2.5 text-[9px] font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                       >
@@ -640,6 +667,37 @@ export default function DashboardPage() {
             })}
           </div>
         )}
+
+        {/* PROFILE REMINDER */}
+        <div className="mt-8 rounded-[32px] border border-[#E8D9A8] bg-[#FFF9E8] p-6 sm:p-8">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#C9A227]/15 text-[#C9A227]">
+                <UserCircle size={25} />
+              </div>
+
+              <div>
+                <h2 className="text-xl font-black text-[#1B1B1B]">
+                  Keep your profile up to date
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-600">
+                  Add your name, phone number and profile
+                  picture so people know who they are
+                  dealing with.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/profile"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-3 font-bold text-white transition hover:bg-[#A67C00]"
+            >
+              <UserCircle size={18} />
+              Edit Profile
+            </Link>
+          </div>
+        </div>
       </div>
     </main>
   );
@@ -686,7 +744,9 @@ function DashboardAction({
 
       <p
         className={`mt-1 text-[10px] sm:text-sm ${
-          primary ? "text-white/75" : "text-slate-500"
+          primary
+            ? "text-white/75"
+            : "text-slate-500"
         }`}
       >
         {description}
