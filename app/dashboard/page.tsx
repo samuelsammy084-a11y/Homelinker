@@ -15,7 +15,6 @@ import {
   Pencil,
   Trash2,
   Heart,
-  MessageCircle,
   Search,
   Bell,
   Building2,
@@ -301,7 +300,7 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* QUICK ACTIONS */}
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
             <DashboardAction
               href="/properties"
               icon={<Search size={22} />}
@@ -315,13 +314,6 @@ export default function DashboardPage() {
               icon={<Heart size={22} />}
               title="My Favorites"
               description="Saved properties"
-            />
-
-            <DashboardAction
-              href="/messages"
-              icon={<MessageCircle size={22} />}
-              title="My Messages"
-              description="Chat with owners"
             />
 
             <DashboardAction
@@ -448,7 +440,9 @@ export default function DashboardPage() {
         </motion.div>
 
         {/* QUICK ACTIONS */}
-        <div className="mb-8 grid grid-cols-2 gap-3 sm:mb-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:mb-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+
+          {/* ADD PROPERTY */}
           <DashboardAction
             href="/post-listing"
             icon={<Plus size={22} />}
@@ -457,13 +451,7 @@ export default function DashboardPage() {
             primary
           />
 
-          <DashboardAction
-            href="/messages"
-            icon={<MessageCircle size={22} />}
-            title="Messages"
-            description="Talk to buyers & renters"
-          />
-
+          {/* NOTIFICATIONS */}
           <DashboardAction
             href="/notifications"
             icon={<Bell size={22} />}
@@ -471,13 +459,7 @@ export default function DashboardPage() {
             description="See new enquiries"
           />
 
-          <DashboardAction
-            href="/properties"
-            icon={<House size={22} />}
-            title="Marketplace"
-            description="See public listings"
-          />
-
+          {/* PROFILE */}
           <DashboardAction
             href="/profile"
             icon={<UserCircle size={22} />}
