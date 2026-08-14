@@ -29,6 +29,7 @@ export default async function FeaturedProperties() {
   return (
     <section className="bg-[#F8F6F1] py-12 sm:py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+
         {/* SECTION HEADER */}
         <div className="mb-7 flex flex-col gap-5 sm:mb-10 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -58,31 +59,15 @@ export default async function FeaturedProperties() {
 
         {/* LISTINGS CONTAINER */}
         <div className="rounded-[26px] border border-[#F0E7CF] bg-[#FFFDF8] p-3 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.18)] sm:rounded-[34px] sm:p-6">
+
           {/* MOBILE */}
           <div className="sm:hidden">
-            <div
-              className="
-                flex
-                snap-x
-                snap-mandatory
-                gap-4
-                overflow-x-auto
-                pb-3
-                px-1
-                [scrollbar-width:none]
-                [&::-webkit-scrollbar]:hidden
-              "
-            >
+
+            {/* NORMAL VERTICAL MOBILE GRID */}
+            <div className="grid grid-cols-2 gap-3">
+
               {displayProperties.map((property: Property) => (
-                <div
-                  key={property.id}
-                  className="
-                    w-[88%]
-                    min-w-[88%]
-                    shrink-0
-                    snap-center
-                  "
-                >
+                <div key={property.id} className="min-w-0">
                   <PropertyCard
                     id={property.id}
                     slug={property.slug}
@@ -111,52 +96,41 @@ export default async function FeaturedProperties() {
                 href="/properties"
                 className="
                   flex
-                  w-[88%]
-                  min-w-[88%]
-                  shrink-0
-                  snap-center
+                  min-h-[260px]
                   flex-col
                   items-center
                   justify-center
-                  rounded-[24px]
+                  rounded-[20px]
                   border
                   border-[#E8D8A5]
                   bg-[#FFF9E8]
-                  px-8
-                  py-14
+                  px-4
+                  py-8
                   text-center
                   transition
                   hover:border-[#C9A227]
                   hover:bg-[#FFF5D0]
                 "
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#C9A227] text-white shadow-md">
-                  <ArrowRight size={24} />
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#C9A227] text-white shadow-md">
+                  <ArrowRight size={21} />
                 </div>
 
-                <h3 className="mt-5 text-xl font-black text-[#1B1B1B]">
+                <h3 className="mt-4 text-base font-black text-[#1B1B1B]">
                   View more
                 </h3>
 
-                <p className="mt-2 max-w-[220px] text-sm leading-6 text-slate-500">
-                  Explore more properties available on HomeLinker.
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  Explore more properties on HomeLinker.
                 </p>
 
-                <span className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#C9A227] px-5 py-3 text-sm font-bold text-white">
-                  Browse properties
-                  <ArrowRight size={16} />
+                <span className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#C9A227] px-4 py-2.5 text-xs font-bold text-white">
+                  Browse
+                  <ArrowRight size={14} />
                 </span>
               </Link>
-            </div>
 
-            {/* SWIPE INDICATOR */}
-            {displayProperties.length > 1 && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
-                <span>←</span>
-                Swipe to explore
-                <span>→</span>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* TABLET / DESKTOP */}
@@ -197,6 +171,7 @@ export default async function FeaturedProperties() {
             <ArrowRight size={16} />
           </Link>
         </div>
+
       </div>
     </section>
   );
