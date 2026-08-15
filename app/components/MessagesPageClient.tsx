@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import MessageThread from "@/app/components/MessageThread";
@@ -23,6 +24,12 @@ type Conversation = {
   created_at: string;
 };
 
+type PersonProfile = {
+  full_name: string;
+  avatar_url: string;
+  is_verified: boolean;
+};
+
 export default function MessagesPageClient({
   conversationId,
 }: {
@@ -37,6 +44,9 @@ export default function MessagesPageClient({
   const [currentUserId, setCurrentUserId] = useState<string | null>(
     null
   );
+
+  const [otherProfile, setOtherProfile] =
+    useState<PersonProfile | null>(null);
 
   useEffect(() => {
     async function loadConversation() {
@@ -130,7 +140,47 @@ export default function MessagesPageClient({
       }
 
       // --------------------------------------------------
-      // 4. Load messages
+      // 4. Find the OTHER person
+      // --------------------------------------------------
+
+      const otherPersonId =
+        conversationData.buyer_id === user.id
+          ? conversationData.owner_id
+          : conversationData.buyer_id;
+
+      // --------------------------------------------------
+      // 5. Load other person's profile
+      // --------------------------------------------------
+
+      const {
+        data: profileData,
+        error: profileError,
+      } = await supabase
+        .from("profiles")
+        .select(
+          "full_name, avatar_url, is_verified"
+        )
+        .eq("id", otherPersonId)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error(
+          "HomeLinker other profile error:",
+          profileError
+        );
+      }
+
+      setOtherProfile({
+        full_name:
+          profileData?.full_name?.trim() || "",
+        avatar_url:
+          profileData?.avatar_url || "",
+        is_verified:
+          profileData?.is_verified || false,
+      });
+
+      // --------------------------------------------------
+      // 6. Load messages
       // --------------------------------------------------
 
       const {
@@ -166,7 +216,7 @@ export default function MessagesPageClient({
       setLoading(false);
     }
 
-    loadConversation();
+    void loadConversation();
   }, [conversationId]);
 
   // --------------------------------------------------
@@ -247,15 +297,35 @@ export default function MessagesPageClient({
     );
   }
 
-  const isOwner = currentUserId === conversation.owner_id;
+  const isOwner =
+    currentUserId === conversation.owner_id;
 
   const otherPersonLabel = isOwner
     ? "Buyer"
     : "Property Owner";
 
+  const otherPersonName =
+    otherProfile?.full_name ||
+    (isOwner ? "Home Seeker" : "Property Owner");
+
+  const initials =
+    otherPersonName
+      .trim()
+      .split(/\s+/)
+      .map((word) => word[0])
+      .filter(Boolean)
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "HL";
+
+  const otherPersonId = isOwner
+    ? conversation.buyer_id
+    : conversation.owner_id;
+
   return (
     <main className="min-h-screen bg-[#F8F6F1] px-3 py-6 sm:px-6">
       <div className="mx-auto max-w-5xl">
+
         {/* Back button */}
         <Link
           href="/messages"
@@ -268,24 +338,61 @@ export default function MessagesPageClient({
         {/* Chat header */}
         <div className="overflow-hidden rounded-t-3xl border border-slate-200 bg-black shadow-sm">
           <div className="flex items-center gap-4 px-5 py-4 sm:px-6">
-            {/* Icon */}
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#C9A227] text-black">
-              <Home size={22} />
-            </div>
+
+            {/* Other person's profile */}
+            <Link
+              href={`/profile/${otherPersonId}`}
+              className="group relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#C9A227] bg-[#C9A227]/15 transition hover:scale-105"
+              aria-label={`View ${otherPersonName}'s profile`}
+            >
+              {otherProfile?.avatar_url ? (
+                <Image
+                  src={otherProfile.avatar_url}
+                  alt={otherPersonName}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <span className="text-sm font-black text-[#C9A227]">
+                  {initials}
+                </span>
+              )}
+            </Link>
 
             {/* Conversation details */}
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium uppercase tracking-wide text-[#C9A227]">
-                Property enquiry
-              </p>
+
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-[#C9A227]">
+                  Property enquiry
+                </p>
+              </div>
 
               <h1 className="truncate text-lg font-bold text-white sm:text-xl">
                 {conversation.property_title ||
                   "Property conversation"}
               </h1>
 
-              <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-                <ShieldCheck size={13} />
+              {/* Clickable person's name */}
+              <div className="mt-1 flex items-center gap-2">
+                <Link
+                  href={`/profile/${otherPersonId}`}
+                  className="truncate text-sm font-semibold text-slate-300 transition hover:text-[#C9A227]"
+                >
+                  {otherPersonName}
+                </Link>
+
+                {otherProfile?.is_verified && (
+                  <ShieldCheck
+                    size={14}
+                    className="shrink-0 text-[#C9A227]"
+                  />
+                )}
+              </div>
+
+              <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                <Home size={13} />
 
                 <span>
                   Chatting with {otherPersonLabel}
