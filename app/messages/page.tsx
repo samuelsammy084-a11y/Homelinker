@@ -46,8 +46,14 @@ export default function MessagesPage() {
         } = await supabase.auth.getUser();
 
         if (authError) {
-          console.error("HomeLinker messages auth error:", authError);
-          throw new Error("Unable to verify your login.");
+          console.error(
+            "HomeLinker messages auth error:",
+            authError
+          );
+
+          throw new Error(
+            "Unable to verify your login."
+          );
         }
 
         if (!user) {
@@ -55,6 +61,7 @@ export default function MessagesPage() {
             setUserId(null);
             setLoading(false);
           }
+
           return;
         }
 
@@ -71,7 +78,9 @@ export default function MessagesPage() {
           .select(
             "id, property_id, property_title, owner_id, buyer_id, created_at, last_message, last_message_at"
           )
-          .or(`buyer_id.eq.${user.id},owner_id.eq.${user.id}`)
+          .or(
+            `buyer_id.eq.${user.id},owner_id.eq.${user.id}`
+          )
           .order("last_message_at", {
             ascending: false,
             nullsFirst: false,
@@ -81,26 +90,31 @@ export default function MessagesPage() {
           });
 
         if (error) {
-          console.error("HomeLinker messages inbox error:", {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code,
-          });
+          console.error(
+            "HomeLinker messages inbox error:",
+            {
+              message: error.message,
+              details: error.details,
+              hint: error.hint,
+              code: error.code,
+            }
+          );
 
           throw new Error(
-            error.message || "Unable to load your messages."
+            error.message ||
+              "Unable to load your messages."
           );
         }
 
-        const conversationData = (data ?? []) as Conversation[];
+        const conversationData =
+          (data ?? []) as Conversation[];
 
         if (!mounted) return;
 
         setConversations(conversationData);
 
         // --------------------------------------------------
-        // 3. Find the OTHER person in every conversation
+        // 3. Find the OTHER person
         // --------------------------------------------------
 
         const otherUserIds = Array.from(
@@ -120,11 +134,15 @@ export default function MessagesPage() {
         // --------------------------------------------------
 
         if (otherUserIds.length > 0) {
-          const { data: profileData, error: profileError } =
-            await supabase
-              .from("profiles")
-              .select("id, full_name, avatar_url")
-              .in("id", otherUserIds);
+          const {
+            data: profileData,
+            error: profileError,
+          } = await supabase
+            .from("profiles")
+            .select(
+              "id, full_name, avatar_url"
+            )
+            .in("id", otherUserIds);
 
           if (profileError) {
             console.error(
@@ -132,12 +150,17 @@ export default function MessagesPage() {
               profileError
             );
           } else {
-            const profileMap: Record<string, Profile> = {};
+            const profileMap: Record<
+              string,
+              Profile
+            > = {};
 
             for (const profile of profileData ?? []) {
               profileMap[profile.id] = {
-                full_name: profile.full_name ?? "",
-                avatar_url: profile.avatar_url ?? "",
+                full_name:
+                  profile.full_name ?? "",
+                avatar_url:
+                  profile.avatar_url ?? "",
               };
             }
 
@@ -173,7 +196,7 @@ export default function MessagesPage() {
     void loadMessages();
 
     // --------------------------------------------------
-    // 5. Refresh inbox when authentication changes
+    // 5. Refresh when authentication changes
     // --------------------------------------------------
 
     const {
@@ -275,7 +298,9 @@ export default function MessagesPage() {
 
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() =>
+                window.location.reload()
+              }
               className="mt-6 rounded-xl bg-black px-6 py-3 font-semibold text-white"
             >
               Try Again
@@ -293,6 +318,7 @@ export default function MessagesPage() {
   return (
     <main className="min-h-screen bg-[#F8F6F1] px-4 py-10">
       <div className="mx-auto max-w-5xl">
+
         {/* Header */}
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -329,8 +355,7 @@ export default function MessagesPage() {
             </h2>
 
             <p className="mx-auto mt-2 max-w-md text-slate-600">
-              When someone contacts you about a property, the
-              conversation will appear here.
+              When someone contacts you about a property, the conversation will appear here.
             </p>
 
             <Link
@@ -342,6 +367,7 @@ export default function MessagesPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+
             {/* List header */}
             <div className="border-b border-slate-200 px-6 py-5">
               <h2 className="text-xl font-bold text-black">
@@ -350,112 +376,137 @@ export default function MessagesPage() {
 
               <p className="mt-1 text-sm text-slate-500">
                 {conversations.length} conversation
-                {conversations.length === 1 ? "" : "s"}
+                {conversations.length === 1
+                  ? ""
+                  : "s"}
               </p>
             </div>
 
             {/* Conversation list */}
             <div className="divide-y divide-slate-200">
-              {conversations.map((conversation) => {
-                const isBuyer =
-                  conversation.buyer_id === userId;
 
-                const otherUserId = isBuyer
-                  ? conversation.owner_id
-                  : conversation.buyer_id;
+              {conversations.map(
+                (conversation) => {
+                  const isBuyer =
+                    conversation.buyer_id ===
+                    userId;
 
-                const otherProfile = profiles[otherUserId];
+                  const otherUserId = isBuyer
+                    ? conversation.owner_id
+                    : conversation.buyer_id;
 
-                const otherName =
-                  otherProfile?.full_name?.trim() ||
-                  (isBuyer ? "Property Owner" : "Home Seeker");
+                  const otherProfile =
+                    profiles[otherUserId];
 
-                const avatarUrl =
-                  otherProfile?.avatar_url || "";
+                  const otherName =
+                    otherProfile?.full_name?.trim() ||
+                    (isBuyer
+                      ? "Property Owner"
+                      : "Home Seeker");
 
-                const title =
-                  conversation.property_title ||
-                  "Property conversation";
+                  const avatarUrl =
+                    otherProfile?.avatar_url ||
+                    "";
 
-                const preview =
-                  conversation.last_message ||
-                  "No messages yet.";
+                  const title =
+                    conversation.property_title ||
+                    "Property conversation";
 
-                const messageDate =
-                  conversation.last_message_at ||
-                  conversation.created_at;
+                  const preview =
+                    conversation.last_message ||
+                    "No messages yet.";
 
-                return (
-                  <Link
-                    key={conversation.id}
-                    href={`/messages/${conversation.id}`}
-                    className="block px-5 py-5 transition hover:bg-[#FFFDF8] sm:px-6"
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* Profile Avatar */}
-                      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#C9A227] bg-[#C9A227]/15">
-                        {avatarUrl ? (
-                          <Image
-                            src={avatarUrl}
-                            alt={otherName}
-                            fill
-                            className="object-cover"
-                            unoptimized
-                          />
-                        ) : (
-                          <span className="text-sm font-black text-[#A67C00]">
-                            {getInitials(otherName)}
-                          </span>
-                        )}
-                      </div>
+                  const messageDate =
+                    conversation.last_message_at ||
+                    conversation.created_at;
 
-                      {/* Conversation */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <h3 className="truncate text-lg font-bold text-black">
+                  return (
+                    <div
+                      key={conversation.id}
+                      className="group px-5 py-5 transition hover:bg-[#FFFDF8] sm:px-6"
+                    >
+                      <div className="flex items-start gap-4">
+
+                        {/* Profile */}
+                        <Link
+                          href={`/profile/${otherUserId}`}
+                          className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#C9A227] bg-[#C9A227]/15 transition hover:scale-105 hover:shadow-md"
+                          title={`View ${otherName}'s profile`}
+                        >
+                          {avatarUrl ? (
+                            <Image
+                              src={avatarUrl}
+                              alt={otherName}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <span className="text-sm font-black text-[#A67C00]">
+                              {getInitials(
+                                otherName
+                              )}
+                            </span>
+                          )}
+                        </Link>
+
+                        {/* Conversation */}
+                        <Link
+                          href={`/messages/${conversation.id}`}
+                          className="min-w-0 flex-1"
+                        >
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+
+                            <h3 className="truncate text-lg font-bold text-black transition group-hover:text-[#C9A227]">
                               {otherName}
                             </h3>
 
-                            {otherProfile?.avatar_url && (
-                              <span className="shrink-0 text-xs font-semibold text-emerald-600">
-                                Profile
-                              </span>
-                            )}
+                            <span className="shrink-0 text-xs font-medium text-slate-500">
+                              {new Date(
+                                messageDate
+                              ).toLocaleString(
+                                "en-ZA",
+                                {
+                                  dateStyle:
+                                    "short",
+                                  timeStyle:
+                                    "short",
+                                }
+                              )}
+                            </span>
                           </div>
 
-                          <span className="shrink-0 text-xs font-medium text-slate-500">
-                            {new Date(
-                              messageDate
-                            ).toLocaleString("en-ZA", {
-                              dateStyle: "short",
-                              timeStyle: "short",
-                            })}
-                          </span>
-                        </div>
+                          <p className="mt-1 truncate font-semibold text-[#C9A227]">
+                            {title}
+                          </p>
 
-                        <p className="mt-1 truncate font-semibold text-[#C9A227]">
-                          {title}
-                        </p>
+                          <p className="mt-1 truncate text-sm text-slate-600">
+                            {preview}
+                          </p>
+                        </Link>
 
-                        <p className="mt-1 truncate text-sm text-slate-600">
-                          {preview}
-                        </p>
+                        {/* Open conversation */}
+                        <Link
+                          href={`/messages/${conversation.id}`}
+                          className="mt-2 shrink-0 text-xl text-slate-400 transition group-hover:text-[#C9A227]"
+                          aria-label="Open conversation"
+                        >
+                          →
+                        </Link>
+
                       </div>
-
-                      <span className="mt-2 shrink-0 text-xl text-slate-400">
-                        →
-                      </span>
                     </div>
-                  </Link>
-                );
-              })}
+                  );
+                }
+              )}
+
             </div>
           </div>
         )}
 
         {/* Bottom navigation */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+
           <Link
             href="/properties"
             className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-black transition hover:border-[#C9A227] hover:bg-[#FFFDF8]"
@@ -469,7 +520,9 @@ export default function MessagesPage() {
           >
             Back to Dashboard
           </Link>
+
         </div>
+
       </div>
     </main>
   );
