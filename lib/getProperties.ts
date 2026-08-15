@@ -8,15 +8,7 @@ export async function getProperties() {
 
   const { data, error } = await supabase
     .from("properties")
-    .select(`
-      *,
-      profiles:owner_id (
-        full_name,
-        phone_number,
-        avatar_url,
-        is_verified
-      )
-    `)
+    .select("*")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -24,35 +16,27 @@ export async function getProperties() {
     return [];
   }
 
-  return (data || []).map((property: any) => {
-    const profile = property.profiles;
+  return (data || []).map((property: Property) => ({
+    ...property,
 
-    return {
-      ...property,
+    slug: createPropertySlug(
+      property.title,
+      property.city ?? "",
+      property.id
+    ),
 
-      slug: createPropertySlug(
-        property.title,
-        property.city ?? "",
-        property.id
-      ),
+    image_urls: property.image_urls?.length
+      ? property.image_urls
+      : property.image_url
+      ? [property.image_url]
+      : [],
 
-      image_urls: property.image_urls?.length
-        ? property.image_urls
-        : property.image_url
-        ? [property.image_url]
-        : [],
+    owner_name: property.contact_name || "HomeLinker User",
 
-      owner_name:
-        profile?.full_name || "HomeLinker User",
+    owner_phone: property.contact_number || null,
 
-      owner_phone:
-        profile?.phone_number || null,
-
-      owner_avatar:
-        profile?.avatar_url || null,
-
-      owner_verified:
-        profile?.is_verified === true,
-    };
-  });
+    owner_verified:
+      property.verified === true ||
+      property.verification_status === "verified",
+  }));
 }
