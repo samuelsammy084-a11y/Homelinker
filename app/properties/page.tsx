@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { Property } from "@/app/types/property";
 import PropertyCard from "../components/PropertyCard";
 import PropertySearchBar from "../components/PropertySearchBar";
+import FeaturedProperties from "../components/FeaturedProperties";
 import { getProperties } from "@/lib/getProperties";
 
 export const metadata: Metadata = {
@@ -36,7 +37,6 @@ export default async function PropertiesPage({
 
   let properties = await getProperties();
 
-  // Province filter
   if (params.province) {
     properties = properties.filter(
       (property: Property) =>
@@ -44,7 +44,6 @@ export default async function PropertiesPage({
     );
   }
 
-  // City filter
   if (params.city) {
     const search = params.city.toLowerCase();
 
@@ -53,7 +52,6 @@ export default async function PropertiesPage({
     );
   }
 
-  // Property type filter
   if (params.type) {
     properties = properties.filter(
       (property: Property) =>
@@ -61,7 +59,6 @@ export default async function PropertiesPage({
     );
   }
 
-  // Maximum price filter
   if (params.maxPrice) {
     const maxPrice = Number(params.maxPrice);
 
@@ -75,6 +72,15 @@ export default async function PropertiesPage({
 
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
+
+      {/* POPULAR LISTINGS */}
+      {!params.province &&
+        !params.city &&
+        !params.type &&
+        !params.maxPrice && (
+          <FeaturedProperties />
+        )}
+
       <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-6 sm:py-10 lg:px-8">
 
         {/* HEADER */}
@@ -94,7 +100,6 @@ export default async function PropertiesPage({
               </p>
             </div>
 
-            {/* DESKTOP PROPERTY COUNT */}
             <div className="hidden rounded-2xl bg-white px-4 py-3 text-right shadow-sm sm:block">
               <p className="text-2xl font-black text-[#C9A227]">
                 {properties.length}
@@ -112,7 +117,7 @@ export default async function PropertiesPage({
           <PropertySearchBar sticky />
         </div>
 
-        {/* RESULTS BAR */}
+        {/* RESULTS */}
         <div className="mb-4 flex items-center justify-between sm:mb-6">
           <div>
             <p className="text-sm font-bold text-black sm:text-base">
@@ -132,6 +137,7 @@ export default async function PropertiesPage({
         {/* NO RESULTS */}
         {properties.length === 0 ? (
           <div className="rounded-3xl bg-white p-8 text-center shadow-lg sm:p-12">
+
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF9E8] text-2xl">
               🏠
             </div>
@@ -143,13 +149,13 @@ export default async function PropertiesPage({
             <p className="mt-3 text-sm text-gray-600 sm:text-base">
               Try changing your search filters.
             </p>
+
           </div>
         ) : (
           <>
-            {/* ================================================== */}
-            {/* MOBILE — VERTICAL SCROLL                           */}
-            {/* ================================================== */}
+            {/* MOBILE */}
             <div className="grid grid-cols-2 gap-3 sm:hidden">
+
               {properties.map((property: Property) => (
                 <div
                   key={property.id}
@@ -178,12 +184,12 @@ export default async function PropertiesPage({
                   />
                 </div>
               ))}
+
             </div>
 
-            {/* ================================================== */}
-            {/* TABLET / DESKTOP                                   */}
-            {/* ================================================== */}
+            {/* TABLET / DESKTOP */}
             <div className="hidden sm:grid sm:grid-cols-2 sm:gap-6 xl:grid-cols-3 xl:gap-8">
+
               {properties.map((property: Property) => (
                 <PropertyCard
                   key={property.id}
@@ -208,9 +214,11 @@ export default async function PropertiesPage({
                   phoneNumber={property.contact_number}
                 />
               ))}
+
             </div>
           </>
         )}
+
       </div>
     </main>
   );
