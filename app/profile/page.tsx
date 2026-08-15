@@ -8,13 +8,17 @@ import {
   ArrowLeft,
   Camera,
   CheckCircle2,
+  FileCheck2,
   House,
   LogOut,
   Mail,
   Phone,
   Save,
   ShieldCheck,
+  Upload,
   User,
+  Clock3,
+  XCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -29,6 +33,13 @@ type Profile = {
   role: Role;
   is_verified: boolean;
   verification_status: string;
+};
+
+type VerificationRequest = {
+  id: number;
+  status: "pending" | "verified" | "rejected";
+  rejection_reason: string | null;
+  created_at: string;
 };
 
 export default function ProfilePage() {
@@ -47,9 +58,17 @@ export default function ProfilePage() {
     verification_status: "unverified",
   });
 
+  const [verificationRequest, setVerificationRequest] =
+    useState<VerificationRequest | null>(null);
+
+  const [verificationFile, setVerificationFile] =
+    useState<File | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [submittingVerification, setSubmittingVerification] =
+    useState(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -95,6 +114,24 @@ export default function ProfilePage() {
               data.verification_status ?? "unverified",
           });
         }
+
+        const { data: request } = await supabase
+          .from("verification_requests")
+          .select(
+            "id, status, rejection_reason, created_at"
+          )
+          .eq("user_id", user.id)
+          .order("created_at", {
+            ascending: false,
+          })
+          .limit(1)
+          .maybeSingle();
+
+        if (request) {
+          setVerificationRequest(
+            request as VerificationRequest
+          );
+        }
       } catch (error) {
         console.error("Profile loading error:", error);
         toast.error("Something went wrong.");
@@ -126,24 +163,24 @@ export default function ProfilePage() {
     setUploading(true);
 
     try {
-      const extension = file.name.split(".").pop() || "jpg";
+      const extension =
+        file.name.split(".").pop() || "jpg";
 
-      const filePath = `${userId}/avatar-${Date.now()}.${extension}`;
+      const filePath =
+        `${userId}/avatar-${Date.now()}.${extension}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("profile-images")
-        .upload(filePath, file, {
-          upsert: true,
-          contentType: file.type,
-        });
+      const { error: uploadError } =
+        await supabase.storage
+          .from("profile-images")
+          .upload(filePath, file, {
+            upsert: true,
+            contentType: file.type,
+          });
 
       if (uploadError) {
-        console.error(uploadError);
-
         toast.error(
           `Could not upload profile picture: ${uploadError.message}`
         );
-
         return;
       }
 
@@ -153,13 +190,14 @@ export default function ProfilePage() {
 
       const avatarUrl = data.publicUrl;
 
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          avatar_url: avatarUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId);
+      const { error: updateError } =
+        await supabase
+          .from("profiles")
+          .update({
+            avatar_url: avatarUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userId);
 
       if (updateError) {
         toast.error(updateError.message);
@@ -174,9 +212,139 @@ export default function ProfilePage() {
       toast.success("Profile picture updated!");
     } catch (error) {
       console.error("Avatar upload error:", error);
-      toast.error("Something went wrong uploading your picture.");
+      toast.error(
+        "Something went wrong uploading your picture."
+      );
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleVerificationSubmit() {
+    if (!userId || !verificationFile) {
+      toast.error("Please choose your verification document.");
+      return;
+    }
+
+    if (
+      ![
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+      ].includes(verificationFile.type)
+    ) {
+      toast.error(
+        "Please upload a JPG, PNG or WebP image."
+      );
+      return;
+    }
+
+    if (verificationFile.size > 5 * 1024 * 1024) {
+      toast.error(
+        "Verification document must be smaller than 5MB."
+      );
+      return;
+    }
+
+    if (
+      verificationRequest?.status === "pending"
+    ) {
+      toast.error(
+        "You already have a verification request under review."
+      );
+      return;
+    }
+
+    setSubmittingVerification(true);
+
+    try {
+      const extension =
+        verificationFile.name.split(".").pop() || "jpg";
+
+      const filePath =
+        `${userId}/id-${Date.now()}.${extension}`;
+
+      const { error: uploadError } =
+        await supabase.storage
+          .from("verification-documents")
+          .upload(filePath, verificationFile, {
+            upsert: false,
+            contentType: verificationFile.type,
+          });
+
+      if (uploadError) {
+        console.error(uploadError);
+
+        toast.error(
+          `Could not upload document: ${uploadError.message}`
+        );
+
+        return;
+      }
+
+      const { data: request, error: requestError } =
+        await supabase
+          .from("verification_requests")
+          .insert({
+            user_id: userId,
+            id_document_url: filePath,
+            selfie_url: filePath,
+            status: "pending",
+          })
+          .select(
+            "id, status, rejection_reason, created_at"
+          )
+          .single();
+
+      if (requestError) {
+        console.error(requestError);
+
+        await supabase.storage
+          .from("verification-documents")
+          .remove([filePath]);
+
+        toast.error(
+          `Could not submit verification: ${requestError.message}`
+        );
+
+        return;
+      }
+
+      await supabase
+        .from("profiles")
+        .update({
+          verification_status: "pending",
+          is_verified: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
+
+      setVerificationRequest(
+        request as VerificationRequest
+      );
+
+      setProfile((current) => ({
+        ...current,
+        verification_status: "pending",
+        is_verified: false,
+      }));
+
+      setVerificationFile(null);
+
+      toast.success(
+        "Verification submitted! We'll review your account."
+      );
+    } catch (error) {
+      console.error(
+        "Verification submission error:",
+        error
+      );
+
+      toast.error(
+        "Something went wrong submitting verification."
+      );
+    } finally {
+      setSubmittingVerification(false);
     }
   }
 
@@ -207,15 +375,20 @@ export default function ProfilePage() {
         .eq("id", userId);
 
       if (error) {
-        console.error("Profile update error:", error);
-        toast.error(`Could not save profile: ${error.message}`);
+        toast.error(
+          `Could not save profile: ${error.message}`
+        );
         return;
       }
 
-      toast.success("Profile updated successfully!");
+      toast.success(
+        "Profile updated successfully!"
+      );
     } catch (error) {
       console.error("Profile save error:", error);
-      toast.error("Something went wrong saving your profile.");
+      toast.error(
+        "Something went wrong saving your profile."
+      );
     } finally {
       setSaving(false);
     }
@@ -228,10 +401,13 @@ export default function ProfilePage() {
 
     if (!confirmed) return;
 
-    const { error } = await supabase.auth.signOut();
+    const { error } =
+      await supabase.auth.signOut();
 
     if (error) {
-      toast.error(`Could not log out: ${error.message}`);
+      toast.error(
+        `Could not log out: ${error.message}`
+      );
       return;
     }
 
@@ -240,7 +416,8 @@ export default function ProfilePage() {
 
   function getRoleLabel(role: Role) {
     if (role === "estate_agent") return "Estate Agent";
-    if (role === "property_owner") return "Property Owner";
+    if (role === "property_owner")
+      return "Property Owner";
     return "Home Seeker";
   }
 
@@ -251,13 +428,9 @@ export default function ProfilePage() {
           <div className="rounded-[32px] border border-[#F0E7CF] bg-white p-10 text-center shadow-xl">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#C9A227]/20 border-t-[#C9A227]" />
 
-            <h1 className="mt-6 text-2xl font-black text-[#1B1B1B]">
+            <h1 className="mt-6 text-2xl font-black">
               Loading your profile...
             </h1>
-
-            <p className="mt-2 text-slate-500">
-              Just a moment.
-            </p>
           </div>
         </div>
       </main>
@@ -273,10 +446,18 @@ export default function ProfilePage() {
       .slice(0, 2)
       .toUpperCase() || "HL";
 
+  const isPending =
+    verificationRequest?.status === "pending" ||
+    profile.verification_status === "pending";
+
+  const isRejected =
+    verificationRequest?.status === "rejected" ||
+    profile.verification_status === "rejected";
+
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-4xl">
-        {/* BACK */}
+
         <Link
           href="/dashboard"
           className="mb-6 inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-[#C9A227]"
@@ -285,17 +466,20 @@ export default function ProfilePage() {
           Back to Dashboard
         </Link>
 
-        {/* HEADER */}
+        {/* PROFILE HEADER */}
         <div className="overflow-hidden rounded-[32px] bg-[#111111] shadow-xl">
           <div className="p-6 sm:p-10">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-              {/* AVATAR */}
+
               <div className="relative shrink-0">
                 <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-[#C9A227] bg-[#C9A227]/10 sm:h-32 sm:w-32">
                   {profile.avatar_url ? (
                     <Image
                       src={profile.avatar_url}
-                      alt={profile.full_name || "Profile picture"}
+                      alt={
+                        profile.full_name ||
+                        "Profile picture"
+                      }
                       fill
                       className="object-cover"
                       unoptimized
@@ -324,11 +508,11 @@ export default function ProfilePage() {
                 </label>
               </div>
 
-              {/* NAME */}
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-3xl font-black text-white sm:text-4xl">
-                    {profile.full_name || "Your Profile"}
+                    {profile.full_name ||
+                      "Your Profile"}
                   </h1>
 
                   {profile.is_verified && (
@@ -348,6 +532,8 @@ export default function ProfilePage() {
 
                   {profile.is_verified
                     ? "Verified Profile"
+                    : isPending
+                    ? "Verification Pending"
                     : "Profile Not Yet Verified"}
                 </div>
               </div>
@@ -355,10 +541,10 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* PROFILE INFORMATION */}
-        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.2)] sm:p-10">
+        {/* PERSONAL INFORMATION */}
+        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
           <div className="mb-8">
-            <h2 className="text-2xl font-black text-[#1B1B1B] sm:text-3xl">
+            <h2 className="text-2xl font-black sm:text-3xl">
               Personal Information
             </h2>
 
@@ -368,9 +554,9 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-6">
-            {/* NAME */}
+
             <div>
-              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
+              <label className="mb-2 block text-sm font-bold">
                 Full Name
               </label>
 
@@ -386,18 +572,18 @@ export default function ProfilePage() {
                   onChange={(event) =>
                     setProfile((current) => ({
                       ...current,
-                      full_name: event.target.value,
+                      full_name:
+                        event.target.value,
                     }))
                   }
                   placeholder="Enter your full name"
-                  className="w-full rounded-2xl border border-slate-200 bg-white py-4 pl-12 pr-4 text-[#1B1B1B] outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
+                  className="w-full rounded-2xl border border-slate-200 py-4 pl-12 pr-4 text-[#1B1B1B] outline-none focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
                 />
               </div>
             </div>
 
-            {/* PHONE */}
             <div>
-              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
+              <label className="mb-2 block text-sm font-bold">
                 Phone Number
               </label>
 
@@ -413,18 +599,18 @@ export default function ProfilePage() {
                   onChange={(event) =>
                     setProfile((current) => ({
                       ...current,
-                      phone_number: event.target.value,
+                      phone_number:
+                        event.target.value,
                     }))
                   }
                   placeholder="e.g. 082 123 4567"
-                  className="w-full rounded-2xl border border-slate-200 bg-white py-4 pl-12 pr-4 text-[#1B1B1B] outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
+                  className="w-full rounded-2xl border border-slate-200 py-4 pl-12 pr-4 text-[#1B1B1B] outline-none focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
                 />
               </div>
             </div>
 
-            {/* EMAIL */}
             <div>
-              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
+              <label className="mb-2 block text-sm font-bold">
                 Email Address
               </label>
 
@@ -438,42 +624,36 @@ export default function ProfilePage() {
                   type="email"
                   value={email}
                   disabled
-                  className="w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-slate-500 outline-none"
+                  className="w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-slate-500"
                 />
               </div>
-
-              <p className="mt-2 text-xs text-slate-400">
-                Your email address is managed through your HomeLinker
-                account.
-              </p>
             </div>
 
-            {/* ACCOUNT TYPE */}
             <div>
-              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
+              <label className="mb-2 block text-sm font-bold">
                 Account Type
               </label>
 
               <div className="flex items-center gap-3 rounded-2xl border border-[#F0E7CF] bg-[#FFF9E8] p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9A227]/10 text-[#C9A227]">
-                  <House size={20} />
-                </div>
+                <House
+                  size={20}
+                  className="text-[#C9A227]"
+                />
 
                 <div>
-                  <p className="font-bold text-[#1B1B1B]">
+                  <p className="font-bold">
                     {getRoleLabel(profile.role)}
                   </p>
 
                   <p className="text-sm text-slate-500">
-                    Your account role on HomeLinker.
+                    Your HomeLinker account role.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* BIO */}
             <div>
-              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
+              <label className="mb-2 block text-sm font-bold">
                 About You
               </label>
 
@@ -487,110 +667,218 @@ export default function ProfilePage() {
                   }))
                 }
                 placeholder="Tell people a little about yourself..."
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 text-[#1B1B1B] outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
+                className="w-full resize-none rounded-2xl border border-slate-200 p-4 text-[#1B1B1B] outline-none focus:border-[#C9A227]"
               />
             </div>
           </div>
 
-          {/* SAVE */}
           <button
             type="button"
             onClick={handleSaveProfile}
             disabled={saving}
-            className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-white transition hover:bg-[#A67C00] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-white hover:bg-[#A67C00] disabled:opacity-60 sm:w-auto"
           >
             <Save size={18} />
-
-            {saving ? "Saving..." : "Save Changes"}
+            {saving
+              ? "Saving..."
+              : "Save Changes"}
           </button>
         </section>
 
         {/* VERIFICATION */}
-        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.2)] sm:p-10">
+        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
+
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#C9A227]/10 text-[#C9A227]">
-              <ShieldCheck size={24} />
+              <ShieldCheck size={25} />
             </div>
 
             <div>
-              <h2 className="text-2xl font-black text-[#1B1B1B]">
+              <h2 className="text-2xl font-black sm:text-3xl">
                 Verification & Safety
               </h2>
 
               <p className="mt-2 text-slate-600">
-                We want HomeLinker to remain a trusted marketplace.
-                Verification features will help protect users from
-                fake profiles and scams.
+                Verify your identity to help other HomeLinker
+                users know that your account is genuine.
               </p>
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="font-bold text-[#1B1B1B]">
-                  Current status
-                </p>
-
-                <p className="mt-1 text-sm capitalize text-slate-500">
-                  {profile.is_verified
-                    ? "Your profile is verified."
-                    : `Status: ${profile.verification_status}`}
-                </p>
-              </div>
-
-              {profile.is_verified ? (
+          {/* VERIFIED */}
+          {profile.is_verified ? (
+            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+              <div className="flex items-center gap-3">
                 <CheckCircle2
-                  size={28}
-                  className="shrink-0 text-emerald-600"
+                  size={30}
+                  className="text-emerald-600"
                 />
-              ) : (
-                <ShieldCheck
-                  size={28}
-                  className="shrink-0 text-slate-400"
-                />
-              )}
-            </div>
-          </div>
 
-          <p className="mt-4 text-sm text-slate-500">
-            More verification options for property owners and estate
-            agents can be added here later.
-          </p>
+                <div>
+                  <h3 className="font-black text-emerald-800">
+                    Your account is verified
+                  </h3>
+
+                  <p className="mt-1 text-sm text-emerald-700">
+                    Other users can now see that your HomeLinker
+                    profile has been verified.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : isPending ? (
+            /* PENDING */
+            <div className="mt-6 rounded-2xl border border-yellow-200 bg-yellow-50 p-6">
+              <div className="flex items-center gap-3">
+                <Clock3
+                  size={30}
+                  className="text-yellow-600"
+                />
+
+                <div>
+                  <h3 className="font-black text-yellow-800">
+                    Verification under review
+                  </h3>
+
+                  <p className="mt-1 text-sm text-yellow-700">
+                    Your verification documents have been submitted.
+                    Please wait while HomeLinker reviews them.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* REJECTED */}
+              {isRejected && (
+                <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+                  <div className="flex items-start gap-3">
+                    <XCircle
+                      size={24}
+                      className="mt-0.5 shrink-0 text-red-600"
+                    />
+
+                    <div>
+                      <h3 className="font-black text-red-800">
+                        Verification was not approved
+                      </h3>
+
+                      {verificationRequest?.rejection_reason && (
+                        <p className="mt-1 text-sm text-red-700">
+                          Reason:{" "}
+                          {
+                            verificationRequest.rejection_reason
+                          }
+                        </p>
+                      )}
+
+                      <p className="mt-2 text-sm text-red-700">
+                        You can submit a new document below.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* UPLOAD */}
+              <div className="mt-6 rounded-2xl border-2 border-dashed border-[#E8D9A8] bg-[#FFFDF8] p-6">
+
+                <div className="text-center">
+                  <FileCheck2
+                    size={40}
+                    className="mx-auto text-[#C9A227]"
+                  />
+
+                  <h3 className="mt-4 text-xl font-black">
+                    Verify your account
+                  </h3>
+
+                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                    Upload a clear photo of an accepted identity
+                    document. Your document is stored privately and
+                    only used for verification.
+                  </p>
+                </div>
+
+                <label
+                  htmlFor="verification-document"
+                  className="mx-auto mt-6 flex max-w-xl cursor-pointer items-center justify-center gap-3 rounded-2xl border border-[#C9A227] bg-white px-6 py-5 font-bold text-[#A67C00] transition hover:bg-[#FFF9E8]"
+                >
+                  <Upload size={20} />
+
+                  {verificationFile
+                    ? verificationFile.name
+                    : "Choose verification document"}
+
+                  <input
+                    id="verification-document"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(event) => {
+                      setVerificationFile(
+                        event.target.files?.[0] ??
+                          null
+                      );
+                    }}
+                  />
+                </label>
+
+                <p className="mt-3 text-center text-xs text-slate-400">
+                  JPG, PNG or WebP • Maximum 5MB
+                </p>
+
+                {verificationFile && (
+                  <button
+                    type="button"
+                    onClick={handleVerificationSubmit}
+                    disabled={submittingVerification}
+                    className="mx-auto mt-6 flex w-full max-w-xl items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-white transition hover:bg-[#A67C00] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <ShieldCheck size={19} />
+
+                    {submittingVerification
+                      ? "Submitting..."
+                      : "Submit for Verification"}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </section>
 
-        {/* COMMUNITY POLICY */}
-        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.2)] sm:p-10">
-          <h2 className="text-2xl font-black text-[#1B1B1B]">
+        {/* COMMUNITY */}
+        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
+          <h2 className="text-2xl font-black">
             Community & Safety
           </h2>
 
           <p className="mt-2 text-slate-600">
-            Help keep HomeLinker safe and trustworthy for everyone.
+            Help keep HomeLinker safe and trustworthy.
           </p>
 
           <div className="mt-6 space-y-3">
             <Link
               href="/terms"
-              className="block rounded-2xl border border-slate-200 p-4 font-semibold text-[#1B1B1B] transition hover:border-[#C9A227] hover:bg-[#FFF9E8]"
+              className="block rounded-2xl border border-slate-200 p-4 font-semibold hover:border-[#C9A227] hover:bg-[#FFF9E8]"
             >
               Terms & Conditions
             </Link>
 
             <Link
               href="/privacy"
-              className="block rounded-2xl border border-slate-200 p-4 font-semibold text-[#1B1B1B] transition hover:border-[#C9A227] hover:bg-[#FFF9E8]"
+              className="block rounded-2xl border border-slate-200 p-4 font-semibold hover:border-[#C9A227] hover:bg-[#FFF9E8]"
             >
               Privacy Policy
             </Link>
           </div>
         </section>
 
-        {/* LOGOUT - BOTTOM */}
-        <section className="mt-8 rounded-[32px] border border-red-100 bg-white p-6 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.2)] sm:p-10">
+        {/* LOGOUT */}
+        <section className="mt-8 rounded-[32px] border border-red-100 bg-white p-6 shadow-xl sm:p-10">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-black text-[#1B1B1B]">
+              <h2 className="text-xl font-black">
                 Sign out of HomeLinker
               </h2>
 
@@ -602,7 +890,7 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 font-bold text-white transition hover:bg-red-700"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 font-bold text-white hover:bg-red-700"
             >
               <LogOut size={18} />
               Logout
