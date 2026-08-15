@@ -178,9 +178,12 @@ export default function ProfilePage() {
           });
 
       if (uploadError) {
+        console.error("Avatar upload error:", uploadError);
+
         toast.error(
           `Could not upload profile picture: ${uploadError.message}`
         );
+
         return;
       }
 
@@ -190,17 +193,37 @@ export default function ProfilePage() {
 
       const avatarUrl = data.publicUrl;
 
-      const { error: updateError } =
+      /*
+       * IMPORTANT:
+       * Upsert instead of update.
+       *
+       * This makes sure the profile row exists and saves
+       * the avatar even if the profile row was never created.
+       */
+      const { error: profileError } =
         await supabase
           .from("profiles")
-          .update({
-            avatar_url: avatarUrl,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", userId);
+          .upsert(
+            {
+              id: userId,
+              avatar_url: avatarUrl,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: "id",
+            }
+          );
 
-      if (updateError) {
-        toast.error(updateError.message);
+      if (profileError) {
+        console.error(
+          "Profile avatar save error:",
+          profileError
+        );
+
+        toast.error(
+          `Picture uploaded, but profile could not be saved: ${profileError.message}`
+        );
+
         return;
       }
 
@@ -209,14 +232,115 @@ export default function ProfilePage() {
         avatar_url: avatarUrl,
       }));
 
-      toast.success("Profile picture updated!");
+      toast.success("Profile picture saved!");
     } catch (error) {
       console.error("Avatar upload error:", error);
+
       toast.error(
         "Something went wrong uploading your picture."
       );
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleSaveProfile() {
+    if (!userId) {
+      toast.error("You are not logged in.");
+      return;
+    }
+
+    if (!profile.full_name.trim()) {
+      toast.error("Please enter your name.");
+      return;
+    }
+
+    if (!profile.phone_number.trim()) {
+      toast.error("Please enter your phone number.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      /*
+       * IMPORTANT:
+       * Use UPSERT instead of UPDATE.
+       *
+       * UPDATE only works if a profile row already exists.
+       * UPSERT creates it when necessary and updates it when
+       * it already exists.
+       */
+      const { data, error } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: userId,
+            full_name: profile.full_name.trim(),
+            phone_number: profile.phone_number.trim(),
+            avatar_url: profile.avatar_url || null,
+            bio: profile.bio.trim(),
+            role: profile.role,
+            is_verified: profile.is_verified,
+            verification_status:
+              profile.verification_status,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "id",
+          }
+        )
+        .select(
+          "full_name, phone_number, avatar_url, bio, role, is_verified, verification_status"
+        )
+        .single();
+
+      if (error) {
+        console.error(
+          "PROFILE SAVE ERROR:",
+          error
+        );
+
+        toast.error(
+          `Could not save profile: ${error.message}`
+        );
+
+        return;
+      }
+
+      if (!data) {
+        toast.error(
+          "Profile was not returned after saving."
+        );
+
+        return;
+      }
+
+      setProfile({
+        full_name: data.full_name ?? "",
+        phone_number: data.phone_number ?? "",
+        avatar_url: data.avatar_url ?? "",
+        bio: data.bio ?? "",
+        role: (data.role as Role) ?? "home_seeker",
+        is_verified: data.is_verified ?? false,
+        verification_status:
+          data.verification_status ?? "unverified",
+      });
+
+      toast.success(
+        "Profile saved successfully!"
+      );
+    } catch (error) {
+      console.error(
+        "Profile save error:",
+        error
+      );
+
+      toast.error(
+        "Something went wrong saving your profile."
+      );
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -348,52 +472,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleSaveProfile() {
-    if (!userId) return;
-
-    if (!profile.full_name.trim()) {
-      toast.error("Please enter your name.");
-      return;
-    }
-
-    if (!profile.phone_number.trim()) {
-      toast.error("Please enter your phone number.");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: profile.full_name.trim(),
-          phone_number: profile.phone_number.trim(),
-          bio: profile.bio.trim(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId);
-
-      if (error) {
-        toast.error(
-          `Could not save profile: ${error.message}`
-        );
-        return;
-      }
-
-      toast.success(
-        "Profile updated successfully!"
-      );
-    } catch (error) {
-      console.error("Profile save error:", error);
-      toast.error(
-        "Something went wrong saving your profile."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleLogout() {
     const confirmed = window.confirm(
       "Are you sure you want to log out of HomeLinker?"
@@ -418,7 +496,6 @@ export default function ProfilePage() {
     if (role === "estate_agent") return "Estate Agent";
     if (role === "property_owner")
       return "Property Owner";
-
     return "Home Seeker";
   }
 
@@ -426,7 +503,7 @@ export default function ProfilePage() {
     return (
       <main className="min-h-screen bg-[#F8F6F1] px-6 py-24">
         <div className="mx-auto max-w-3xl">
-          <div className="rounded-[32px] border border-[#E9DFC3] bg-white p-10 text-center shadow-xl">
+          <div className="rounded-[32px] border border-[#F0E7CF] bg-white p-10 text-center shadow-xl">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#C9A227]/20 border-t-[#C9A227]" />
 
             <h1 className="mt-6 text-2xl font-black text-[#1B1B1B]">
@@ -456,33 +533,24 @@ export default function ProfilePage() {
     profile.verification_status === "rejected";
 
   return (
-    <main className="min-h-screen bg-[#F8F6F1] px-4 py-8 sm:px-6 sm:py-12">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-4xl">
 
-        {/* BACK */}
         <Link
           href="/dashboard"
-          className="mb-6 inline-flex items-center gap-2 font-semibold text-[#475569] transition hover:text-[#C9A227]"
+          className="mb-6 inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-[#A67C00]"
         >
           <ArrowLeft size={18} />
           Back to Dashboard
         </Link>
 
-        {/* ===================================================== */}
-        {/* PROFILE IDENTITY                                      */}
-        {/* ===================================================== */}
-        <section className="overflow-hidden rounded-[32px] border border-[#E9DFC3] bg-white shadow-xl">
-
-          {/* GOLD TOP LINE */}
-          <div className="h-2 bg-[#C9A227]" />
-
-          <div className="p-6 sm:p-10">
+        {/* PROFILE HEADER */}
+        <div className="overflow-hidden rounded-[32px] border border-[#E8D8A5] bg-white shadow-xl">
+          <div className="border-t-8 border-[#C9A227] p-6 sm:p-10">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
 
-              {/* PROFILE PHOTO */}
-              <div className="relative mx-auto shrink-0 sm:mx-0">
-                <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-[#C9A227] bg-[#FFF9E8] shadow-md sm:h-32 sm:w-32">
-
+              <div className="relative shrink-0">
+                <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-[#C9A227] bg-[#FFF9E8] sm:h-32 sm:w-32">
                   {profile.avatar_url ? (
                     <Image
                       src={profile.avatar_url}
@@ -501,7 +569,6 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* CAMERA */}
                 <label
                   htmlFor="avatar-upload"
                   className="absolute bottom-0 right-0 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-[#C9A227] text-white shadow-lg transition hover:bg-[#A67C00]"
@@ -519,11 +586,9 @@ export default function ProfilePage() {
                 </label>
               </div>
 
-              {/* NAME */}
-              <div className="min-w-0 text-center sm:text-left">
-
-                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                  <h1 className="break-words text-3xl font-black tracking-tight text-[#111111] sm:text-4xl">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-3xl font-black text-[#1B1B1B] sm:text-4xl">
                     {profile.full_name ||
                       "Your Name"}
                   </h1>
@@ -536,11 +601,11 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                <p className="mt-2 text-base font-medium text-[#64748B]">
+                <p className="mt-2 text-slate-500">
                   {getRoleLabel(profile.role)}
                 </p>
 
-                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#E9DFC3] bg-[#FFF9E8] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#A67C00]">
+                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#E8D8A5] bg-[#FFF9E8] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#A67C00]">
                   <ShieldCheck size={14} />
 
                   {profile.is_verified
@@ -552,26 +617,22 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        {/* ===================================================== */}
-        {/* PERSONAL INFORMATION                                  */}
-        {/* ===================================================== */}
-        <section className="mt-8 rounded-[32px] border border-[#E9DFC3] bg-white p-6 shadow-xl sm:p-10">
-
+        {/* PERSONAL INFORMATION */}
+        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
           <div className="mb-8">
-            <h2 className="text-2xl font-black text-[#111111] sm:text-3xl">
+            <h2 className="text-2xl font-black text-[#1B1B1B] sm:text-3xl">
               Personal Information
             </h2>
 
-            <p className="mt-2 text-[#64748B]">
+            <p className="mt-2 text-slate-500">
               Keep your HomeLinker profile information up to date.
             </p>
           </div>
 
           <div className="space-y-6">
 
-            {/* FULL NAME */}
             <div>
               <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 Full Name
@@ -580,7 +641,7 @@ export default function ProfilePage() {
               <div className="relative">
                 <User
                   size={18}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                 />
 
                 <input
@@ -594,12 +655,11 @@ export default function ProfilePage() {
                     }))
                   }
                   placeholder="Enter your full name"
-                  className="w-full rounded-2xl border border-[#DDE3EA] bg-white py-4 pl-12 pr-4 text-[#111111] placeholder:text-[#94A3B8] outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
+                  className="w-full rounded-2xl border border-slate-200 py-4 pl-12 pr-4 text-[#1B1B1B] outline-none focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
                 />
               </div>
             </div>
 
-            {/* PHONE */}
             <div>
               <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 Phone Number
@@ -608,7 +668,7 @@ export default function ProfilePage() {
               <div className="relative">
                 <Phone
                   size={18}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                 />
 
                 <input
@@ -622,12 +682,11 @@ export default function ProfilePage() {
                     }))
                   }
                   placeholder="e.g. 082 123 4567"
-                  className="w-full rounded-2xl border border-[#DDE3EA] bg-white py-4 pl-12 pr-4 text-[#111111] placeholder:text-[#94A3B8] outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
+                  className="w-full rounded-2xl border border-slate-200 py-4 pl-12 pr-4 text-[#1B1B1B] outline-none focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
                 />
               </div>
             </div>
 
-            {/* EMAIL */}
             <div>
               <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 Email Address
@@ -636,43 +695,41 @@ export default function ProfilePage() {
               <div className="relative">
                 <Mail
                   size={18}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                 />
 
                 <input
                   type="email"
                   value={email}
                   disabled
-                  className="w-full cursor-not-allowed rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] py-4 pl-12 pr-4 text-[#64748B]"
+                  className="w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-slate-500"
                 />
               </div>
             </div>
 
-            {/* ACCOUNT TYPE */}
             <div>
               <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 Account Type
               </label>
 
-              <div className="flex items-center gap-3 rounded-2xl border border-[#E9DFC3] bg-[#FFF9E8] p-4">
+              <div className="flex items-center gap-3 rounded-2xl border border-[#F0E7CF] bg-[#FFF9E8] p-4">
                 <House
                   size={20}
                   className="text-[#C9A227]"
                 />
 
                 <div>
-                  <p className="font-bold text-[#111111]">
+                  <p className="font-bold text-[#1B1B1B]">
                     {getRoleLabel(profile.role)}
                   </p>
 
-                  <p className="text-sm text-[#64748B]">
+                  <p className="text-sm text-slate-500">
                     Your HomeLinker account role.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* BIO */}
             <div>
               <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 About You
@@ -688,7 +745,7 @@ export default function ProfilePage() {
                   }))
                 }
                 placeholder="Tell people a little about yourself..."
-                className="w-full resize-none rounded-2xl border border-[#DDE3EA] bg-white p-4 text-[#111111] placeholder:text-[#94A3B8] outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
+                className="w-full resize-none rounded-2xl border border-slate-200 p-4 text-[#1B1B1B] outline-none focus:border-[#C9A227]"
               />
             </div>
           </div>
@@ -697,20 +754,17 @@ export default function ProfilePage() {
             type="button"
             onClick={handleSaveProfile}
             disabled={saving}
-            className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-white transition hover:bg-[#A67C00] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-white transition hover:bg-[#A67C00] disabled:opacity-60 sm:w-auto"
           >
             <Save size={18} />
-
             {saving
               ? "Saving..."
               : "Save Changes"}
           </button>
         </section>
 
-        {/* ===================================================== */}
-        {/* VERIFICATION                                          */}
-        {/* ===================================================== */}
-        <section className="mt-8 rounded-[32px] border border-[#E9DFC3] bg-white p-6 shadow-xl sm:p-10">
+        {/* VERIFICATION */}
+        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
 
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FFF9E8] text-[#C9A227]">
@@ -718,18 +772,17 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <h2 className="text-2xl font-black text-[#111111] sm:text-3xl">
+              <h2 className="text-2xl font-black text-[#1B1B1B] sm:text-3xl">
                 Verification & Safety
               </h2>
 
-              <p className="mt-2 text-[#64748B]">
+              <p className="mt-2 text-slate-600">
                 Verify your identity to help other HomeLinker
                 users know that your account is genuine.
               </p>
             </div>
           </div>
 
-          {/* VERIFIED */}
           {profile.is_verified ? (
             <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
               <div className="flex items-center gap-3">
@@ -772,7 +825,6 @@ export default function ProfilePage() {
             </div>
           ) : (
             <>
-              {/* REJECTED */}
               {isRejected && (
                 <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
                   <div className="flex items-start gap-3">
@@ -803,7 +855,6 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* UPLOAD */}
               <div className="mt-6 rounded-2xl border-2 border-dashed border-[#E8D9A8] bg-[#FFFDF8] p-6">
 
                 <div className="text-center">
@@ -812,11 +863,11 @@ export default function ProfilePage() {
                     className="mx-auto text-[#C9A227]"
                   />
 
-                  <h3 className="mt-4 text-xl font-black text-[#111111]">
+                  <h3 className="mt-4 text-xl font-black text-[#1B1B1B]">
                     Verify your account
                   </h3>
 
-                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#64748B]">
+                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
                     Upload a clear photo of an accepted identity
                     document. Your document is stored privately and
                     only used for verification.
@@ -847,7 +898,7 @@ export default function ProfilePage() {
                   />
                 </label>
 
-                <p className="mt-3 text-center text-xs text-[#94A3B8]">
+                <p className="mt-3 text-center text-xs text-slate-400">
                   JPG, PNG or WebP • Maximum 5MB
                 </p>
 
@@ -870,49 +921,42 @@ export default function ProfilePage() {
           )}
         </section>
 
-        {/* ===================================================== */}
-        {/* COMMUNITY                                             */}
-        {/* ===================================================== */}
-        <section className="mt-8 rounded-[32px] border border-[#E9DFC3] bg-white p-6 shadow-xl sm:p-10">
-
-          <h2 className="text-2xl font-black text-[#111111]">
+        {/* COMMUNITY */}
+        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
+          <h2 className="text-2xl font-black text-[#1B1B1B]">
             Community & Safety
           </h2>
 
-          <p className="mt-2 text-[#64748B]">
+          <p className="mt-2 text-slate-600">
             Help keep HomeLinker safe and trustworthy.
           </p>
 
           <div className="mt-6 space-y-3">
             <Link
               href="/terms"
-              className="block rounded-2xl border border-[#DDE3EA] p-4 font-semibold text-[#1B1B1B] transition hover:border-[#C9A227] hover:bg-[#FFF9E8]"
+              className="block rounded-2xl border border-slate-200 p-4 font-semibold transition hover:border-[#C9A227] hover:bg-[#FFF9E8]"
             >
               Terms & Conditions
             </Link>
 
             <Link
               href="/privacy"
-              className="block rounded-2xl border border-[#DDE3EA] p-4 font-semibold text-[#1B1B1B] transition hover:border-[#C9A227] hover:bg-[#FFF9E8]"
+              className="block rounded-2xl border border-slate-200 p-4 font-semibold transition hover:border-[#C9A227] hover:bg-[#FFF9E8]"
             >
               Privacy Policy
             </Link>
           </div>
         </section>
 
-        {/* ===================================================== */}
-        {/* LOGOUT                                                */}
-        {/* ===================================================== */}
+        {/* LOGOUT */}
         <section className="mt-8 rounded-[32px] border border-red-100 bg-white p-6 shadow-xl sm:p-10">
-
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-
             <div>
-              <h2 className="text-xl font-black text-[#111111]">
+              <h2 className="text-xl font-black text-[#1B1B1B]">
                 Sign out of HomeLinker
               </h2>
 
-              <p className="mt-1 text-sm text-[#64748B]">
+              <p className="mt-1 text-sm text-slate-500">
                 You can sign back in at any time.
               </p>
             </div>
@@ -920,19 +964,17 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 font-bold text-white transition hover:bg-red-700"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 font-bold text-white hover:bg-red-700"
             >
               <LogOut size={18} />
               Logout
             </button>
-
           </div>
         </section>
 
-        <div className="pb-8 pt-8 text-center text-sm text-[#94A3B8]">
+        <div className="pb-8 pt-8 text-center text-sm text-slate-400">
           HomeLinker • Your trusted property marketplace
         </div>
-
       </div>
     </main>
   );
