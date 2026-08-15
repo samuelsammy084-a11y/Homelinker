@@ -36,41 +36,48 @@ export default async function PropertiesPage({
 
   let properties = await getProperties();
 
-  // Filter by Province
+  // Province filter
   if (params.province) {
     properties = properties.filter(
-      (p: Property) => p.province === params.province
+      (property: Property) =>
+        property.province === params.province
     );
   }
 
-  // Filter by City
+  // City filter
   if (params.city) {
     const search = params.city.toLowerCase();
 
-    properties = properties.filter((p: Property) =>
-      p.city?.toLowerCase().includes(search)
+    properties = properties.filter((property: Property) =>
+      property.city?.toLowerCase().includes(search)
     );
   }
 
-  // Filter by Property Type
+  // Property type filter
   if (params.type) {
     properties = properties.filter(
-      (p: Property) => p.property_type === params.type
+      (property: Property) =>
+        property.property_type === params.type
     );
   }
 
-  // Filter by Maximum Price
+  // Maximum price filter
   if (params.maxPrice) {
-    properties = properties.filter(
-      (p: Property) => Number(p.price) <= Number(params.maxPrice)
-    );
+    const maxPrice = Number(params.maxPrice);
+
+    if (!Number.isNaN(maxPrice)) {
+      properties = properties.filter(
+        (property: Property) =>
+          Number(property.price) <= maxPrice
+      );
+    }
   }
 
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
       <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-6 sm:py-10 lg:px-8">
 
-        {/* Header */}
+        {/* HEADER */}
         <div className="mb-5 sm:mb-8">
           <div className="flex items-end justify-between gap-3">
             <div>
@@ -87,10 +94,12 @@ export default async function PropertiesPage({
               </p>
             </div>
 
+            {/* DESKTOP PROPERTY COUNT */}
             <div className="hidden rounded-2xl bg-white px-4 py-3 text-right shadow-sm sm:block">
               <p className="text-2xl font-black text-[#C9A227]">
                 {properties.length}
               </p>
+
               <p className="text-xs font-semibold text-slate-500">
                 properties
               </p>
@@ -98,26 +107,29 @@ export default async function PropertiesPage({
           </div>
         </div>
 
-        {/* Search */}
+        {/* SEARCH */}
         <div className="mb-5 rounded-2xl border border-[#E9E1CA] bg-white p-2 shadow-sm sm:mb-8 sm:rounded-3xl sm:p-4">
           <PropertySearchBar sticky />
         </div>
 
-        {/* Results bar */}
+        {/* RESULTS BAR */}
         <div className="mb-4 flex items-center justify-between sm:mb-6">
           <div>
             <p className="text-sm font-bold text-black sm:text-base">
               {properties.length}{" "}
-              {properties.length === 1 ? "property" : "properties"} found
+              {properties.length === 1
+                ? "property"
+                : "properties"}{" "}
+              found
             </p>
 
             <p className="mt-0.5 text-xs text-slate-500 sm:hidden">
-              Swipe through listings
+              Scroll down to explore properties
             </p>
           </div>
         </div>
 
-        {/* No results */}
+        {/* NO RESULTS */}
         {properties.length === 0 ? (
           <div className="rounded-3xl bg-white p-8 text-center shadow-lg sm:p-12">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF9E8] text-2xl">
@@ -134,12 +146,14 @@ export default async function PropertiesPage({
           </div>
         ) : (
           <>
-            {/* MOBILE: horizontal property rail */}
-            <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-5 snap-x snap-mandatory scrollbar-hide sm:hidden">
+            {/* ================================================== */}
+            {/* MOBILE — VERTICAL SCROLL                           */}
+            {/* ================================================== */}
+            <div className="grid grid-cols-2 gap-3 sm:hidden">
               {properties.map((property: Property) => (
                 <div
                   key={property.id}
-                  className="w-[calc(50vw-20px)] min-w-[calc(50vw-20px)] snap-start"
+                  className="min-w-0"
                 >
                   <PropertyCard
                     id={property.id}
@@ -160,12 +174,15 @@ export default async function PropertiesPage({
                     parking={property.parking ?? 0}
                     featured={property.featured}
                     verified={property.verified}
+                    phoneNumber={property.contact_number}
                   />
                 </div>
               ))}
             </div>
 
-            {/* DESKTOP / TABLET */}
+            {/* ================================================== */}
+            {/* TABLET / DESKTOP                                   */}
+            {/* ================================================== */}
             <div className="hidden sm:grid sm:grid-cols-2 sm:gap-6 xl:grid-cols-3 xl:gap-8">
               {properties.map((property: Property) => (
                 <PropertyCard
@@ -188,6 +205,7 @@ export default async function PropertiesPage({
                   parking={property.parking ?? 0}
                   featured={property.featured}
                   verified={property.verified}
+                  phoneNumber={property.contact_number}
                 />
               ))}
             </div>
