@@ -418,6 +418,7 @@ export default function ProfilePage() {
     if (role === "estate_agent") return "Estate Agent";
     if (role === "property_owner")
       return "Property Owner";
+
     return "Home Seeker";
   }
 
@@ -425,10 +426,10 @@ export default function ProfilePage() {
     return (
       <main className="min-h-screen bg-[#F8F6F1] px-6 py-24">
         <div className="mx-auto max-w-3xl">
-          <div className="rounded-[32px] border border-[#F0E7CF] bg-white p-10 text-center shadow-xl">
+          <div className="rounded-[32px] border border-[#E9DFC3] bg-white p-10 text-center shadow-xl">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#C9A227]/20 border-t-[#C9A227]" />
 
-            <h1 className="mt-6 text-2xl font-black">
+            <h1 className="mt-6 text-2xl font-black text-[#1B1B1B]">
               Loading your profile...
             </h1>
           </div>
@@ -455,24 +456,33 @@ export default function ProfilePage() {
     profile.verification_status === "rejected";
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
+    <main className="min-h-screen bg-[#F8F6F1] px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-4xl">
 
+        {/* BACK */}
         <Link
           href="/dashboard"
-          className="mb-6 inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-[#C9A227]"
+          className="mb-6 inline-flex items-center gap-2 font-semibold text-[#475569] transition hover:text-[#C9A227]"
         >
           <ArrowLeft size={18} />
           Back to Dashboard
         </Link>
 
-        {/* PROFILE HEADER */}
-        <div className="overflow-hidden rounded-[32px] bg-[#111111] shadow-xl">
+        {/* ===================================================== */}
+        {/* PROFILE IDENTITY                                      */}
+        {/* ===================================================== */}
+        <section className="overflow-hidden rounded-[32px] border border-[#E9DFC3] bg-white shadow-xl">
+
+          {/* GOLD TOP LINE */}
+          <div className="h-2 bg-[#C9A227]" />
+
           <div className="p-6 sm:p-10">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
 
-              <div className="relative shrink-0">
-                <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-[#C9A227] bg-[#C9A227]/10 sm:h-32 sm:w-32">
+              {/* PROFILE PHOTO */}
+              <div className="relative mx-auto shrink-0 sm:mx-0">
+                <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-[#C9A227] bg-[#FFF9E8] shadow-md sm:h-32 sm:w-32">
+
                   {profile.avatar_url ? (
                     <Image
                       src={profile.avatar_url}
@@ -491,6 +501,7 @@ export default function ProfilePage() {
                   )}
                 </div>
 
+                {/* CAMERA */}
                 <label
                   htmlFor="avatar-upload"
                   className="absolute bottom-0 right-0 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-[#C9A227] text-white shadow-lg transition hover:bg-[#A67C00]"
@@ -508,11 +519,13 @@ export default function ProfilePage() {
                 </label>
               </div>
 
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-3xl font-black text-white sm:text-4xl">
+              {/* NAME */}
+              <div className="min-w-0 text-center sm:text-left">
+
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  <h1 className="break-words text-3xl font-black tracking-tight text-[#111111] sm:text-4xl">
                     {profile.full_name ||
-                      "Your Profile"}
+                      "Your Name"}
                   </h1>
 
                   {profile.is_verified && (
@@ -523,11 +536,11 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                <p className="mt-2 text-slate-300">
+                <p className="mt-2 text-base font-medium text-[#64748B]">
                   {getRoleLabel(profile.role)}
                 </p>
 
-                <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#C9A227]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#C9A227]">
+                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#E9DFC3] bg-[#FFF9E8] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#A67C00]">
                   <ShieldCheck size={14} />
 
                   {profile.is_verified
@@ -539,31 +552,35 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* PERSONAL INFORMATION */}
-        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
+        {/* ===================================================== */}
+        {/* PERSONAL INFORMATION                                  */}
+        {/* ===================================================== */}
+        <section className="mt-8 rounded-[32px] border border-[#E9DFC3] bg-white p-6 shadow-xl sm:p-10">
+
           <div className="mb-8">
-            <h2 className="text-2xl font-black sm:text-3xl">
+            <h2 className="text-2xl font-black text-[#111111] sm:text-3xl">
               Personal Information
             </h2>
 
-            <p className="mt-2 text-slate-500">
+            <p className="mt-2 text-[#64748B]">
               Keep your HomeLinker profile information up to date.
             </p>
           </div>
 
           <div className="space-y-6">
 
+            {/* FULL NAME */}
             <div>
-              <label className="mb-2 block text-sm font-bold">
+              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 Full Name
               </label>
 
               <div className="relative">
                 <User
                   size={18}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]"
                 />
 
                 <input
@@ -577,20 +594,21 @@ export default function ProfilePage() {
                     }))
                   }
                   placeholder="Enter your full name"
-                  className="w-full rounded-2xl border border-slate-200 py-4 pl-12 pr-4 text-[#1B1B1B] outline-none focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
+                  className="w-full rounded-2xl border border-[#DDE3EA] bg-white py-4 pl-12 pr-4 text-[#111111] placeholder:text-[#94A3B8] outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
                 />
               </div>
             </div>
 
+            {/* PHONE */}
             <div>
-              <label className="mb-2 block text-sm font-bold">
+              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 Phone Number
               </label>
 
               <div className="relative">
                 <Phone
                   size={18}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]"
                 />
 
                 <input
@@ -604,56 +622,59 @@ export default function ProfilePage() {
                     }))
                   }
                   placeholder="e.g. 082 123 4567"
-                  className="w-full rounded-2xl border border-slate-200 py-4 pl-12 pr-4 text-[#1B1B1B] outline-none focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
+                  className="w-full rounded-2xl border border-[#DDE3EA] bg-white py-4 pl-12 pr-4 text-[#111111] placeholder:text-[#94A3B8] outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
                 />
               </div>
             </div>
 
+            {/* EMAIL */}
             <div>
-              <label className="mb-2 block text-sm font-bold">
+              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 Email Address
               </label>
 
               <div className="relative">
                 <Mail
                   size={18}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]"
                 />
 
                 <input
                   type="email"
                   value={email}
                   disabled
-                  className="w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-slate-500"
+                  className="w-full cursor-not-allowed rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] py-4 pl-12 pr-4 text-[#64748B]"
                 />
               </div>
             </div>
 
+            {/* ACCOUNT TYPE */}
             <div>
-              <label className="mb-2 block text-sm font-bold">
+              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 Account Type
               </label>
 
-              <div className="flex items-center gap-3 rounded-2xl border border-[#F0E7CF] bg-[#FFF9E8] p-4">
+              <div className="flex items-center gap-3 rounded-2xl border border-[#E9DFC3] bg-[#FFF9E8] p-4">
                 <House
                   size={20}
                   className="text-[#C9A227]"
                 />
 
                 <div>
-                  <p className="font-bold">
+                  <p className="font-bold text-[#111111]">
                     {getRoleLabel(profile.role)}
                   </p>
 
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-[#64748B]">
                     Your HomeLinker account role.
                   </p>
                 </div>
               </div>
             </div>
 
+            {/* BIO */}
             <div>
-              <label className="mb-2 block text-sm font-bold">
+              <label className="mb-2 block text-sm font-bold text-[#1B1B1B]">
                 About You
               </label>
 
@@ -667,7 +688,7 @@ export default function ProfilePage() {
                   }))
                 }
                 placeholder="Tell people a little about yourself..."
-                className="w-full resize-none rounded-2xl border border-slate-200 p-4 text-[#1B1B1B] outline-none focus:border-[#C9A227]"
+                className="w-full resize-none rounded-2xl border border-[#DDE3EA] bg-white p-4 text-[#111111] placeholder:text-[#94A3B8] outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10"
               />
             </div>
           </div>
@@ -676,29 +697,32 @@ export default function ProfilePage() {
             type="button"
             onClick={handleSaveProfile}
             disabled={saving}
-            className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-white hover:bg-[#A67C00] disabled:opacity-60 sm:w-auto"
+            className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-white transition hover:bg-[#A67C00] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             <Save size={18} />
+
             {saving
               ? "Saving..."
               : "Save Changes"}
           </button>
         </section>
 
-        {/* VERIFICATION */}
-        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
+        {/* ===================================================== */}
+        {/* VERIFICATION                                          */}
+        {/* ===================================================== */}
+        <section className="mt-8 rounded-[32px] border border-[#E9DFC3] bg-white p-6 shadow-xl sm:p-10">
 
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#C9A227]/10 text-[#C9A227]">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FFF9E8] text-[#C9A227]">
               <ShieldCheck size={25} />
             </div>
 
             <div>
-              <h2 className="text-2xl font-black sm:text-3xl">
+              <h2 className="text-2xl font-black text-[#111111] sm:text-3xl">
                 Verification & Safety
               </h2>
 
-              <p className="mt-2 text-slate-600">
+              <p className="mt-2 text-[#64748B]">
                 Verify your identity to help other HomeLinker
                 users know that your account is genuine.
               </p>
@@ -727,7 +751,6 @@ export default function ProfilePage() {
               </div>
             </div>
           ) : isPending ? (
-            /* PENDING */
             <div className="mt-6 rounded-2xl border border-yellow-200 bg-yellow-50 p-6">
               <div className="flex items-center gap-3">
                 <Clock3
@@ -789,11 +812,11 @@ export default function ProfilePage() {
                     className="mx-auto text-[#C9A227]"
                   />
 
-                  <h3 className="mt-4 text-xl font-black">
+                  <h3 className="mt-4 text-xl font-black text-[#111111]">
                     Verify your account
                   </h3>
 
-                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#64748B]">
                     Upload a clear photo of an accepted identity
                     document. Your document is stored privately and
                     only used for verification.
@@ -824,7 +847,7 @@ export default function ProfilePage() {
                   />
                 </label>
 
-                <p className="mt-3 text-center text-xs text-slate-400">
+                <p className="mt-3 text-center text-xs text-[#94A3B8]">
                   JPG, PNG or WebP • Maximum 5MB
                 </p>
 
@@ -847,42 +870,49 @@ export default function ProfilePage() {
           )}
         </section>
 
-        {/* COMMUNITY */}
-        <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
-          <h2 className="text-2xl font-black">
+        {/* ===================================================== */}
+        {/* COMMUNITY                                             */}
+        {/* ===================================================== */}
+        <section className="mt-8 rounded-[32px] border border-[#E9DFC3] bg-white p-6 shadow-xl sm:p-10">
+
+          <h2 className="text-2xl font-black text-[#111111]">
             Community & Safety
           </h2>
 
-          <p className="mt-2 text-slate-600">
+          <p className="mt-2 text-[#64748B]">
             Help keep HomeLinker safe and trustworthy.
           </p>
 
           <div className="mt-6 space-y-3">
             <Link
               href="/terms"
-              className="block rounded-2xl border border-slate-200 p-4 font-semibold hover:border-[#C9A227] hover:bg-[#FFF9E8]"
+              className="block rounded-2xl border border-[#DDE3EA] p-4 font-semibold text-[#1B1B1B] transition hover:border-[#C9A227] hover:bg-[#FFF9E8]"
             >
               Terms & Conditions
             </Link>
 
             <Link
               href="/privacy"
-              className="block rounded-2xl border border-slate-200 p-4 font-semibold hover:border-[#C9A227] hover:bg-[#FFF9E8]"
+              className="block rounded-2xl border border-[#DDE3EA] p-4 font-semibold text-[#1B1B1B] transition hover:border-[#C9A227] hover:bg-[#FFF9E8]"
             >
               Privacy Policy
             </Link>
           </div>
         </section>
 
-        {/* LOGOUT */}
+        {/* ===================================================== */}
+        {/* LOGOUT                                                */}
+        {/* ===================================================== */}
         <section className="mt-8 rounded-[32px] border border-red-100 bg-white p-6 shadow-xl sm:p-10">
+
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+
             <div>
-              <h2 className="text-xl font-black">
+              <h2 className="text-xl font-black text-[#111111]">
                 Sign out of HomeLinker
               </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-[#64748B]">
                 You can sign back in at any time.
               </p>
             </div>
@@ -890,17 +920,19 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 font-bold text-white hover:bg-red-700"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 font-bold text-white transition hover:bg-red-700"
             >
               <LogOut size={18} />
               Logout
             </button>
+
           </div>
         </section>
 
-        <div className="pb-8 pt-8 text-center text-sm text-slate-400">
+        <div className="pb-8 pt-8 text-center text-sm text-[#94A3B8]">
           HomeLinker • Your trusted property marketplace
         </div>
+
       </div>
     </main>
   );
