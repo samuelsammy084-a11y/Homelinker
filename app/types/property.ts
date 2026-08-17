@@ -57,6 +57,7 @@ export type Property = {
 
   // Contact
   contact_number?: string | null;
+  contact_phone?: string | null;
   contact_name?: string | null;
 
   // Dates

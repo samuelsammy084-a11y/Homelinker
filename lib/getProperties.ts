@@ -33,7 +33,7 @@ export async function getProperties() {
 
     owner_name: property.contact_name || "HomeLinker User",
 
-    owner_phone: property.contact_number || null,
+    owner_phone: property.contact_phone || null,
 
     owner_verified:
       property.verified === true ||

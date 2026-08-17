@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -12,8 +12,9 @@ import {
   MapPin,
   MessageCircle,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
-type PropertyCardProps = {
+type Props = {
   id: number;
   slug?: string;
   images: string[];
@@ -41,8 +42,12 @@ export default function PropertyCard({
   featured,
   verified,
   phoneNumber,
-}: PropertyCardProps) {
+}: Props) {
   const [currentImage, setCurrentImage] = useState(0);
+
+  const [contactPhone, setContactPhone] = useState<
+    string | null
+  >(phoneNumber ?? null);
 
   const safeImages =
     images?.length > 0
@@ -55,15 +60,43 @@ export default function PropertyCard({
     ? `/properties/${slug}`
     : `/properties/${id}`;
 
-  /*
-   * Convert South African phone numbers into
-   * WhatsApp international format.
-   *
-   * Examples:
-   * 082 123 4567 -> 27821234567
-   * 0821234567   -> 27821234567
-   * +27 82 123 4567 -> 27821234567
-   */
+  // --------------------------------------------------
+  // Get WhatsApp number
+  // --------------------------------------------------
+
+  useEffect(() => {
+    if (phoneNumber?.trim()) {
+      setContactPhone(phoneNumber);
+      return;
+    }
+
+    async function loadContactPhone() {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("contact_phone")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          "HomeLinker WhatsApp number error:",
+          error
+        );
+        return;
+      }
+
+      if (data?.contact_phone) {
+        setContactPhone(data.contact_phone);
+      }
+    }
+
+    void loadContactPhone();
+  }, [id, phoneNumber]);
+
+  // --------------------------------------------------
+  // Format South African WhatsApp number
+  // --------------------------------------------------
+
   function formatWhatsAppNumber(
     phone: string
   ): string | null {
@@ -86,13 +119,17 @@ export default function PropertyCard({
     return null;
   }
 
+  // --------------------------------------------------
+  // WhatsApp
+  // --------------------------------------------------
+
   function openWhatsApp(
-    event: React.MouseEvent
+    event: React.MouseEvent<HTMLButtonElement>
   ) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (!phoneNumber) {
+    if (!contactPhone?.trim()) {
       alert(
         "The owner has not provided a WhatsApp number for this property."
       );
@@ -100,7 +137,7 @@ export default function PropertyCard({
     }
 
     const whatsappNumber =
-      formatWhatsAppNumber(phoneNumber);
+      formatWhatsAppNumber(contactPhone);
 
     if (!whatsappNumber) {
       alert(
@@ -109,49 +146,57 @@ export default function PropertyCard({
       return;
     }
 
+    // Build the full property URL.
+    // On localhost this will use localhost.
+    // Once deployed it will automatically use homelinker.co.za.
+    const propertyUrl =
+      `${window.location.origin}${listingUrl}`;
+
     const message = encodeURIComponent(
-      `Hi, I found your property "${title}" on HomeLinker and I'm interested in it. Is it still available?`
+      `Hi, I found this property on HomeLinker and I'm interested in it. Is it still available?\n\n${propertyUrl}`
     );
 
+    const whatsappUrl =
+      `https://wa.me/${whatsappNumber}?text=${message}`;
+
     window.open(
-      `https://wa.me/${whatsappNumber}?text=${message}`,
+      whatsappUrl,
       "_blank",
       "noopener,noreferrer"
     );
   }
 
-  const nextImage = (
-    e: React.MouseEvent
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
+  function nextImage(
+    event: React.MouseEvent<HTMLButtonElement>
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
 
-    setCurrentImage((prev) =>
-      prev === safeImages.length - 1
+    setCurrentImage((previous) =>
+      previous === safeImages.length - 1
         ? 0
-        : prev + 1
+        : previous + 1
     );
-  };
+  }
 
-  const prevImage = (
-    e: React.MouseEvent
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
+  function previousImage(
+    event: React.MouseEvent<HTMLButtonElement>
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
 
-    setCurrentImage((prev) =>
-      prev === 0
+    setCurrentImage((previous) =>
+      previous === 0
         ? safeImages.length - 1
-        : prev - 1
+        : previous - 1
     );
-  };
+  }
 
   return (
     <article className="group overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_10px_35px_-20px_rgba(0,0,0,0.35)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-22px_rgba(0,0,0,0.3)]">
 
       {/* IMAGE */}
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
-
         <Image
           src={safeImages[currentImage]}
           alt={title}
@@ -174,7 +219,6 @@ export default function PropertyCard({
 
         {/* BADGES */}
         <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-2">
-
           {featured && (
             <span className="rounded-full bg-[#C9A227] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-lg">
               Featured
@@ -186,7 +230,6 @@ export default function PropertyCard({
               Verified
             </span>
           )}
-
         </div>
 
         {/* PHOTO COUNT */}
@@ -202,7 +245,7 @@ export default function PropertyCard({
           <>
             <button
               type="button"
-              onClick={prevImage}
+              onClick={previousImage}
               className="absolute left-3 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-[#1B1B1B] shadow-lg transition hover:scale-110"
               aria-label="Show previous image"
             >
@@ -223,31 +266,25 @@ export default function PropertyCard({
         {/* IMAGE DOTS */}
         {safeImages.length > 1 && (
           <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1.5">
-
-            {safeImages
-              .slice(0, 5)
-              .map((_, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    setCurrentImage(index);
-                  }}
-                  aria-label={`Show photo ${index + 1}`}
-                  className={`h-1.5 rounded-full transition-all ${
-                    currentImage === index
-                      ? "w-5 bg-white"
-                      : "w-1.5 bg-white/60"
-                  }`}
-                />
-              ))}
-
+            {safeImages.slice(0, 5).map((_, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setCurrentImage(index);
+                }}
+                aria-label={`Show photo ${index + 1}`}
+                className={`h-1.5 rounded-full transition-all ${
+                  currentImage === index
+                    ? "w-5 bg-white"
+                    : "w-1.5 bg-white/60"
+                }`}
+              />
+            ))}
           </div>
         )}
-
       </div>
 
       {/* CONTENT */}
@@ -271,7 +308,6 @@ export default function PropertyCard({
 
         {/* LOCATION */}
         <p className="mt-2 flex min-w-0 items-center gap-1.5 text-sm leading-5 text-slate-600">
-
           <MapPin
             size={15}
             className="shrink-0 text-[#C9A227]"
@@ -280,7 +316,6 @@ export default function PropertyCard({
           <span className="line-clamp-1">
             {location}
           </span>
-
         </p>
 
         {/* FEATURES */}
@@ -355,7 +390,6 @@ export default function PropertyCard({
           </button>
 
         </div>
-
       </div>
     </article>
   );

@@ -180,7 +180,7 @@ export default async function PropertiesPage({
                     parking={property.parking ?? 0}
                     featured={property.featured}
                     verified={property.verified}
-                    phoneNumber={property.contact_number}
+                    phoneNumber={property.contact_phone}
                   />
                 </div>
               ))}
@@ -211,7 +211,7 @@ export default async function PropertiesPage({
                   parking={property.parking ?? 0}
                   featured={property.featured}
                   verified={property.verified}
-                  phoneNumber={property.contact_number}
+                  phoneNumber={property.contact_phone}
                 />
               ))}
 
