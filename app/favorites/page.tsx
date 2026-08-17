@@ -10,6 +10,8 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(true);
 
   const loadFavorites = useCallback(async () => {
+    setLoading(true);
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -29,74 +31,98 @@ export default function FavoritesPage() {
       .eq("user_id", user.id);
 
     if (error) {
-      console.log(error);
+      console.error("HomeLinker favorites error:", error);
+      setProperties([]);
       setLoading(false);
       return;
     }
 
     type FavoriteRow = {
       property_id: number;
-      properties?: Property[];
+      properties?: Property | Property[] | null;
     };
 
     const props = (data || [])
-      .map((item: FavoriteRow) => item.properties?.[0])
-      .filter((property): property is Property => Boolean(property));
+      .map((item: FavoriteRow) => {
+        if (!item.properties) {
+          return null;
+        }
+
+        // Supabase may return the related property
+        // as either an object or an array depending
+        // on the relationship.
+        if (Array.isArray(item.properties)) {
+          return item.properties[0] ?? null;
+        }
+
+        return item.properties;
+      })
+      .filter(
+        (property): property is Property =>
+          Boolean(property)
+      );
 
     setProperties(props);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    Promise.resolve().then(loadFavorites);
+    void loadFavorites();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        void loadFavorites();
-      } else {
-        setProperties([]);
-        setLoading(false);
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) {
+          void loadFavorites();
+        } else {
+          setProperties([]);
+          setLoading(false);
+        }
       }
-    });
+    );
 
     return () => subscription.unsubscribe();
   }, [loadFavorites]);
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <h1 className="text-3xl font-bold">Loading...</h1>
+      <main className="flex min-h-screen items-center justify-center bg-[#F8F6F1]">
+        <h1 className="text-3xl font-bold text-[#1B1B1B]">
+          Loading...
+        </h1>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-[#F8F6F1] py-16">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="mx-auto max-w-7xl px-6">
 
-        <h1 className="text-5xl font-bold text-[#1B1B1B] mb-3">
+        <h1 className="mb-3 text-5xl font-bold text-[#1B1B1B]">
           My Favorites ❤️
         </h1>
 
-        <p className="text-gray-700 mb-10">
-          {properties.length} saved properties
+        <p className="mb-10 text-gray-700">
+          {properties.length} saved{" "}
+          {properties.length === 1
+            ? "property"
+            : "properties"}
         </p>
 
         {properties.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow-lg p-12 text-center">
+          <div className="rounded-3xl bg-white p-12 text-center shadow-lg">
             <h2 className="text-3xl font-bold text-[#1B1B1B]">
               No saved properties yet.
             </h2>
 
-            <p className="text-gray-600 mt-4">
+            <p className="mt-4 text-gray-600">
               Browse properties and tap the ❤️ to save them.
             </p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-3 gap-8">
-            {properties.map((property: Property) => (
+          <div className="grid gap-8 md:grid-cols-3">
+            {properties.map((property) => (
               <PropertyCard
                 key={property.id}
                 id={property.id}
