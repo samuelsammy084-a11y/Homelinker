@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MessageCircle,
@@ -53,20 +53,54 @@ export default function ContactOwner({
   const [showMessageBox, setShowMessageBox] = useState(false);
   const [sharing, setSharing] = useState(false);
 
+  // Use the number passed from the property page first.
+  // If it is not available, get the SAME contact_phone
+  // field used by the working PropertyCard WhatsApp button.
+  const [contactPhone, setContactPhone] = useState<string | null>(
+    contactNumber ?? null
+  );
+
   const [message, setMessage] = useState(
     `Hi, I found your property "${title}" on HomeLinker and I'm interested. Is it still available?`
   );
 
-  const hasPhone = Boolean(contactNumber?.trim());
+  useEffect(() => {
+    if (contactNumber?.trim()) {
+      setContactPhone(contactNumber);
+      return;
+    }
+
+    async function loadContactPhone() {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("contact_phone")
+        .eq("id", propertyId)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          "HomeLinker WhatsApp number error:",
+          error
+        );
+        return;
+      }
+
+      if (data?.contact_phone) {
+        setContactPhone(data.contact_phone);
+      }
+    }
+
+    void loadContactPhone();
+  }, [propertyId, contactNumber]);
+
+  const hasPhone = Boolean(contactPhone?.trim());
 
   const whatsappNumber = hasPhone
-    ? formatWhatsAppNumber(contactNumber!.trim())
+    ? formatWhatsAppNumber(contactPhone!.trim())
     : "";
 
   /*
    * Get the exact property URL the user is currently viewing.
-   * This means the WhatsApp message will contain the real
-   * HomeLinker property link.
    */
   const propertyUrl =
     typeof window !== "undefined"
@@ -130,7 +164,6 @@ ${propertyUrl}`;
         "Your browser does not support sharing."
       );
     } catch (error) {
-      // User cancelled the native share menu.
       if (
         error instanceof DOMException &&
         error.name === "AbortError"
@@ -212,11 +245,6 @@ ${propertyUrl}`;
         return;
       }
 
-      /*
-       * Find an existing conversation first.
-       * This prevents creating a new conversation every time
-       * the buyer clicks Message Owner.
-       */
       const {
         data: existingConversation,
         error: existingError,
@@ -253,9 +281,6 @@ ${propertyUrl}`;
         conversationId =
           existingConversation.id;
       } else {
-        /*
-         * Create the conversation.
-         */
         const {
           data: newConversation,
           error: conversationError,
@@ -292,9 +317,6 @@ ${propertyUrl}`;
           newConversation.id;
       }
 
-      /*
-       * Send the actual message.
-       */
       const {
         data: newMessage,
         error: messageError,
@@ -326,9 +348,6 @@ ${propertyUrl}`;
         return;
       }
 
-      /*
-       * Update conversation preview.
-       */
       const {
         error: updateError,
       } = await supabase
@@ -347,9 +366,6 @@ ${propertyUrl}`;
         );
       }
 
-      /*
-       * Create the owner's notification.
-       */
       const {
         error: notificationError,
       } = await supabase
@@ -377,9 +393,6 @@ ${propertyUrl}`;
         );
       }
 
-      /*
-       * Open the conversation immediately.
-       */
       router.push(
         `/messages/${conversationId}`
       );
@@ -439,17 +452,6 @@ ${propertyUrl}`;
             : "Message Owner"}
         </button>
 
-        {/* CALL OWNER */}
-        {hasPhone && (
-          <a
-            href={`tel:${contactNumber}`}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-black transition hover:border-[#C9A227] hover:bg-[#FFFDF8]"
-          >
-            <Phone size={18} />
-            Call Owner
-          </a>
-        )}
-
         {/* WHATSAPP */}
         {whatsappUrl && (
           <a
@@ -476,6 +478,17 @@ ${propertyUrl}`;
             ? "Sharing..."
             : "Share Listing"}
         </button>
+
+        {/* CALL OWNER */}
+        {hasPhone && (
+          <a
+            href={`tel:${contactPhone}`}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-black transition hover:border-[#C9A227] hover:bg-[#FFFDF8]"
+          >
+            <Phone size={18} />
+            Call Owner
+          </a>
+        )}
       </div>
 
       {showMessageBox && (
@@ -522,13 +535,11 @@ ${propertyUrl}`;
 
       {!hasPhone ? (
         <div className="mt-5 rounded-xl bg-[#FFF9E8] px-4 py-3 text-sm text-[#A16207]">
-          Phone and WhatsApp contact details are not available for this
-          listing.
+          Phone and WhatsApp contact details are not available for this listing.
         </div>
       ) : (
         <p className="mt-5 text-sm text-slate-500">
-          You can call or WhatsApp the owner directly, or send a message
-          through HomeLinker.
+          You can call or WhatsApp the owner directly, or send a message through HomeLinker.
         </p>
       )}
     </section>
