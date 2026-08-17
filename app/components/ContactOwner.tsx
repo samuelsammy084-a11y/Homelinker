@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Phone, Send } from "lucide-react";
+import {
+  MessageCircle,
+  Phone,
+  Send,
+  Share2,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
@@ -46,6 +51,8 @@ export default function ContactOwner({
 
   const [loading, setLoading] = useState(false);
   const [showMessageBox, setShowMessageBox] = useState(false);
+  const [sharing, setSharing] = useState(false);
+
   const [message, setMessage] = useState(
     `Hi, I found your property "${title}" on HomeLinker and I'm interested. Is it still available?`
   );
@@ -56,11 +63,93 @@ export default function ContactOwner({
     ? formatWhatsAppNumber(contactNumber!.trim())
     : "";
 
+  /*
+   * Get the exact property URL the user is currently viewing.
+   * This means the WhatsApp message will contain the real
+   * HomeLinker property link.
+   */
+  const propertyUrl =
+    typeof window !== "undefined"
+      ? window.location.href
+      : "";
+
+  const whatsappMessage = `Hi, I found your property "${title}" on HomeLinker and I'm interested. Is it still available?
+
+View the property here:
+${propertyUrl}`;
+
   const whatsappUrl = whatsappNumber
     ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-        `Hi, I found your property "${title}" on HomeLinker and I'm interested. Is it still available?`
+        whatsappMessage
       )}`
     : "";
+
+  async function handleShareListing() {
+    if (sharing) return;
+
+    const shareUrl =
+      typeof window !== "undefined"
+        ? window.location.href
+        : "";
+
+    if (!shareUrl) {
+      toast.error("Unable to get the property link.");
+      return;
+    }
+
+    setSharing(true);
+
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.share
+      ) {
+        await navigator.share({
+          title: title,
+          text: `Check out this property on HomeLinker: ${title}`,
+          url: shareUrl,
+        });
+
+        return;
+      }
+
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard
+      ) {
+        await navigator.clipboard.writeText(shareUrl);
+
+        toast.success(
+          "Property link copied! You can now share it anywhere."
+        );
+
+        return;
+      }
+
+      toast.error(
+        "Your browser does not support sharing."
+      );
+    } catch (error) {
+      // User cancelled the native share menu.
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        return;
+      }
+
+      console.error(
+        "HomeLinker share error:",
+        error
+      );
+
+      toast.error(
+        "Unable to share this property."
+      );
+    } finally {
+      setSharing(false);
+    }
+  }
 
   async function startConversation() {
     if (loading) return;
@@ -74,32 +163,51 @@ export default function ContactOwner({
       } = await supabase.auth.getUser();
 
       if (authError) {
-        console.error("HomeLinker auth error:", authError);
-        toast.error("Unable to verify your login.");
+        console.error(
+          "HomeLinker auth error:",
+          authError
+        );
+
+        toast.error(
+          "Unable to verify your login."
+        );
+
         setLoading(false);
         return;
       }
 
       if (!user) {
-        toast.error("Please log in before messaging the property owner.");
+        toast.error(
+          "Please log in before messaging the property owner."
+        );
+
         router.push("/login");
         return;
       }
 
       if (!ownerId) {
-        toast.error("This property does not have a valid owner.");
+        toast.error(
+          "This property does not have a valid owner."
+        );
+
         setLoading(false);
         return;
       }
 
       if (user.id === ownerId) {
-        toast.error("You cannot message yourself about your own property.");
+        toast.error(
+          "You cannot message yourself about your own property."
+        );
+
         setLoading(false);
         return;
       }
 
       if (!message.trim()) {
-        toast.error("Please enter a message.");
+        toast.error(
+          "Please enter a message."
+        );
+
         setLoading(false);
         return;
       }
@@ -109,16 +217,21 @@ export default function ContactOwner({
        * This prevents creating a new conversation every time
        * the buyer clicks Message Owner.
        */
-      const { data: existingConversation, error: existingError } =
-  await supabase
-    .from("conversations")
-    .select("id")
-    .eq("property_id", propertyId)
-    .eq("buyer_id", user.id)
-    .eq("owner_id", ownerId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+      const {
+        data: existingConversation,
+        error: existingError,
+      } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("property_id", propertyId)
+        .eq("buyer_id", user.id)
+        .eq("owner_id", ownerId)
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
+
       if (existingError) {
         console.error(
           "HomeLinker existing conversation error:",
@@ -126,7 +239,8 @@ export default function ContactOwner({
         );
 
         toast.error(
-          existingError.message || "Unable to check your conversation."
+          existingError.message ||
+            "Unable to check your conversation."
         );
 
         setLoading(false);
@@ -136,24 +250,30 @@ export default function ContactOwner({
       let conversationId: string;
 
       if (existingConversation?.id) {
-        conversationId = existingConversation.id;
+        conversationId =
+          existingConversation.id;
       } else {
         /*
          * Create the conversation.
          */
-        const { data: newConversation, error: conversationError } =
-          await supabase
-            .from("conversations")
-            .insert({
-              property_id: propertyId,
-              property_title: title,
-              owner_id: ownerId,
-              buyer_id: user.id,
-            })
-            .select("id")
-            .single();
+        const {
+          data: newConversation,
+          error: conversationError,
+        } = await supabase
+          .from("conversations")
+          .insert({
+            property_id: propertyId,
+            property_title: title,
+            owner_id: ownerId,
+            buyer_id: user.id,
+          })
+          .select("id")
+          .single();
 
-        if (conversationError || !newConversation) {
+        if (
+          conversationError ||
+          !newConversation
+        ) {
           console.error(
             "HomeLinker conversation creation error:",
             conversationError
@@ -168,13 +288,17 @@ export default function ContactOwner({
           return;
         }
 
-        conversationId = newConversation.id;
+        conversationId =
+          newConversation.id;
       }
 
       /*
        * Send the actual message.
        */
-      const { data: newMessage, error: messageError } = await supabase
+      const {
+        data: newMessage,
+        error: messageError,
+      } = await supabase
         .from("messages")
         .insert({
           conversation_id: conversationId,
@@ -184,14 +308,18 @@ export default function ContactOwner({
         .select("id")
         .single();
 
-      if (messageError || !newMessage) {
+      if (
+        messageError ||
+        !newMessage
+      ) {
         console.error(
           "HomeLinker initial message error:",
           messageError
         );
 
         toast.error(
-          messageError?.message || "Unable to send your message."
+          messageError?.message ||
+            "Unable to send your message."
         );
 
         setLoading(false);
@@ -201,11 +329,14 @@ export default function ContactOwner({
       /*
        * Update conversation preview.
        */
-      const { error: updateError } = await supabase
+      const {
+        error: updateError,
+      } = await supabase
         .from("conversations")
         .update({
           last_message: message.trim(),
-          last_message_at: new Date().toISOString(),
+          last_message_at:
+            new Date().toISOString(),
         })
         .eq("id", conversationId);
 
@@ -218,23 +349,21 @@ export default function ContactOwner({
 
       /*
        * Create the owner's notification.
-       *
-       * IMPORTANT:
-       * "type" is required by the notifications table.
-       *
-       * We intentionally do NOT send listing_id because your
-       * notifications.listing_id is UUID while properties.id
-       * is BIGINT.
        */
-      const { error: notificationError } = await supabase
+      const {
+        error: notificationError,
+      } = await supabase
         .from("notifications")
         .insert({
           user_id: ownerId,
           title: "New property message",
-          message: `${contactName || "Someone"} sent you a message about "${title}".`,
+          message: `${
+            contactName || "Someone"
+          } sent you a message about "${title}".`,
           type: "message",
           is_read: false,
-          conversation_id: conversationId,
+          conversation_id:
+            conversationId,
         });
 
       if (notificationError) {
@@ -243,10 +372,6 @@ export default function ContactOwner({
           notificationError
         );
 
-        /*
-         * Do not block the conversation if notification creation
-         * fails. The message has already been sent successfully.
-         */
         toast.warning(
           "Message sent, but the owner notification could not be created."
         );
@@ -255,9 +380,14 @@ export default function ContactOwner({
       /*
        * Open the conversation immediately.
        */
-      router.push(`/messages/${conversationId}`);
+      router.push(
+        `/messages/${conversationId}`
+      );
     } catch (error) {
-      console.error("HomeLinker contact owner error:", error);
+      console.error(
+        "HomeLinker contact owner error:",
+        error
+      );
 
       toast.error(
         error instanceof Error
@@ -283,22 +413,33 @@ export default function ContactOwner({
         {createdAt ? (
           <p className="mt-1 text-sm text-slate-500">
             Posted{" "}
-            {new Date(createdAt).toLocaleDateString("en-ZA")}
+            {new Date(
+              createdAt
+            ).toLocaleDateString("en-ZA")}
           </p>
         ) : null}
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
+        {/* MESSAGE OWNER */}
         <button
           type="button"
-          onClick={() => setShowMessageBox((value) => !value)}
+          onClick={() =>
+            setShowMessageBox(
+              (value) => !value
+            )
+          }
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black transition hover:bg-[#b89520] disabled:cursor-not-allowed disabled:opacity-60"
         >
           <MessageCircle size={18} />
-          {loading ? "Opening..." : "Message Owner"}
+
+          {loading
+            ? "Opening..."
+            : "Message Owner"}
         </button>
 
+        {/* CALL OWNER */}
         {hasPhone && (
           <a
             href={`tel:${contactNumber}`}
@@ -309,6 +450,7 @@ export default function ContactOwner({
           </a>
         )}
 
+        {/* WHATSAPP */}
         {whatsappUrl && (
           <a
             href={whatsappUrl}
@@ -320,6 +462,20 @@ export default function ContactOwner({
             WhatsApp
           </a>
         )}
+
+        {/* SHARE LISTING */}
+        <button
+          type="button"
+          onClick={handleShareListing}
+          disabled={sharing}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-black transition hover:border-[#C9A227] hover:bg-[#FFFDF8] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Share2 size={18} />
+
+          {sharing
+            ? "Sharing..."
+            : "Share Listing"}
+        </button>
       </div>
 
       {showMessageBox && (
@@ -334,7 +490,11 @@ export default function ContactOwner({
           <textarea
             id="owner-message"
             value={message}
-            onChange={(event) => setMessage(event.target.value)}
+            onChange={(event) =>
+              setMessage(
+                event.target.value
+              )
+            }
             rows={5}
             className="mt-3 w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-black outline-none placeholder:text-slate-400 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/20"
             placeholder="Write your message..."
@@ -344,11 +504,17 @@ export default function ContactOwner({
             <button
               type="button"
               onClick={startConversation}
-              disabled={loading || !message.trim()}
+              disabled={
+                loading ||
+                !message.trim()
+              }
               className="inline-flex items-center gap-2 rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black transition hover:bg-[#b89520] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Send size={17} />
-              {loading ? "Sending..." : "Send Message"}
+
+              {loading
+                ? "Sending..."
+                : "Send Message"}
             </button>
           </div>
         </div>
