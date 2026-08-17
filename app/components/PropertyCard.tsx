@@ -146,9 +146,6 @@ export default function PropertyCard({
       return;
     }
 
-    // Build the full property URL.
-    // On localhost this will use localhost.
-    // Once deployed it will automatically use homelinker.co.za.
     const propertyUrl =
       `${window.location.origin}${listingUrl}`;
 
@@ -288,26 +285,26 @@ export default function PropertyCard({
       </div>
 
       {/* CONTENT */}
-      <div className="p-4 sm:p-5">
+      <div className="p-3.5 sm:p-5">
 
         {/* PRICE */}
         <div>
-          <p className="text-2xl font-black leading-none text-[#C9A227]">
+          <p className="text-[22px] font-black leading-none text-[#C9A227] sm:text-2xl">
             R{Number(price).toLocaleString("en-ZA")}
           </p>
 
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-[11px] text-slate-500 sm:text-xs">
             per month
           </p>
         </div>
 
         {/* TITLE */}
-        <h2 className="mt-4 line-clamp-2 min-h-[48px] text-lg font-bold leading-6 text-[#1B1B1B]">
+        <h2 className="mt-3 min-h-[44px] line-clamp-2 text-[16px] font-bold leading-5 text-[#1B1B1B] sm:mt-4 sm:min-h-[48px] sm:text-lg sm:leading-6">
           {title}
         </h2>
 
         {/* LOCATION */}
-        <p className="mt-2 flex min-w-0 items-center gap-1.5 text-sm leading-5 text-slate-600">
+        <p className="mt-2 flex min-w-0 items-center gap-1.5 text-[13px] leading-5 text-slate-600 sm:text-sm">
           <MapPin
             size={15}
             className="shrink-0 text-[#C9A227]"
@@ -319,49 +316,49 @@ export default function PropertyCard({
         </p>
 
         {/* FEATURES */}
-        <div className="mt-5 grid grid-cols-3 gap-2">
+        <div className="mt-4 grid grid-cols-3 gap-1.5 sm:mt-5 sm:gap-2">
 
-          <div className="rounded-xl bg-[#F8F6F1] px-2 py-3 text-center">
+          <div className="rounded-xl bg-[#F8F6F1] px-1.5 py-2.5 text-center sm:px-2 sm:py-3">
             <BedDouble
-              size={17}
-              className="mx-auto text-[#C9A227]"
+              size={16}
+              className="mx-auto text-[#C9A227] sm:size-[17px]"
             />
 
             <p className="mt-1 text-sm font-bold text-[#1B1B1B]">
               {bedrooms}
             </p>
 
-            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-500 sm:text-[9px] sm:tracking-[0.12em]">
               Beds
             </p>
           </div>
 
-          <div className="rounded-xl bg-[#F8F6F1] px-2 py-3 text-center">
+          <div className="rounded-xl bg-[#F8F6F1] px-1.5 py-2.5 text-center sm:px-2 sm:py-3">
             <Bath
-              size={17}
-              className="mx-auto text-[#C9A227]"
+              size={16}
+              className="mx-auto text-[#C9A227] sm:size-[17px]"
             />
 
             <p className="mt-1 text-sm font-bold text-[#1B1B1B]">
               {bathrooms}
             </p>
 
-            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-500 sm:text-[9px] sm:tracking-[0.12em]">
               Baths
             </p>
           </div>
 
-          <div className="rounded-xl bg-[#F8F6F1] px-2 py-3 text-center">
+          <div className="rounded-xl bg-[#F8F6F1] px-1.5 py-2.5 text-center sm:px-2 sm:py-3">
             <CarFront
-              size={17}
-              className="mx-auto text-[#C9A227]"
+              size={16}
+              className="mx-auto text-[#C9A227] sm:size-[17px]"
             />
 
             <p className="mt-1 text-sm font-bold text-[#1B1B1B]">
               {parking}
             </p>
 
-            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-500 sm:text-[9px] sm:tracking-[0.12em]">
               Parking
             </p>
           </div>
@@ -369,12 +366,12 @@ export default function PropertyCard({
         </div>
 
         {/* ACTIONS */}
-        <div className="mt-5 grid grid-cols-2 gap-2">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5">
 
           {/* VIEW LISTING */}
           <Link
             href={listingUrl}
-            className="flex items-center justify-center rounded-xl bg-[#C9A227] py-3 text-sm font-bold text-white transition hover:bg-[#A67C00] hover:shadow-lg"
+            className="flex min-w-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-xl bg-[#C9A227] px-2 py-2.5 text-[12px] font-bold text-white transition hover:bg-[#A67C00] hover:shadow-lg sm:py-3 sm:text-sm"
           >
             View listing
           </Link>
@@ -383,10 +380,16 @@ export default function PropertyCard({
           <button
             type="button"
             onClick={openWhatsApp}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#25D366] py-3 text-sm font-bold text-white transition hover:bg-[#1ebe5d] hover:shadow-lg"
+            className="flex min-w-0 items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap rounded-xl bg-[#25D366] px-2 py-2.5 text-[12px] font-bold text-white transition hover:bg-[#1ebe5d] hover:shadow-lg sm:gap-2 sm:py-3 sm:text-sm"
           >
-            <MessageCircle size={17} />
-            WhatsApp
+            <MessageCircle
+              size={16}
+              className="shrink-0 sm:size-[17px]"
+            />
+
+            <span className="truncate">
+              WhatsApp
+            </span>
           </button>
 
         </div>
