@@ -188,7 +188,7 @@ export default async function PropertiesPage({
             </div>
 
             {/* TABLET / DESKTOP */}
-            <div className="hidden sm:grid sm:grid-cols-2 sm:gap-6 xl:grid-cols-3 xl:gap-8">
+            <div className="hidden sm:grid sm:grid-cols-1 sm:gap-6 xl:grid-cols-3 xl:gap-8">
 
               {properties.map((property: Property) => (
                 <PropertyCard
