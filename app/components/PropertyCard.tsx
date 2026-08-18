@@ -366,7 +366,7 @@ export default function PropertyCard({
         </div>
 
         {/* ACTIONS */}
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5">
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:mt-5">
 
           {/* VIEW LISTING */}
           <Link
