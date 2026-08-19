@@ -63,8 +63,8 @@ export default async function FeaturedProperties() {
           {/* MOBILE */}
           <div className="sm:hidden">
 
-            {/* NORMAL VERTICAL MOBILE GRID */}
-            <div className="grid grid-cols-2 gap-3">
+                        {/* NORMAL VERTICAL MOBILE GRID */}
+            <div className="grid grid-cols-1 gap-3">
 
               {displayProperties.map((property: Property) => (
                 <div key={property.id} className="min-w-0">
