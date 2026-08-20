@@ -98,20 +98,8 @@ export const metadata: Metadata = {
     images: ["https://homelinker.co.za/og-image.png"],
   },
 
-  // HomeLinker logo / favicon
   icons: {
-    icon: [
-      {
-        url: "/favicon.ico",
-        sizes: "any",
-      },
-      {
-        url: "/icon.png",
-        type: "image/png",
-        sizes: "512x512",
-      },
-    ],
-    apple: "/apple-icon.png",
+    icon: "/icon.png",
   },
 
   category: "Real Estate",
