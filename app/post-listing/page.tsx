@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { createPropertySlug } from "@/lib/property-slug";
+
+import imageCompression from "browser-image-compression";
+
 
 import ListingTypeStep from "./components/ListingTypeStep";
+
 import PropertyTypeStep from "./components/PropertyTypeStep";
 import LocationStep from "./components/LocationStep";
 import PropertyDetailsStep from "./components/PropertyDetailsStep";
@@ -114,15 +119,33 @@ export default function PostListingPage() {
       let imageUrl = "";
       const imageUrls: string[] = [];
 
-      // Upload Images
+            // Upload Images
       if (images.length > 0) {
+        const compressionOptions = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        };
+
         for (const image of images) {
+          // Compress image
+          let imageToUpload = image;
+          try {
+            imageToUpload = await imageCompression(
+              image,
+              compressionOptions
+            );
+          } catch (e) {
+            console.error("Compression failed", e);
+          }
+
           const fileName = `${Date.now()}-${Math.random()}-${image.name}`;
 
           const { error: uploadError } =
             await supabase.storage
               .from("property-images")
-              .upload(fileName, image);
+              .upload(fileName, imageToUpload);
+
 
           if (uploadError) {
             setPopup({
@@ -144,7 +167,7 @@ export default function PostListingPage() {
         imageUrl = imageUrls[0];
       }
 
-      const { error } = await supabase
+            const { data: insertedProperty, error } = await supabase
         .from("properties")
         .insert([
           {
@@ -221,6 +244,21 @@ export default function PostListingPage() {
 
         return;
       }
+
+      // Generate and update slug with the new ID
+      if (insertedProperty) {
+        const generatedSlug = createPropertySlug(
+          title,
+          city,
+          insertedProperty.id
+        );
+
+        await supabase
+          .from("properties")
+          .update({ slug: generatedSlug })
+          .eq("id", insertedProperty.id);
+      }
+
 
       setPopup({
         show: true,

@@ -35,53 +35,19 @@ export default async function PropertiesPage({
 }: Props) {
   const params = await searchParams;
 
-  let properties = await getProperties();
-
-  if (params.province) {
-    properties = properties.filter(
-      (property: Property) =>
-        property.province === params.province
-    );
-  }
-
-  if (params.city) {
-    const search = params.city.toLowerCase();
-
-    properties = properties.filter((property: Property) =>
-      property.city?.toLowerCase().includes(search)
-    );
-  }
-
-  if (params.type) {
-    properties = properties.filter(
-      (property: Property) =>
-        property.property_type === params.type
-    );
-  }
-
-  if (params.maxPrice) {
-    const maxPrice = Number(params.maxPrice);
-
-    if (!Number.isNaN(maxPrice)) {
-      properties = properties.filter(
-        (property: Property) =>
-          Number(property.price) <= maxPrice
-      );
-    }
-  }
+  const properties = await getProperties({
+    province: params.province,
+    city: params.city,
+    type: params.type,
+    maxPrice: params.maxPrice
+      ? Number(params.maxPrice)
+      : undefined,
+  });
 
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
-
-      {/* POPULAR LISTINGS */}
-      {!params.province &&
-        !params.city &&
-        !params.type &&
-        !params.maxPrice && (
-          <FeaturedProperties />
-        )}
-
       <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-6 sm:py-10 lg:px-8">
+
 
         {/* HEADER */}
         <div className="mb-5 sm:mb-8">
@@ -154,7 +120,7 @@ export default async function PropertiesPage({
         ) : (
           <>
             {/* MOBILE */}
-            <div className="grid grid-cols-2 gap-3 sm:hidden">
+            <div className="grid grid-cols-1 gap-3 sm:hidden">
 
               {properties.map((property: Property) => (
                 <div
@@ -187,8 +153,9 @@ export default async function PropertiesPage({
 
             </div>
 
-            {/* TABLET / DESKTOP */}
-            <div className="hidden sm:grid sm:grid-cols-1 sm:gap-6 xl:grid-cols-3 xl:gap-8">
+                        {/* TABLET / DESKTOP */}
+            <div className="hidden sm:grid sm:grid-cols-1 sm:gap-6 xl:grid-cols-1 xl:gap-8">
+
 
               {properties.map((property: Property) => (
                 <PropertyCard

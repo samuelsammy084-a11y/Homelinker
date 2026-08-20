@@ -102,13 +102,16 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
+        url: "/favicon.ico",
+        sizes: "any",
+      },
+      {
         url: "/icon.png",
         type: "image/png",
         sizes: "512x512",
       },
     ],
-    shortcut: "/icon.png",
-    apple: "/icon.png",
+    apple: "/apple-icon.png",
   },
 
   category: "Real Estate",
@@ -136,9 +139,11 @@ export default function RootLayout({
           duration={3000}
         />
 
-        <GoogleAnalytics
-          gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!}
-        />
+        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
+          <GoogleAnalytics
+            gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}
+          />
+        )}
       </body>
     </html>
   );
