@@ -48,7 +48,6 @@ export default async function PropertiesPage({
     <main className="min-h-screen bg-[#F8F6F1]">
       <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-6 sm:py-10 lg:px-8">
 
-
         {/* HEADER */}
         <div className="mb-5 sm:mb-8">
           <div className="flex items-end justify-between gap-3">
@@ -119,7 +118,7 @@ export default async function PropertiesPage({
           </div>
         ) : (
           <>
-            {/* MOBILE */}
+            {/* MOBILE - 1 LISTING PER ROW */}
             <div className="grid grid-cols-1 gap-3 sm:hidden">
 
               {properties.map((property: Property) => (
@@ -153,9 +152,8 @@ export default async function PropertiesPage({
 
             </div>
 
-                        {/* TABLET / DESKTOP */}
-            <div className="hidden sm:grid sm:grid-cols-1 sm:gap-6 xl:grid-cols-1 xl:gap-8">
-
+            {/* LAPTOP / DESKTOP - 3 LISTINGS PER ROW */}
+            <div className="hidden sm:grid sm:grid-cols-3 sm:gap-6">
 
               {properties.map((property: Property) => (
                 <PropertyCard
