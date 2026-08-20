@@ -6,18 +6,39 @@ import FeaturedProperties from "../components/FeaturedProperties";
 import { getProperties } from "@/lib/getProperties";
 
 export const metadata: Metadata = {
-  title: "Browse Properties",
+  title: "Properties for Sale & Rent Across South Africa | HomeLinker",
   description:
-    "Browse rooms, apartments, houses and properties to rent or buy across South Africa on HomeLinker.",
+    "Find houses, apartments, flats, rooms and properties to rent or buy anywhere in South Africa. Browse property listings across cities, suburbs and provinces on HomeLinker.",
   alternates: {
     canonical: "https://homelinker.co.za/properties",
   },
   openGraph: {
-    title: "Browse Properties | HomeLinker",
+    title: "Properties for Sale & Rent Across South Africa | HomeLinker",
     description:
-      "Browse rooms, apartments, houses and properties to rent or buy across South Africa.",
+      "Find houses, apartments, flats, rooms and properties to rent or buy anywhere in South Africa on HomeLinker.",
     url: "https://homelinker.co.za/properties",
+    siteName: "HomeLinker",
+    locale: "en_ZA",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "HomeLinker - South Africa's Property Marketplace",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Properties for Sale & Rent Across South Africa | HomeLinker",
+    description:
+      "Find houses, apartments, flats, rooms and properties to rent or buy anywhere in South Africa on HomeLinker.",
     images: ["/og-image.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
