@@ -260,17 +260,20 @@ export default function PostListingPage() {
       }
 
 
-      setPopup({
+            setPopup({
         show: true,
         type: "success",
         title: "Listing Published!",
         message:
-          "Your property has been successfully listed on HomeLinker.",
+          "Your property has been successfully listed on HomeLinker. Would you like to promote it to reach more people?",
       });
 
+      // Instead of just redirecting to dashboard, let's go to pricing
+      // with the new property ID so they can choose to upgrade
       setTimeout(() => {
-        router.push("/dashboard");
-      }, 1800);
+        router.push(`/pricing?propertyId=${insertedProperty.id}`);
+      }, 2500);
+
     } catch (err: unknown) {
       setPopup({
         show: true,
