@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
 import { createPropertySlug } from "@/lib/property-slug";
 
-const BASE_URL = "https://homelinker.co.za";
+const BASE_URL = "https://www.homelinker.co.za";
 
 function createCitySlug(city: string) {
   return city
@@ -94,16 +94,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
    * --------------------------------------------------
    * SOUTH AFRICAN CITY PAGES
    *
-   * Automatically generated from cities that
-   * actually have properties on HomeLinker.
-   *
    * Each city gets BOTH:
    *
    * /rent/city
    * /sale/city
-   *
-   * This allows HomeLinker to target both rental
-   * and property-for-sale searches across SA.
    * --------------------------------------------------
    */
 
@@ -140,11 +134,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   /*
    * RENT CITY PAGES
-   *
-   * Example:
-   * /rent/midrand
-   * /rent/johannesburg
-   * /rent/cape-town
    */
 
   const rentCityPages: MetadataRoute.Sitemap =
@@ -159,11 +148,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   /*
    * SALE CITY PAGES
-   *
-   * Example:
-   * /sale/midrand
-   * /sale/johannesburg
-   * /sale/cape-town
    */
 
   const saleCityPages: MetadataRoute.Sitemap =
