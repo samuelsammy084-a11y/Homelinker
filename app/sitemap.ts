@@ -2,7 +2,8 @@ import type { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
 import { createPropertySlug } from "@/lib/property-slug";
 
-const BASE_URL = "https://www.homelinker.co.za";
+const BASE_URL = "https://homelinker.co.za";
+
 
 function createCitySlug(city: string) {
   return city
@@ -16,10 +17,11 @@ function createCitySlug(city: string) {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  const { data: properties, error } = await supabase
+    const { data: properties, error } = await supabase
     .from("properties")
-    .select("id, title, city, created_at")
+    .select("id, title, city, created_at, slug")
     .order("created_at", { ascending: false });
+
 
   if (error) {
     console.error("Sitemap property fetch error:", error);
@@ -166,26 +168,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
    * --------------------------------------------------
    */
 
-  const propertyPages: MetadataRoute.Sitemap =
+    const propertyPages: MetadataRoute.Sitemap =
     safeProperties
-      .filter(
-        (property) =>
-          property.id &&
-          property.title &&
-          property.city
-      )
+      .filter((property) => property.id && property.title)
       .map((property) => ({
-        url: `${BASE_URL}/properties/${createPropertySlug(
-          property.title,
-          property.city,
-          property.id
-        )}`,
+        url: `${BASE_URL}/properties/${
+          property.slug ||
+          createPropertySlug(
+            property.title,
+            property.city || "",
+            property.id
+          )
+        }`,
         lastModified: property.created_at
           ? new Date(property.created_at)
           : now,
         changeFrequency: "daily",
         priority: 0.8,
       }));
+
 
   /*
    * --------------------------------------------------
