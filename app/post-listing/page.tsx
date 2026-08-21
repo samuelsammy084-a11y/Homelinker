@@ -4,12 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { createPropertySlug } from "@/lib/property-slug";
-
 import imageCompression from "browser-image-compression";
 
-
 import ListingTypeStep from "./components/ListingTypeStep";
-
 import PropertyTypeStep from "./components/PropertyTypeStep";
 import LocationStep from "./components/LocationStep";
 import PropertyDetailsStep from "./components/PropertyDetailsStep";
@@ -119,7 +116,10 @@ export default function PostListingPage() {
       let imageUrl = "";
       const imageUrls: string[] = [];
 
-            // Upload Images
+      // --------------------------------------------------
+      // UPLOAD IMAGES
+      // --------------------------------------------------
+
       if (images.length > 0) {
         const compressionOptions = {
           maxSizeMB: 1,
@@ -128,15 +128,18 @@ export default function PostListingPage() {
         };
 
         for (const image of images) {
-          // Compress image
           let imageToUpload = image;
+
           try {
             imageToUpload = await imageCompression(
               image,
               compressionOptions
             );
           } catch (e) {
-            console.error("Compression failed", e);
+            console.error(
+              "Image compression failed:",
+              e
+            );
           }
 
           const fileName = `${Date.now()}-${Math.random()}-${image.name}`;
@@ -144,8 +147,10 @@ export default function PostListingPage() {
           const { error: uploadError } =
             await supabase.storage
               .from("property-images")
-              .upload(fileName, imageToUpload);
-
+              .upload(
+                fileName,
+                imageToUpload
+              );
 
           if (uploadError) {
             setPopup({
@@ -154,12 +159,14 @@ export default function PostListingPage() {
               title: "Upload Failed",
               message: uploadError.message,
             });
+
             return;
           }
 
-          const { data } = supabase.storage
-            .from("property-images")
-            .getPublicUrl(fileName);
+          const { data } =
+            supabase.storage
+              .from("property-images")
+              .getPublicUrl(fileName);
 
           imageUrls.push(data.publicUrl);
         }
@@ -167,74 +174,93 @@ export default function PostListingPage() {
         imageUrl = imageUrls[0];
       }
 
-            const { data: insertedProperty, error } = await supabase
-        .from("properties")
-        .insert([
-          {
-            user_id: user.id,
+      // --------------------------------------------------
+      // CREATE PROPERTY
+      //
+      // IMPORTANT:
+      // The property is NOT active yet.
+      // It must go through the pricing/payment step first.
+      // --------------------------------------------------
 
-            listing_type: listingType,
-            property_type: propertyType,
+      const { data: insertedProperty, error } =
+        await supabase
+          .from("properties")
+          .insert([
+            {
+              user_id: user.id,
 
-            title,
-            description,
+              listing_type: listingType,
+              property_type: propertyType,
 
-            province,
-            city,
-            suburb,
+              title,
+              description,
 
-            street_address: address,
+              province,
+              city,
+              suburb,
 
-            latitude,
-            longitude,
+              street_address: address,
 
-            price: Number(price),
+              latitude,
+              longitude,
 
-            bedrooms: Number(bedrooms),
-            bathrooms: Number(bathrooms),
-            parking: Number(parking),
+              price: Number(price),
 
-            deposit: deposit
-              ? Number(deposit)
-              : null,
+              bedrooms: Number(bedrooms),
+              bathrooms: Number(bathrooms),
+              parking: Number(parking),
 
-            available_from:
-              availableFrom || null,
+              deposit: deposit
+                ? Number(deposit)
+                : null,
 
-            floor_size: floorSize
-              ? Number(floorSize)
-              : null,
+              available_from:
+                availableFrom || null,
 
-            land_size: landSize
-              ? Number(landSize)
-              : null,
+              floor_size: floorSize
+                ? Number(floorSize)
+                : null,
 
-            condition: condition || null,
+              land_size: landSize
+                ? Number(landSize)
+                : null,
 
-            rates: rates
-              ? Number(rates)
-              : null,
+              condition:
+                condition || null,
 
-            levies: levies
-              ? Number(levies)
-              : null,
+              rates: rates
+                ? Number(rates)
+                : null,
 
-            furnished,
+              levies: levies
+                ? Number(levies)
+                : null,
 
-            pet_friendly: petFriendly,
+              furnished,
 
-            image_url: imageUrl,
+              pet_friendly: petFriendly,
 
-            image_urls: imageUrls,
+              image_url: imageUrl,
 
-            // Contact / WhatsApp number
-            contact_phone: phoneNumber.trim(),
-          },
-        ])
-        .select()
-        .single();
+              image_urls: imageUrls,
+
+              contact_phone:
+                phoneNumber.trim(),
+
+              // Keep the listing inactive
+              // until the user chooses a plan.
+              status: "inactive",
+            },
+          ])
+          .select()
+          .single();
 
       if (error) {
+        console.error(
+          "Property insert error:",
+          error
+        );
+
         setPopup({
           show: true,
           type: "error",
@@ -245,36 +271,75 @@ export default function PostListingPage() {
         return;
       }
 
-      // Generate and update slug with the new ID
-      if (insertedProperty) {
-        const generatedSlug = createPropertySlug(
+      if (!insertedProperty) {
+        setPopup({
+          show: true,
+          type: "error",
+          title: "Listing Error",
+          message:
+            "The property could not be created.",
+        });
+
+        return;
+      }
+
+      // --------------------------------------------------
+      // GENERATE PROPERTY SLUG
+      // --------------------------------------------------
+
+      const generatedSlug =
+        createPropertySlug(
           title,
           city,
           insertedProperty.id
         );
 
+      const { error: slugError } =
         await supabase
           .from("properties")
-          .update({ slug: generatedSlug })
-          .eq("id", insertedProperty.id);
+          .update({
+            slug: generatedSlug,
+          })
+          .eq(
+            "id",
+            insertedProperty.id
+          );
+
+      if (slugError) {
+        console.error(
+          "Slug update error:",
+          slugError
+        );
       }
 
+      // --------------------------------------------------
+      // SAVE PROPERTY ID
+      //
+      // This allows the pricing page to find
+      // the property even if the URL changes.
+      // --------------------------------------------------
 
-            setPopup({
-        show: true,
-        type: "success",
-        title: "Listing Published!",
-        message:
-          "Your property has been successfully listed on HomeLinker. Would you like to promote it to reach more people?",
-      });
+      sessionStorage.setItem(
+        "propertyId",
+        insertedProperty.id
+      );
 
-      // Instead of just redirecting to dashboard, let's go to pricing
-      // with the new property ID so they can choose to upgrade
-      setTimeout(() => {
-        router.push(`/pricing?propertyId=${insertedProperty.id}`);
-      }, 2500);
+      // --------------------------------------------------
+      // GO DIRECTLY TO PRICING
+      //
+      // NO "LISTING PUBLISHED" MESSAGE.
+      // NO 2.5 SECOND DELAY.
+      // --------------------------------------------------
 
+      router.push(
+        `/pricing?propertyId=${insertedProperty.id}`
+      );
     } catch (err: unknown) {
+      console.error(
+        "Unexpected listing error:",
+        err
+      );
+
       setPopup({
         show: true,
         type: "error",
@@ -290,11 +355,10 @@ export default function PostListingPage() {
   return (
     <main className="min-h-screen bg-[#F8F6F1] px-6 py-12">
 
-      {/* Success / Error Popup */}
+      {/* SUCCESS / ERROR POPUP */}
       {popup.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-
-          <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl animate-[fadeIn_.25s_ease]">
+          <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
 
             <div
               className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full text-5xl ${
@@ -329,16 +393,14 @@ export default function PostListingPage() {
             >
               Continue
             </button>
-
           </div>
-
         </div>
       )}
 
       <div className="mx-auto max-w-6xl">
 
+        {/* HEADER */}
         <div className="mb-10 text-center">
-
           <h1 className="text-5xl font-black text-[#111111]">
             Create Listing
           </h1>
@@ -346,9 +408,9 @@ export default function PostListingPage() {
           <p className="mt-4 text-[#555555]">
             List your property on HomeLinker
           </p>
-
         </div>
 
+        {/* PROGRESS */}
         <div className="mb-12">
 
           <div className="mb-6 flex items-center justify-between">
@@ -378,7 +440,9 @@ export default function PostListingPage() {
                         : "border border-[#E8D9A8] bg-[#F6F2E8] text-[#777777]"
                     }`}
                   >
-                    {current < step ? "✓" : current}
+                    {current < step
+                      ? "✓"
+                      : current}
                   </div>
 
                   <span
@@ -393,7 +457,6 @@ export default function PostListingPage() {
                 </div>
               );
             })}
-
           </div>
 
           <div className="relative h-4 overflow-hidden rounded-full bg-[#EFE6C9]">
@@ -421,9 +484,9 @@ export default function PostListingPage() {
             </span>
 
           </div>
-
         </div>
 
+        {/* STEP 1 */}
         {step === 1 && (
           <ListingTypeStep
             listingType={listingType}
@@ -432,18 +495,24 @@ export default function PostListingPage() {
           />
         )}
 
+        {/* STEP 2 */}
         {step === 2 && (
           <PropertyTypeStep
             listingType={
-              listingType as "rent" | "sale"
+              listingType as
+                | "rent"
+                | "sale"
             }
             propertyType={propertyType}
-            setPropertyType={setPropertyType}
+            setPropertyType={
+              setPropertyType
+            }
             onBack={() => setStep(1)}
             onNext={() => setStep(3)}
           />
         )}
 
+        {/* STEP 3 */}
         {step === 3 && (
           <LocationStep
             province={province}
@@ -463,10 +532,13 @@ export default function PostListingPage() {
           />
         )}
 
+        {/* STEP 4 */}
         {step === 4 && (
           <PropertyDetailsStep
             listingType={
-              listingType as "rent" | "sale"
+              listingType as
+                | "rent"
+                | "sale"
             }
             price={price}
             setPrice={setPrice}
@@ -482,8 +554,12 @@ export default function PostListingPage() {
             setPetFriendly={setPetFriendly}
             deposit={deposit}
             setDeposit={setDeposit}
-            availableFrom={availableFrom}
-            setAvailableFrom={setAvailableFrom}
+            availableFrom={
+              availableFrom
+            }
+            setAvailableFrom={
+              setAvailableFrom
+            }
             floorSize={floorSize}
             setFloorSize={setFloorSize}
             landSize={landSize}
@@ -499,6 +575,7 @@ export default function PostListingPage() {
           />
         )}
 
+        {/* STEP 5 */}
         {step === 5 && (
           <PhotosStep
             images={images}
@@ -508,19 +585,25 @@ export default function PostListingPage() {
           />
         )}
 
+        {/* STEP 6 */}
         {step === 6 && (
           <DescriptionStep
             title={title}
             setTitle={setTitle}
             description={description}
-            setDescription={setDescription}
+            setDescription={
+              setDescription
+            }
             phoneNumber={phoneNumber}
-            setPhoneNumber={setPhoneNumber}
+            setPhoneNumber={
+              setPhoneNumber
+            }
             onBack={() => setStep(5)}
             onNext={() => setStep(7)}
           />
         )}
 
+        {/* STEP 7 */}
         {step === 7 && (
           <ReviewStep
             listingType={listingType}
@@ -538,7 +621,9 @@ export default function PostListingPage() {
             phoneNumber={phoneNumber}
             images={images}
             onBack={() => setStep(6)}
-            onPublish={publishListing}
+            onPublish={
+              publishListing
+            }
           />
         )}
 

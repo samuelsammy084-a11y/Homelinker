@@ -60,7 +60,10 @@ export type Property = {
   contact_phone?: string | null;
   contact_name?: string | null;
 
-  // Dates
+    // Dates
   created_at?: string | null;
   updated_at?: string | null;
+
+  // Status
+  status?: string | null; // e.g., 'active', 'sold', 'rented', 'draft'
 };

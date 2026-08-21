@@ -23,8 +23,10 @@ import {
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import type { Property } from "@/app/types/property";
+import { CheckCircle2, RotateCcw } from "lucide-react";
 
 type Role =
+
   | "home_seeker"
   | "property_owner"
   | "estate_agent";
@@ -112,7 +114,51 @@ export default function DashboardPage() {
     void loadData();
   }, []);
 
+    async function handleToggleStatus(
+    propertyId: number,
+    currentStatus: string | null,
+    listingType: string | null
+  ) {
+    const isSold =
+      currentStatus === "sold" ||
+      currentStatus === "rented";
+
+    let newStatus = "active";
+
+    if (!isSold) {
+      newStatus =
+        listingType === "sale" ? "sold" : "rented";
+    }
+
+    try {
+      const { error } = await supabase
+        .from("properties")
+        .update({ status: newStatus })
+        .eq("id", propertyId);
+
+      if (error) throw error;
+
+      setProperties((current) =>
+        current.map((p) =>
+          p.id === propertyId
+            ? { ...p, status: newStatus }
+            : p
+        )
+      );
+
+      toast.success(
+        isSold
+          ? "Property listed as active again!"
+          : `Property marked as ${newStatus}!`
+      );
+    } catch (error) {
+      console.error("Error toggling status:", error);
+      toast.error("Failed to update status.");
+    }
+  }
+
   async function handleDeleteProperty(
+
     propertyId: number
   ) {
     if (!user) {
@@ -559,8 +605,19 @@ export default function DashboardPage() {
                       unoptimized
                     />
 
-                    <div className="absolute left-2 top-2 flex max-w-[80%] flex-wrap gap-1 sm:left-4 sm:top-4 sm:gap-2">
+                                        <div className="absolute left-2 top-2 flex max-w-[80%] flex-wrap gap-1 sm:left-4 sm:top-4 sm:gap-2">
+                      {(property.status === "sold" ||
+                        property.status ===
+                          "rented") && (
+                        <span className="rounded-full bg-black px-2 py-1 text-[7px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.2em]">
+                          {property.status === "sold"
+                            ? "Sold"
+                            : "Rented"}
+                        </span>
+                      )}
+
                       {property.featured && (
+
                         <span className="rounded-full bg-[#C9A227] px-2 py-1 text-[7px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.2em]">
                           Featured
                         </span>
@@ -616,33 +673,72 @@ export default function DashboardPage() {
                       />
                     </div>
 
-                    {/* ACTIONS */}
-                    <div className="mt-3 flex flex-col gap-2 sm:mt-8 sm:flex-row sm:gap-3">
-                      <Link
-                        href={`/edit-listing/${property.id}`}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2 py-2.5 text-[9px] font-semibold text-white transition hover:bg-slate-700 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
-                      >
-                        <Pencil size={13} />
-                        Edit
-                      </Link>
+                                        {/* ACTIONS */}
+                    <div className="mt-3 flex flex-col gap-2 sm:mt-8">
+                      <div className="flex gap-2 sm:gap-3">
+                        <Link
+                          href={`/edit-listing/${property.id}`}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2 py-2.5 text-[9px] font-semibold text-white transition hover:bg-slate-700 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                        >
+                          <Pencil size={13} />
+                          Edit
+                        </Link>
+
+                        <button
+                          type="button"
+                          disabled={isDeleting}
+                          onClick={() =>
+                            handleDeleteProperty(
+                              property.id
+                            )
+                          }
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2 py-2.5 text-[9px] font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                        >
+                          <Trash2 size={13} />
+
+                          {isDeleting
+                            ? "Deleting..."
+                            : "Delete"}
+                        </button>
+                      </div>
 
                       <button
                         type="button"
-                        disabled={isDeleting}
                         onClick={() =>
-                          handleDeleteProperty(
-                            property.id
+                          handleToggleStatus(
+                            property.id,
+                            property.status || null,
+                            property.listing_type ||
+                              null
                           )
                         }
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2 py-2.5 text-[9px] font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                        className={`flex w-full items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[9px] font-bold transition sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm ${
+                          property.status === "sold" ||
+                          property.status === "rented"
+                            ? "border-2 border-[#C9A227] bg-white text-[#C9A227] hover:bg-[#C9A227] hover:text-white"
+                            : "bg-[#C9A227] text-white hover:bg-[#A67C00]"
+                        }`}
                       >
-                        <Trash2 size={13} />
-
-                        {isDeleting
-                          ? "Deleting..."
-                          : "Delete"}
+                        {property.status === "sold" ||
+                        property.status ===
+                          "rented" ? (
+                          <>
+                            <RotateCcw size={14} />
+                            Mark as Available
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={14} />
+                            Mark as{" "}
+                            {property.listing_type ===
+                            "sale"
+                              ? "Sold"
+                              : "Rented"}
+                          </>
+                        )}
                       </button>
                     </div>
+
                   </div>
                 </motion.div>
               );
