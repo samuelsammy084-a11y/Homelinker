@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, Loader2 } from "lucide-react";
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const searchParams = useSearchParams();
 
   const sessionId =
@@ -87,8 +87,7 @@ export default function PaymentSuccessPage() {
   }, [sessionId]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F8F6F1] px-6">
-      <div className="w-full max-w-lg rounded-[32px] bg-white p-10 text-center shadow-2xl">
+    <div className="w-full max-w-lg rounded-[32px] bg-white p-10 text-center shadow-2xl">
         {status === "loading" && (
           <>
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#C9A227]/10">
@@ -155,6 +154,15 @@ export default function PaymentSuccessPage() {
           </>
         )}
       </div>
+  )
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#F8F6F1] px-6">
+      <Suspense fallback={<div>Loading...</div>}>
+        <PaymentSuccessContent />
+      </Suspense>
     </main>
   );
 }

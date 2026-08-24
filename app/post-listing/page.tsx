@@ -178,8 +178,7 @@ export default function PostListingPage() {
       // CREATE PROPERTY
       //
       // IMPORTANT:
-      // The property is NOT active yet.
-      // It must go through the pricing/payment step first.
+      // The property is active as soon as it's posted.
       // --------------------------------------------------
 
       const { data: insertedProperty, error } =
@@ -247,13 +246,13 @@ export default function PostListingPage() {
               contact_phone:
                 phoneNumber.trim(),
 
-              // Keep the listing inactive
-              // until the user chooses a plan.
-              status: "inactive",
+              // Make it active immediately
+              status: "active",
             },
           ])
           .select()
           .single();
+
 
       if (error) {
         console.error(
@@ -325,15 +324,13 @@ export default function PostListingPage() {
       );
 
       // --------------------------------------------------
-      // GO DIRECTLY TO PRICING
-      //
-      // NO "LISTING PUBLISHED" MESSAGE.
-      // NO 2.5 SECOND DELAY.
+      // GO TO DASHBOARD
       // --------------------------------------------------
 
       router.push(
-        `/pricing?propertyId=${insertedProperty.id}`
+        `/dashboard?newListing=${insertedProperty.id}`
       );
+
     } catch (err: unknown) {
       console.error(
         "Unexpected listing error:",

@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://homelinker.co.za"),
+  metadataBase: new URL("https://www.homelinker.co.za"),
 
   title: {
     default: "HomeLinker | South Africa's Property Marketplace",
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   authors: [
     {
       name: "HomeLinker",
-      url: "https://homelinker.co.za",
+      url: "https://www.homelinker.co.za",
     },
   ],
 
@@ -69,20 +69,20 @@ export const metadata: Metadata = {
   },
 
   alternates: {
-    canonical: "https://homelinker.co.za",
+    canonical: "https://www.homelinker.co.za",
   },
 
   openGraph: {
     type: "website",
     locale: "en_ZA",
-    url: "https://homelinker.co.za",
+    url: "https://www.homelinker.co.za",
     siteName: "HomeLinker",
     title: "HomeLinker | South Africa's Property Marketplace",
     description:
       "Find rooms, apartments, houses, flats and properties to rent or buy across South Africa.",
     images: [
       {
-        url: "https://homelinker.co.za/og-image.png",
+        url: "https://www.homelinker.co.za/og-image.png",
         width: 1200,
         height: 630,
         alt: "HomeLinker - South Africa's Property Marketplace",
@@ -95,7 +95,7 @@ export const metadata: Metadata = {
     title: "HomeLinker | South Africa's Property Marketplace",
     description:
       "Find rooms, apartments, houses, flats and properties to rent or buy across South Africa.",
-    images: ["https://homelinker.co.za/og-image.png"],
+    images: ["https://www.homelinker.co.za/og-image.png"],
   },
 
   icons: {
@@ -116,6 +116,39 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-screen bg-[#F8F6F1]">
+
+        {/* GEO / Structured Data - HomeLinker Organization */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "@id": "https://www.homelinker.co.za/#organization",
+              name: "HomeLinker",
+              url: "https://www.homelinker.co.za",
+              logo: "https://www.homelinker.co.za/icon.png",
+              description:
+                "HomeLinker is a South African property marketplace where people can find rooms, apartments, houses, flats and other properties to rent or buy, and property owners can list properties.",
+              areaServed: {
+                "@type": "Country",
+                name: "South Africa",
+              },
+              knowsAbout: [
+                "Property rentals in South Africa",
+                "Property sales in South Africa",
+                "Rooms to rent",
+                "Apartments to rent",
+                "Houses for sale",
+                "Flats to rent",
+                "Student accommodation",
+                "South African real estate",
+                "Property listings",
+              ],
+            }),
+          }}
+        />
+
         <Navbar />
 
         <main className="flex-1">{children}</main>
