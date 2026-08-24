@@ -7,6 +7,7 @@ import {
   getPropertyIdFromSlug,
 } from "@/lib/property-slug";
 import Link from "next/link";
+import { BedDouble, Bath, CarFront, Home as HomeIcon } from "lucide-react";
 import PropertyMap from "@/app/components/PropertyMap";
 import PropertyGallery from "@/app/components/PropertyGallery";
 import FavoriteButton from "@/app/components/FavoriteButton";
@@ -33,8 +34,6 @@ type PropertyDetails = Property & {
 };
 
 // Site-wide canonical domain — must match metadataBase in app/layout.tsx.
-// Keeping this in one place avoids the www / non-www mismatch that was
-// splitting SEO signals between two URL versions of the same page.
 const SITE_URL = "https://www.homelinker.co.za";
 
 async function getPropertyBySlugOrId(
@@ -234,12 +233,12 @@ export default async function PropertyDetails({
     property.owner_name ??
     null;
 
+  const isVerified =
+    property.verified ||
+    property.verification_status === "verified";
+
   /*
    * Structured data for Google.
-   * Upgraded from a bare "Residence" to a "RealEstateListing" wrapping the
-   * accommodation — this is the shape Google's real-estate rich results
-   * actually expect, and it lets bedroom/bathroom/floor-size counts be
-   * read directly from structured data rather than only visible text.
    */
   const propertySchemaType =
     property.property_type?.toLowerCase() === "house"
@@ -329,6 +328,8 @@ export default async function PropertyDetails({
     ],
   };
 
+  const formattedPrice = `R${Number(property.price).toLocaleString("en-ZA")}`;
+
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
       <script
@@ -338,11 +339,13 @@ export default async function PropertyDetails({
         }}
       />
 
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
 
-        {/* Visible breadcrumb nav — mirrors the BreadcrumbList schema above
-            so users and Google see the same navigation path. */}
-        <nav aria-label="Breadcrumb" className="mb-6 text-sm text-slate-500">
+        {/* Breadcrumb — hidden on mobile to save space, visible from sm up */}
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-4 hidden text-sm text-slate-500 sm:block"
+        >
           <ol className="flex flex-wrap items-center gap-2">
             <li>
               <Link href="/" className="hover:text-[#C9A227]">
@@ -368,157 +371,198 @@ export default async function PropertyDetails({
           altText={`${property.title} — ${property.city}, ${property.province}`}
         />
 
-        {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <h1 className="text-5xl font-bold text-black">
-            {property.title}
-          </h1>
+        {/* ---------- MAIN GRID: content + sticky sidebar ---------- */}
+        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-10">
 
-          <div className="flex items-center gap-2">
-            <FavoriteButton
-              propertyId={property.id}
-              className="rounded-full border border-[#E8D8A5] bg-white p-3 text-[#C9A227] shadow-sm transition hover:scale-105"
-            />
+          {/* LEFT: main content */}
+          <div className="lg:col-span-2">
 
-            <ReportListingButton
-              propertyId={property.id}
-            />
-          </div>
-        </div>
+            {/* Title + actions */}
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold leading-tight text-[#1B1B1B] sm:text-3xl lg:text-4xl">
+                  {property.title}
+                </h1>
 
-        {/* Verification */}
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          {property.verified ||
-          property.verification_status ===
-            "verified" ? (
-            <span className="rounded-full bg-green-600 px-3 py-1 text-sm font-semibold text-white">
-              ✔ Verified Property
-            </span>
-          ) : (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-700">
-              ⏳ Pending Verification
-            </span>
-          )}
+                <p className="mt-2 text-sm text-slate-600 sm:text-base">
+                  {streetAddress ? `${streetAddress}, ` : ""}
+                  {property.suburb ? `${property.suburb}, ` : ""}
+                  {property.city}, {property.province}
+                </p>
+              </div>
 
-          {property.user_id ? (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-              Verified Landlord
-            </span>
-          ) : null}
-        </div>
+              <div className="flex items-center gap-2">
+                <FavoriteButton
+                  propertyId={property.id}
+                  className="rounded-full border border-[#E8D8A5] bg-white p-2.5 text-[#C9A227] shadow-sm transition hover:scale-105 sm:p-3"
+                />
 
-        {/* Price */}
-        <p className="mt-4 text-4xl font-bold text-[#C9A227]">
-          R
-          {Number(property.price).toLocaleString(
-            "en-ZA"
-          )}
-          {property.listing_type === "sale"
-            ? ""
-            : " / month"}
-        </p>
+                <ReportListingButton propertyId={property.id} />
+              </div>
+            </div>
 
-        {/* Location */}
-        <div className="mt-3 space-y-1">
-          {streetAddress ? (
-            <p className="text-lg font-medium text-[#1B1B1B]">
-              📍 {streetAddress}
+            {/* Badges */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {isVerified ? (
+                <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
+                  ✔ Verified Property
+                </span>
+              ) : (
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                  ⏳ Pending Verification
+                </span>
+              )}
+
+              {property.user_id ? (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  Verified Landlord
+                </span>
+              ) : null}
+            </div>
+
+            {/* Price — visible here on mobile only, since sidebar is desktop-only */}
+            <p className="mt-5 text-3xl font-bold text-[#C9A227] lg:hidden">
+              {formattedPrice}
+              {property.listing_type === "sale" ? "" : (
+                <span className="ml-1 text-base font-medium text-slate-500">
+                  / month
+                </span>
+              )}
             </p>
-          ) : null}
 
-          {property.suburb ? (
-            <p className="text-[#1B1B1B]">
-              {property.suburb}
-            </p>
-          ) : null}
+            {/* Key details */}
+            <div className="mt-6 grid grid-cols-4 gap-2 rounded-2xl border border-[#E8D8A5] bg-white p-4 sm:gap-4 sm:p-5">
+              <div className="text-center">
+                <BedDouble size={20} className="mx-auto text-[#C9A227]" />
+                <p className="mt-1.5 text-base font-bold text-[#1B1B1B] sm:text-lg">
+                  {property.bedrooms ?? 0}
+                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
+                  Beds
+                </p>
+              </div>
 
-          <p className="text-[#1B1B1B]">
-            {property.city},{" "}
-            {property.province}
-          </p>
-        </div>
+              <div className="text-center">
+                <Bath size={20} className="mx-auto text-[#C9A227]" />
+                <p className="mt-1.5 text-base font-bold text-[#1B1B1B] sm:text-lg">
+                  {property.bathrooms ?? 0}
+                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
+                  Baths
+                </p>
+              </div>
 
-        {/* Property details */}
-        <div className="mt-10 flex flex-wrap gap-8 text-lg text-black">
-          <div>
-            🛏 {property.bedrooms ?? 0} Bedrooms
+              <div className="text-center">
+                <CarFront size={20} className="mx-auto text-[#C9A227]" />
+                <p className="mt-1.5 text-base font-bold text-[#1B1B1B] sm:text-lg">
+                  {property.parking ?? 0}
+                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
+                  Parking
+                </p>
+              </div>
+
+              <div className="text-center">
+                <HomeIcon size={20} className="mx-auto text-[#C9A227]" />
+                <p className="mt-1.5 truncate text-base font-bold capitalize text-[#1B1B1B] sm:text-lg">
+                  {property.property_type || "—"}
+                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
+                  Type
+                </p>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="mt-8">
+              <h2 className="mb-3 text-xl font-bold text-[#1B1B1B] sm:text-2xl">
+                Description
+              </h2>
+
+              <p className="whitespace-pre-line text-[15px] leading-7 text-slate-700 sm:text-base sm:leading-8">
+                {property.description || "No description provided."}
+              </p>
+            </div>
+
+            {/* Contact — inline on mobile, since sidebar is desktop-only */}
+            <div className="mt-8 lg:hidden">
+              <ContactOwner
+                propertyId={property.id}
+                title={property.title}
+                contactNumber={contactNumber}
+                contactName={contactName}
+                ownerId={property.user_id ?? null}
+                createdAt={property.created_at ?? null}
+              />
+            </div>
+
+            {/* Map */}
+            {property.latitude != null && property.longitude != null ? (
+              <div className="mt-8">
+                <h2 className="mb-3 text-xl font-bold text-[#1B1B1B] sm:text-2xl">
+                  Location
+                </h2>
+                <PropertyMap
+                  latitude={property.latitude}
+                  longitude={property.longitude}
+                  title={property.title}
+                />
+              </div>
+            ) : null}
+
+            {/* Back */}
+            <div className="mt-8">
+              <Link
+                href="/properties"
+                className="inline-flex rounded-xl border border-[#1B1B1B] px-6 py-3 text-sm font-semibold text-[#1B1B1B] transition hover:bg-[#1B1B1B] hover:text-white"
+              >
+                ← Back to all properties
+              </Link>
+            </div>
           </div>
 
-          <div>
-            🛁 {property.bathrooms ?? 0} Bathrooms
+          {/* RIGHT: sticky price + contact sidebar (desktop only) */}
+          <div className="hidden lg:col-span-1 lg:block">
+            <div className="sticky top-6 rounded-2xl border border-[#E8D8A5] bg-white p-6 shadow-sm">
+              <p className="text-3xl font-bold text-[#C9A227]">
+                {formattedPrice}
+                {property.listing_type === "sale" ? "" : (
+                  <span className="ml-1 text-base font-medium text-slate-500">
+                    / month
+                  </span>
+                )}
+              </p>
+
+              <div className="mt-4 space-y-1 border-t border-[#F0EAD2] pt-4 text-sm text-slate-600">
+                <p>
+                  <span className="font-semibold text-[#1B1B1B]">
+                    Location:
+                  </span>{" "}
+                  {property.city}, {property.province}
+                </p>
+                <p>
+                  <span className="font-semibold text-[#1B1B1B]">
+                    Property type:
+                  </span>{" "}
+                  <span className="capitalize">
+                    {property.property_type || "Property"}
+                  </span>
+                </p>
+              </div>
+
+              <div className="mt-5">
+                <ContactOwner
+                  propertyId={property.id}
+                  title={property.title}
+                  contactNumber={contactNumber}
+                  contactName={contactName}
+                  ownerId={property.user_id ?? null}
+                  createdAt={property.created_at ?? null}
+                />
+              </div>
+            </div>
           </div>
-
-          <div>
-            🚗 {property.parking ?? 0} Parking
-          </div>
-
-          <div>
-            🏠{" "}
-            {property.property_type ||
-              "Property"}
-          </div>
         </div>
-
-        {/* Description */}
-        <div className="mt-12">
-          <h2 className="mb-4 text-3xl font-bold text-black">
-            Description
-          </h2>
-
-          <p className="text-lg leading-8 text-black">
-            {property.description ||
-              "No description provided."}
-          </p>
-        </div>
-
-        {/* Contact Owner */}
-        <ContactOwner
-          propertyId={property.id}
-          title={property.title}
-          contactNumber={contactNumber}
-          contactName={contactName}
-          ownerId={property.user_id ?? null}
-          createdAt={property.created_at ?? null}
-        />
-
-        {/* Back */}
-        <div className="mt-8">
-          <Link
-            href="/properties"
-            className="inline-flex rounded-xl border border-black px-8 py-4 text-black transition hover:bg-black hover:text-white"
-          >
-            ← Back
-          </Link>
-        </div>
-
-        {/* Property details box */}
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-          <p className="font-semibold text-[#1B1B1B]">
-            Property details
-          </p>
-
-          <p className="mt-2">
-            Location: {property.city},{" "}
-            {property.province}
-          </p>
-
-          <p className="mt-1">
-            Property type:{" "}
-            {property.property_type ||
-              "Property"}
-          </p>
-        </div>
-
-        {/* Map */}
-        {property.latitude != null &&
-        property.longitude != null ? (
-          <PropertyMap
-            latitude={property.latitude}
-            longitude={property.longitude}
-            title={property.title}
-          />
-        ) : null}
-
       </div>
     </main>
   );
