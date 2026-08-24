@@ -60,6 +60,11 @@ export default function PropertyCard({
     ? `/properties/${slug}`
     : `/properties/${id}`;
 
+  // Descriptive alt text — includes location and bed/bath count so image
+  // search (Google Images) has real context to rank on, not just the title.
+  const imageAlt =
+    `${title} — ${bedrooms} bed, ${bathrooms} bath property in ${location}`;
+
   // --------------------------------------------------
   // Get WhatsApp number
   // --------------------------------------------------
@@ -196,10 +201,10 @@ export default function PropertyCard({
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
         <Image
           src={safeImages[currentImage]}
-          alt={title}
+          alt={imageAlt}
           fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover transition duration-500 group-hover:scale-[1.03]"
-          unoptimized
         />
 
         <Link
