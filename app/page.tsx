@@ -117,17 +117,13 @@ export default function Home() {
 
       <Hero />
 
-      {/* DESKTOP ONLY */}
-      <div className="hidden lg:block">
-        <FeaturedProperties />
-        <PopularAreas />
-      </div>
+      {/* POPULAR LISTINGS */}
+      <FeaturedProperties />
+
+      {/* POPULAR AREAS */}
+      <PopularAreas />
 
       <WhyChooseUs />
-
-      <div className="lg:hidden">
-        {/* On mobile, why choose us comes before marketplace as per request */}
-      </div>
 
       <Footer />
     </main>
