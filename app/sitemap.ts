@@ -1,8 +1,12 @@
 import type { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
 import { createPropertySlug } from "@/lib/property-slug";
+import { blogPosts } from "@/lib/blog-posts";
 
-const BASE_URL = "https://homelinker.co.za";
+// Must match metadataBase in app/layout.tsx and SITE_URL in the property
+// detail page — using the same www domain everywhere avoids splitting
+// SEO signals between two URL versions of the same site.
+const BASE_URL = "https://www.homelinker.co.za";
 
 
 function createCitySlug(city: string) {
@@ -53,6 +57,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}/faq`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}/blog`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
     },
     {
       url: `${BASE_URL}/contact`,
@@ -190,6 +206,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   /*
    * --------------------------------------------------
+   * BLOG POST PAGES
+   * --------------------------------------------------
+   */
+
+  const blogPostPages: MetadataRoute.Sitemap = blogPosts.map((post) => ({
+    url: `${BASE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.publishedAt),
+    changeFrequency: "monthly",
+    priority: 0.6,
+  }));
+
+  /*
+   * --------------------------------------------------
    * FINAL SITEMAP
    * --------------------------------------------------
    */
@@ -199,5 +228,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...rentCityPages,
     ...saleCityPages,
     ...propertyPages,
+    ...blogPostPages,
   ];
 }

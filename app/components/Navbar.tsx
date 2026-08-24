@@ -68,6 +68,10 @@ export default function Navbar() {
       return pathname.startsWith("/contact");
     }
 
+    if (href === "/blog") {
+      return pathname.startsWith("/blog");
+    }
+
     if (href === "/dashboard") {
       return pathname.startsWith("/dashboard");
     }
@@ -202,6 +206,18 @@ export default function Navbar() {
                   }`}
                 >
                   Browse Properties
+                </Link>
+
+                <Link
+                  href="/blog"
+                  onClick={closeMenus}
+                  className={`block rounded-xl px-4 py-3 transition ${
+                    isActive("/blog")
+                      ? "bg-[#C9A227]/10 text-[#C9A227]"
+                      : "text-white hover:bg-white/5 hover:text-[#C9A227]"
+                  }`}
+                >
+                  Blog
                 </Link>
 
                 <Link
@@ -402,6 +418,18 @@ export default function Navbar() {
                 onClick={closeMenus}
               >
                 Browse Properties
+              </Link>
+
+              <Link
+                href="/blog"
+                className={`rounded-xl px-4 py-3 transition ${
+                  isActive("/blog")
+                    ? "bg-[#C9A227]/10 text-[#C9A227]"
+                    : "text-white hover:bg-white/5 hover:text-[#C9A227]"
+                }`}
+                onClick={closeMenus}
+              >
+                Blog
               </Link>
 
               <Link
