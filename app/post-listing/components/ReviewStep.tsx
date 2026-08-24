@@ -65,7 +65,7 @@ export default function ReviewStep({
       </h2>
 
       <p className="mb-10 mt-3 text-center text-[#555555]">
-        Make sure everything looks correct before publishing.
+        Make sure everything looks correct before continuing.
       </p>
 
       <div className="space-y-8">
@@ -195,7 +195,7 @@ export default function ReviewStep({
           onClick={onPublish}
           className="rounded-2xl bg-[#C9A227] px-10 py-4 font-bold text-white transition hover:bg-[#A67C00]"
         >
-          Publish Listing
+          Next Step
         </button>
       </div>
     </div>

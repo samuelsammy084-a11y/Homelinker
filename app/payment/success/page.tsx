@@ -1,85 +1,159 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { useSearchParams } from "next/navigation";
+import { CheckCircle, Loader2 } from "lucide-react";
 
 export default function PaymentSuccessPage() {
-  const [loading, setLoading] = useState(true);
-  const [success, setSuccess] = useState(false);
+  const searchParams = useSearchParams();
+
+  const sessionId =
+    searchParams.get("session_id");
+
+  const [status, setStatus] = useState<
+    "loading" | "success" | "error"
+  >("loading");
+
+  const [message, setMessage] =
+    useState(
+      "Confirming your payment..."
+    );
 
   useEffect(() => {
     async function activateListing() {
-      try {
-        const propertyId = sessionStorage.getItem("propertyId");
-
-        if (!propertyId) {
-          setLoading(false);
-          return;
-        }
-
-        const { error } = await supabase
-          .from("properties")
-          .update({
-            status: "active",
-            plan: "premium",
-          })
-          .eq("id", propertyId);
-
-        if (error) {
-          throw error;
-        }
-
-        sessionStorage.removeItem("propertyId");
-
-        setSuccess(true);
-      } catch (err) {
-        console.error(err);
+      if (!sessionId) {
+        setStatus("error");
+        setMessage(
+          "Payment session could not be found."
+        );
+        return;
       }
 
-      setLoading(false);
+      try {
+        const response = await fetch(
+          "/api/activate-paid-listing",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              sessionId,
+            }),
+          }
+        );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Unable to activate your listing."
+          );
+        }
+
+        sessionStorage.removeItem(
+          "propertyId"
+        );
+
+        setStatus("success");
+
+        setMessage(
+          "Your payment was successful and your property is now live."
+        );
+
+        setTimeout(() => {
+          window.location.href =
+            "/dashboard";
+        }, 1500);
+      } catch (error) {
+        console.error(
+          "Payment activation error:",
+          error
+        );
+
+        setStatus("error");
+
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Payment was successful, but we could not activate your listing."
+        );
+      }
     }
 
-    activateListing();
-  }, []);
+    void activateListing();
+  }, [sessionId]);
 
   return (
-    <main className="min-h-screen bg-[#F8F6F1] flex items-center justify-center px-6">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full p-12 text-center">
+    <main className="flex min-h-screen items-center justify-center bg-[#F8F6F1] px-6">
+      <div className="w-full max-w-lg rounded-[32px] bg-white p-10 text-center shadow-2xl">
+        {status === "loading" && (
+          <>
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#C9A227]/10">
+              <Loader2
+                size={42}
+                className="animate-spin text-[#C9A227]"
+              />
+            </div>
 
-        <div className="text-6xl">
-          🎉
-        </div>
+            <h1 className="mt-6 text-3xl font-black text-[#111111]">
+              Confirming Payment
+            </h1>
 
-        <h1 className="text-5xl font-black mt-6">
-          Payment Successful
-        </h1>
-
-        {loading && (
-          <p className="mt-6 text-gray-600">
-            Activating your listing...
-          </p>
+            <p className="mt-4 text-[#666666]">
+              Please wait while we confirm your
+              payment and publish your property.
+            </p>
+          </>
         )}
 
-        {!loading && success && (
-          <p className="mt-6 text-green-600 text-lg">
-            Your listing is now live!
-          </p>
+        {status === "success" && (
+          <>
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle
+                size={48}
+                className="text-green-600"
+              />
+            </div>
+
+            <h1 className="mt-6 text-3xl font-black text-[#111111]">
+              Payment Successful!
+            </h1>
+
+            <p className="mt-4 text-[#666666]">
+              {message}
+            </p>
+
+            <p className="mt-6 text-sm font-semibold text-[#C9A227]">
+              Taking you to your dashboard...
+            </p>
+          </>
         )}
 
-        {!loading && !success && (
-          <p className="mt-6 text-red-600 text-lg">
-            We couldn&apos;t activate your listing.
-          </p>
+        {status === "error" && (
+          <>
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-100 text-4xl">
+              ❌
+            </div>
+
+            <h1 className="mt-6 text-3xl font-black text-[#111111]">
+              Something went wrong
+            </h1>
+
+            <p className="mt-4 text-[#666666]">
+              {message}
+            </p>
+
+            <a
+              href="/dashboard"
+              className="mt-8 inline-flex rounded-2xl bg-[#C9A227] px-8 py-4 font-bold text-white transition hover:bg-[#A67C00]"
+            >
+              Go to Dashboard
+            </a>
+          </>
         )}
-
-        <Link
-          href="/dashboard"
-          className="block mt-10 bg-[#C9A227] text-white py-4 rounded-xl font-bold hover:bg-[#A67C00]"
-        >
-          Go to Dashboard
-        </Link>
-
       </div>
     </main>
   );
