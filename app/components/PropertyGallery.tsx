@@ -29,8 +29,9 @@ export default function PropertyGallery({ images, altText = "Property image" }: 
           src={images[current]}
           alt={altText}
           fill
+          sizes="(max-width: 1024px) 100vw, 1000px"
           className="object-cover"
-          unoptimized
+          priority
         />
 
         {images.length > 1 && (
@@ -69,10 +70,10 @@ export default function PropertyGallery({ images, altText = "Property image" }: 
             >
               <Image
                 src={image}
-                alt={`${altText} ${index + 1}`}
+                alt={`${altText} — photo ${index + 1}`}
                 fill
+                sizes="150px"
                 className="object-cover"
-                unoptimized
               />
             </button>
           ))}

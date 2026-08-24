@@ -8,6 +8,7 @@ import {
 } from "@/lib/property-slug";
 import Link from "next/link";
 import PropertyMap from "@/app/components/PropertyMap";
+import PropertyGallery from "@/app/components/PropertyGallery";
 import FavoriteButton from "@/app/components/FavoriteButton";
 import ReportListingButton from "@/app/components/ReportListingButton";
 import ContactOwner from "@/app/components/ContactOwner";
@@ -30,6 +31,11 @@ type PropertyDetails = Property & {
   contact_number?: string | null;
   contact_name?: string | null;
 };
+
+// Site-wide canonical domain — must match metadataBase in app/layout.tsx.
+// Keeping this in one place avoids the www / non-www mismatch that was
+// splitting SEO signals between two URL versions of the same page.
+const SITE_URL = "https://www.homelinker.co.za";
 
 async function getPropertyBySlugOrId(
   slug: string
@@ -65,7 +71,7 @@ export async function generateMetadata({
       title: "Property Not Found | HomeLinker",
       description: "The requested property could not be found.",
       alternates: {
-        canonical: "https://homelinker.co.za/properties",
+        canonical: `${SITE_URL}/properties`,
       },
     };
   }
@@ -96,7 +102,7 @@ export async function generateMetadata({
     property.id
   );
 
-  const canonicalUrl = `https://homelinker.co.za/properties/${canonicalSlug}`;
+  const canonicalUrl = `${SITE_URL}/properties/${canonicalSlug}`;
 
   const keywords = [
     property.title,
@@ -203,7 +209,7 @@ export default async function PropertyDetails({
     property.id
   );
 
-  const canonicalUrl = `https://homelinker.co.za/properties/${canonicalSlug}`;
+  const canonicalUrl = `${SITE_URL}/properties/${canonicalSlug}`;
 
   /*
    * Redirect old numeric/incorrect URLs
@@ -229,8 +235,20 @@ export default async function PropertyDetails({
     null;
 
   /*
-   * Structured data for Google
+   * Structured data for Google.
+   * Upgraded from a bare "Residence" to a "RealEstateListing" wrapping the
+   * accommodation — this is the shape Google's real-estate rich results
+   * actually expect, and it lets bedroom/bathroom/floor-size counts be
+   * read directly from structured data rather than only visible text.
    */
+  const propertySchemaType =
+    property.property_type?.toLowerCase() === "house"
+      ? "SingleFamilyResidence"
+      : property.property_type?.toLowerCase() === "apartment" ||
+        property.property_type?.toLowerCase() === "flat"
+      ? "Apartment"
+      : "Residence";
+
   const schema = {
     "@context": "https://schema.org",
 
@@ -243,14 +261,14 @@ export default async function PropertyDetails({
             "@type": "ListItem",
             position: 1,
             name: "Home",
-            item: "https://homelinker.co.za",
+            item: SITE_URL,
           },
 
           {
             "@type": "ListItem",
             position: 2,
             name: "Properties",
-            item: "https://homelinker.co.za/properties",
+            item: `${SITE_URL}/properties`,
           },
 
           {
@@ -263,42 +281,49 @@ export default async function PropertyDetails({
       },
 
       {
-        "@type": "Residence",
-
-        name: property.title,
-
-        description:
-          property.description || undefined,
-
-        image: images,
-
+        "@type": "RealEstateListing",
+        "@id": `${canonicalUrl}#listing`,
         url: canonicalUrl,
+        name: property.title,
+        description: property.description || undefined,
+        image: images,
+        datePosted: property.created_at || undefined,
 
-        address: {
-          "@type": "PostalAddress",
-          streetAddress: streetAddress,
-          addressLocality: property.city,
-          addressRegion: property.province,
-          addressCountry: "ZA",
+        about: {
+          "@type": propertySchemaType,
+          name: property.title,
+          numberOfRooms: property.bedrooms ?? undefined,
+          numberOfBathroomsTotal: property.bathrooms ?? undefined,
+
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: streetAddress,
+            addressLocality: property.city,
+            addressRegion: property.province,
+            addressCountry: "ZA",
+          },
+
+          ...(property.latitude != null &&
+          property.longitude != null
+            ? {
+                geo: {
+                  "@type": "GeoCoordinates",
+                  latitude: property.latitude,
+                  longitude: property.longitude,
+                },
+              }
+            : {}),
         },
-
-        ...(property.latitude != null &&
-        property.longitude != null
-          ? {
-              geo: {
-                "@type": "GeoCoordinates",
-                latitude: property.latitude,
-                longitude: property.longitude,
-              },
-            }
-          : {}),
 
         offers: {
           "@type": "Offer",
           price: property.price,
           priceCurrency: "ZAR",
-          availability:
-            "https://schema.org/InStock",
+          availability: "https://schema.org/InStock",
+          businessFunction:
+            property.listing_type === "sale"
+              ? "http://purl.org/goodrelations/v1#Sell"
+              : "http://purl.org/goodrelations/v1#LeaseOut",
         },
       },
     ],
@@ -314,6 +339,34 @@ export default async function PropertyDetails({
       />
 
       <div className="mx-auto max-w-6xl px-6 py-12">
+
+        {/* Visible breadcrumb nav — mirrors the BreadcrumbList schema above
+            so users and Google see the same navigation path. */}
+        <nav aria-label="Breadcrumb" className="mb-6 text-sm text-slate-500">
+          <ol className="flex flex-wrap items-center gap-2">
+            <li>
+              <Link href="/" className="hover:text-[#C9A227]">
+                Home
+              </Link>
+            </li>
+            <li>/</li>
+            <li>
+              <Link href="/properties" className="hover:text-[#C9A227]">
+                Properties
+              </Link>
+            </li>
+            <li>/</li>
+            <li className="text-slate-700" aria-current="page">
+              {property.title}
+            </li>
+          </ol>
+        </nav>
+
+        {/* Gallery */}
+        <PropertyGallery
+          images={images}
+          altText={`${property.title} — ${property.city}, ${property.province}`}
+        />
 
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4">
