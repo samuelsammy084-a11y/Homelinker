@@ -17,52 +17,88 @@ export async function getProperties(filters?: PropertyFilters) {
     .from("properties")
     .select("*");
 
-  if (filters?.province) {
-    query = query.eq("province", filters.province);
+  // PROVINCE
+  if (filters?.province?.trim()) {
+    query = query.eq(
+      "province",
+      filters.province.trim()
+    );
   }
 
-  if (filters?.city) {
-    query = query.ilike("city", `%${filters.city}%`);
+  // CITY
+  if (filters?.city?.trim()) {
+    query = query.ilike(
+      "city",
+      `%${filters.city.trim()}%`
+    );
   }
 
-  if (filters?.type) {
-    query = query.eq("property_type", filters.type);
+  // PROPERTY TYPE
+  // Case-insensitive so Room, room, ROOM, etc.
+  // all match the same category.
+  if (filters?.type?.trim()) {
+    query = query.ilike(
+      "property_type",
+      filters.type.trim()
+    );
   }
 
-  if (filters?.maxPrice) {
-    query = query.lte("price", filters.maxPrice);
+  // MAX PRICE
+  if (
+    filters?.maxPrice !== undefined &&
+    filters.maxPrice > 0
+  ) {
+    query = query.lte(
+      "price",
+      filters.maxPrice
+    );
   }
 
-  const { data, error } = await query.order("created_at", {
-    ascending: false,
-  });
+  const { data, error } = await query.order(
+    "created_at",
+    {
+      ascending: false,
+    }
+  );
 
   if (error) {
-    console.error("SUPABASE ERROR:", error);
+    console.error(
+      "SUPABASE ERROR:",
+      error
+    );
+
     return [];
   }
 
-  return (data || []).map((property: Property) => ({
-    ...property,
+  return (data || []).map(
+    (property: Property) => ({
+      ...property,
 
-    slug: createPropertySlug(
-      property.title,
-      property.city ?? "",
-      property.id
-    ),
+      slug: createPropertySlug(
+        property.title,
+        property.city ?? "",
+        property.id
+      ),
 
-    image_urls: property.image_urls?.length
-      ? property.image_urls
-      : property.image_url
-      ? [property.image_url]
-      : [],
+      image_urls:
+        property.image_urls?.length
+          ? property.image_urls
+          : property.image_url
+          ? [property.image_url]
+          : [],
 
-    owner_name: property.contact_name || "HomeLinker User",
+      owner_name:
+        property.contact_name ||
+        "HomeLinker User",
 
-    owner_phone: property.contact_phone || null,
+      owner_phone:
+        property.contact_phone ||
+        null,
 
-    owner_verified:
-      property.verified === true ||
-      property.verification_status === "verified",
-  }));
+      owner_verified:
+        property.verified === true ||
+        property.verification_status ===
+          "verified",
+    })
+  );
 }
