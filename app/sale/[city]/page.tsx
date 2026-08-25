@@ -10,6 +10,10 @@ type Props = {
   }>;
 };
 
+// Must match metadataBase in app/layout.tsx and SITE_URL used across
+// the rest of the site — keeps SEO signals on one consistent domain.
+const SITE_URL = "https://www.homelinker.co.za";
+
 function slugToCityName(slug: string) {
   return slug
     .split("-")
@@ -43,7 +47,7 @@ export async function generateMetadata({
     `Find houses, apartments, flats, homes and other properties for sale in ${cityName}, South Africa. Browse property listings on HomeLinker and find your next home.`;
 
   const canonicalUrl =
-    `https://homelinker.co.za/sale/${city.toLowerCase()}`;
+    `${SITE_URL}/sale/${city.toLowerCase()}`;
 
   return {
     title,
@@ -140,7 +144,7 @@ export default async function CitySalePage({
   );
 
   const canonicalUrl =
-    `https://homelinker.co.za/sale/${city.toLowerCase()}`;
+    `${SITE_URL}/sale/${city.toLowerCase()}`;
 
   const schema = {
     "@context": "https://schema.org",
@@ -154,7 +158,7 @@ export default async function CitySalePage({
         isPartOf: {
           "@type": "WebSite",
           name: "HomeLinker",
-          url: "https://homelinker.co.za",
+          url: SITE_URL,
         },
         about: {
           "@type": "Thing",
@@ -169,13 +173,13 @@ export default async function CitySalePage({
             "@type": "ListItem",
             position: 1,
             name: "Home",
-            item: "https://homelinker.co.za",
+            item: SITE_URL,
           },
           {
             "@type": "ListItem",
             position: 2,
             name: "Properties",
-            item: "https://homelinker.co.za/properties",
+            item: `${SITE_URL}/properties`,
           },
           {
             "@type": "ListItem",
@@ -203,8 +207,8 @@ export default async function CitySalePage({
                     position: index + 1,
                     name: property.title,
                     url: property.slug
-                      ? `https://homelinker.co.za/properties/${property.slug}`
-                      : "https://homelinker.co.za/properties",
+                      ? `${SITE_URL}/properties/${property.slug}`
+                      : `${SITE_URL}/properties`,
                   })
                 ),
             },
@@ -296,6 +300,7 @@ export default async function CitySalePage({
                   key={property.id}
                   id={property.id}
                   slug={property.slug}
+                  status={property.status}
                   images={
                     property.image_urls?.length
                       ? property.image_urls

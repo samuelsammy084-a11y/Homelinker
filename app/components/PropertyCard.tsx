@@ -26,6 +26,7 @@ type Props = {
   parking: number;
   featured?: boolean;
   verified?: boolean;
+  status?: string | null;
   phoneNumber?: string | null;
 };
 
@@ -41,6 +42,7 @@ export default function PropertyCard({
   parking,
   featured,
   verified,
+  status,
   phoneNumber,
 }: Props) {
   const [currentImage, setCurrentImage] = useState(0);
@@ -204,7 +206,11 @@ export default function PropertyCard({
           alt={imageAlt}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover transition duration-500 group-hover:scale-[1.03]"
+          className={`object-cover transition duration-500 group-hover:scale-[1.03] ${
+            status === "sold" || status === "rented"
+              ? "grayscale-[40%] brightness-75"
+              : ""
+          }`}
         />
 
         <Link
@@ -218,6 +224,14 @@ export default function PropertyCard({
         </Link>
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+
+        {(status === "sold" || status === "rented") && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/35">
+            <span className="rotate-[-8deg] rounded-lg border-2 border-white bg-black/80 px-5 py-1.5 text-sm font-black uppercase tracking-[0.2em] text-white shadow-lg">
+              {status === "sold" ? "Sold" : "Rented"}
+            </span>
+          </div>
+        )}
 
         {/* BADGES */}
         <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-2">

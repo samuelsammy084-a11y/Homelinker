@@ -51,4 +51,88 @@ export const blogPosts: BlogPost[] = [
       },
     ],
   },
+  {
+    slug: "how-to-avoid-rental-scams-south-africa",
+    title: "How to Avoid Rental Scams in South Africa",
+    description:
+      "Practical, easy-to-follow tips for spotting and avoiding rental scams when searching for a room, flat or house in South Africa.",
+    publishedAt: "2026-08-25",
+    readingTime: "5 min read",
+    content: [
+      {
+        heading: "Why rental scams are common",
+        body: [
+          "South Africa's high demand for affordable rental housing, combined with a large amount of property searching happening online, has made rental scams a persistent problem. Scammers typically post fake listings — often using real photos taken from other properties — at prices that seem unusually good, then ask for a deposit before the renter has seen the property in person.",
+          "Understanding the common warning signs can help you avoid losing money to a scam, and still move quickly on legitimate listings.",
+        ],
+      },
+      {
+        heading: "Warning signs to watch for",
+        body: [
+          "A price significantly below similar properties in the same area is one of the most common red flags — scammers use low prices to attract as many interested renters as possible.",
+          "Be cautious if the person listing the property is unavailable to show it in person or refuses a video call walkthrough, or if they pressure you to pay a deposit quickly because \"someone else is interested.\"",
+          "Requests to pay via untraceable methods, or requests to pay before signing any lease agreement or meeting the landlord, are strong warning signs.",
+        ],
+      },
+      {
+        heading: "Steps to protect yourself",
+        body: [
+          "Always view the property in person, or request a live video call walkthrough if you can't visit before paying anything.",
+          "Ask for the landlord or agent's ID and confirm they are the actual owner or an authorised agent for the property — you can ask to see a recent utility bill or title deed reference as further confirmation.",
+          "Never send money via untraceable payment methods, and be wary of any landlord who refuses to provide a written lease agreement.",
+          "If a listing's photos appear elsewhere online under a different address or price, treat that as a strong sign it may be fraudulent.",
+        ],
+      },
+      {
+        heading: "Reporting a suspicious listing",
+        body: [
+          "If you come across a listing on HomeLinker that looks suspicious, incorrect, or fraudulent, use the \"Report Listing\" button on the property page so our team can review it.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "room-flat-or-house-which-rental-is-right-for-you",
+    title: "Room, Flat or House: Which Rental Is Right for You?",
+    description:
+      "A comparison of renting a room, a flat/apartment, or a full house in South Africa — covering cost, privacy, and what to expect from each option.",
+    publishedAt: "2026-08-25",
+    readingTime: "5 min read",
+    content: [
+      {
+        heading: "Renting a room",
+        body: [
+          "Renting a room in a shared house or apartment is typically the most affordable option, particularly in cities like Johannesburg, Pretoria and Cape Town. It's a common choice for students, young professionals, or anyone looking to minimise monthly costs.",
+          "The trade-off is shared common spaces — kitchen, bathroom and living areas are usually shared with other tenants, and privacy is more limited than renting your own unit.",
+        ],
+      },
+      {
+        heading: "Renting a flat or apartment",
+        body: [
+          "A flat or apartment offers a self-contained living space, usually with its own kitchen and bathroom, while still often being more affordable than a full house. Apartment complexes may also offer additional security, such as access control or on-site management.",
+          "This option suits individuals, couples, or small families who want more privacy than a shared room but don't need the space of a full house.",
+        ],
+      },
+      {
+        heading: "Renting a house",
+        body: [
+          "A full house offers the most space and privacy, often including a garden or yard, and is generally the best option for families or those wanting more independence from neighbours.",
+          "Houses typically come at a higher monthly rent than rooms or flats, and may also involve additional responsibilities, such as garden maintenance, depending on the lease agreement.",
+        ],
+      },
+      {
+        heading: "How to decide",
+        body: [
+          "Consider your budget first, since rooms are typically the most affordable and houses the least. Then weigh how much privacy and space you actually need against how much you're willing to spend.",
+          "It's also worth thinking about location — a room or flat closer to work, transport links or amenities may work out better overall than a larger house further away, once you factor in commuting time and cost.",
+        ],
+      },
+      {
+        heading: "Browse all three on HomeLinker",
+        body: [
+          "HomeLinker lists rooms, flats and houses to rent across South Africa, so you can compare all three options side by side by city, suburb and price before contacting an owner directly.",
+        ],
+      },
+    ],
+  },
 ];

@@ -403,6 +403,13 @@ export default async function PropertyDetails({
 
             {/* Badges */}
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              {(property.status === "sold" ||
+                property.status === "rented") && (
+                <span className="rounded-full bg-black px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+                  {property.status === "sold" ? "Sold" : "Rented"}
+                </span>
+              )}
+
               {isVerified ? (
                 <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
                   ✔ Verified Property
