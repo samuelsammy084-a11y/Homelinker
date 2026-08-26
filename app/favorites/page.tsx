@@ -127,6 +127,7 @@ export default function FavoritesPage() {
                 key={property.id}
                 id={property.id}
                 slug={property.slug}
+                status={property.status}
                 images={
                   property.image_urls?.length
                     ? property.image_urls

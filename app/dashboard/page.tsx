@@ -114,7 +114,7 @@ export default function DashboardPage() {
     void loadData();
   }, []);
 
-    async function handleToggleStatus(
+  async function handleToggleStatus(
     propertyId: number,
     currentStatus: string | null,
     listingType: string | null
@@ -151,9 +151,86 @@ export default function DashboardPage() {
           ? "Property listed as active again!"
           : `Property marked as ${newStatus}!`
       );
+
+      // Notify everyone who favorited this property — but only when it's
+      // newly marked unavailable, not when it's reverted back to active.
+      if (!isSold) {
+        void notifyFavoritersOfStatusChange(
+          propertyId,
+          newStatus
+        );
+      }
     } catch (error) {
       console.error("Error toggling status:", error);
       toast.error("Failed to update status.");
+    }
+  }
+
+  async function notifyFavoritersOfStatusChange(
+    propertyId: number,
+    newStatus: string
+  ) {
+    try {
+      const property = properties.find(
+        (p) => p.id === propertyId
+      );
+
+      const propertyTitle =
+        property?.title || "A property you saved";
+
+      const { data: favoriteRows, error: favoritesError } =
+        await supabase
+          .from("favorites")
+          .select("user_id")
+          .eq("property_id", propertyId);
+
+      if (favoritesError) {
+        console.error(
+          "HomeLinker favorites lookup error:",
+          favoritesError
+        );
+        return;
+      }
+
+      const favoriterIds = Array.from(
+        new Set(
+          (favoriteRows ?? [])
+            .map((row) => row.user_id)
+            .filter(Boolean)
+        )
+      );
+
+      if (favoriterIds.length === 0) return;
+
+      const statusLabel =
+        newStatus === "sold" ? "sold" : "rented";
+
+      const notificationRows = favoriterIds.map(
+        (userId) => ({
+          user_id: userId,
+          title: `A saved property was marked as ${statusLabel}`,
+          message: `"${propertyTitle}" has just been marked as ${statusLabel} by the owner.`,
+          type: "listing_status",
+          is_read: false,
+          listing_id: String(propertyId),
+        })
+      );
+
+      const { error: insertError } = await supabase
+        .from("notifications")
+        .insert(notificationRows);
+
+      if (insertError) {
+        console.error(
+          "HomeLinker notify favoriters error:",
+          insertError
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Unexpected error notifying favoriters:",
+        error
+      );
     }
   }
 
