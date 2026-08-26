@@ -5,6 +5,8 @@ import PopularAreas from "./components/PopularAreas";
 import WhyChooseUs from "./components/WhyChooseUs";
 import Footer from "./components/Footer";
 
+const SITE_URL = "https://www.homelinker.co.za";
+
 export const metadata: Metadata = {
   title:
     "HomeLinker | South Africa's Property Marketplace",
@@ -31,7 +33,7 @@ export const metadata: Metadata = {
   ],
 
   alternates: {
-    canonical: "https://homelinker.co.za",
+    canonical: SITE_URL,
   },
 
   openGraph: {
@@ -41,7 +43,7 @@ export const metadata: Metadata = {
     description:
       "Find houses, apartments, flats, rooms and properties to rent or buy across South Africa. Browse property listings on HomeLinker.",
 
-    url: "https://homelinker.co.za",
+    url: SITE_URL,
     siteName: "HomeLinker",
     locale: "en_ZA",
     type: "website",
@@ -79,25 +81,25 @@ const websiteSchema = {
   "@graph": [
     {
       "@type": "WebSite",
-      "@id": "https://homelinker.co.za/#website",
+      "@id": `${SITE_URL}/#website`,
       name: "HomeLinker",
       alternateName: "HomeLinker South Africa",
-      url: "https://homelinker.co.za/",
+      url: `${SITE_URL}/`,
       description:
         "South African property marketplace for finding properties to rent or buy.",
       inLanguage: "en-ZA",
       publisher: {
-        "@id": "https://homelinker.co.za/#organization",
+        "@id": `${SITE_URL}/#organization`,
       },
     },
     {
       "@type": "Organization",
-      "@id": "https://homelinker.co.za/#organization",
+      "@id": `${SITE_URL}/#organization`,
       name: "HomeLinker",
-      url: "https://homelinker.co.za/",
+      url: `${SITE_URL}/`,
       logo: {
         "@type": "ImageObject",
-        url: "https://homelinker.co.za/icon.png",
+        url: `${SITE_URL}/icon.png`,
       },
       description:
         "HomeLinker is a South African property marketplace where people can find houses, apartments, flats, rooms and other properties to rent or buy.",
