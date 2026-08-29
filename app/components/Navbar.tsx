@@ -11,6 +11,7 @@ import {
   X,
   MessageCircle,
   UserRound,
+  Sparkles,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "./NotificationBell";
@@ -86,6 +87,10 @@ export default function Navbar() {
 
     if (href === "/profile") {
       return pathname.startsWith("/profile");
+    }
+
+    if (href === "/ai") {
+      return pathname.startsWith("/ai");
     }
 
     return false;
@@ -174,6 +179,19 @@ export default function Navbar() {
             </Link>
           )}
 
+          {/* HOME LINKER AI */}
+          <Link
+            href="/ai"
+            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 font-bold transition ${
+              isActive("/ai")
+                ? "border-[#C9A227] bg-[#C9A227] text-black"
+                : "border-[#C9A227]/60 bg-[#C9A227]/10 text-[#C9A227] hover:border-[#C9A227] hover:bg-[#C9A227] hover:text-black"
+            }`}
+          >
+            <Sparkles size={17} />
+            HomeLinker AI
+          </Link>
+
           {/* MORE DROPDOWN */}
           <div className="relative">
             <button
@@ -186,6 +204,7 @@ export default function Navbar() {
               aria-haspopup="menu"
             >
               More
+
               <ChevronDown
                 size={16}
                 className={`transition-transform ${
@@ -400,6 +419,23 @@ export default function Navbar() {
                   Messages
                 </Link>
               )}
+
+              {/* HOME LINKER AI */}
+              <Link
+                href="/ai"
+                className={`mt-1 flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition ${
+                  isActive("/ai")
+                    ? "bg-[#C9A227] text-black"
+                    : "border border-[#C9A227]/50 bg-[#C9A227]/10 text-[#C9A227] hover:bg-[#C9A227] hover:text-black"
+                }`}
+                onClick={closeMenus}
+              >
+                <Sparkles size={19} />
+                <span>HomeLinker AI</span>
+                <span className="ml-auto rounded-full bg-black/10 px-2 py-0.5 text-xs">
+                  AI
+                </span>
+              </Link>
 
               <div className="my-2 border-t border-white/10" />
 
