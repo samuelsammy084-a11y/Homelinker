@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { ShieldCheck, Sparkles, MapPin } from "lucide-react";
 import PropertySearchBar from "./PropertySearchBar";
+import FloatingHouses from "./FloatingHouses";
 
 export default function Hero() {
   return (
@@ -21,6 +22,10 @@ export default function Hero() {
 
       {/* Extra mobile readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-950/20 via-slate-950/45 to-slate-950/80" />
+
+      {/* Floating 3D house shapes — quiet atmospheric layer, sits above the
+          background/overlays but behind the text and search bar below */}
+      <FloatingHouses />
 
       <div className="relative z-10 mx-auto flex min-h-[78vh] max-w-7xl items-center justify-center px-4 py-10 text-center sm:min-h-[92vh] sm:px-6 sm:py-20 lg:px-8 lg:py-24">
         <motion.div
