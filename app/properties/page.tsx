@@ -2,21 +2,23 @@ import type { Metadata } from "next";
 import type { Property } from "@/app/types/property";
 import PropertyCard from "../components/PropertyCard";
 import PropertySearchBar from "../components/PropertySearchBar";
-import FeaturedProperties from "../components/FeaturedProperties";
+import PropertyFilters from "../components/PropertyFilters";
 import { getProperties } from "@/lib/getProperties";
+
+const SITE_URL = "https://www.homelinker.co.za";
 
 export const metadata: Metadata = {
   title: "Properties for Sale & Rent Across South Africa | HomeLinker",
   description:
     "Find houses, apartments, flats, rooms and properties to rent or buy anywhere in South Africa. Browse property listings across cities, suburbs and provinces on HomeLinker.",
   alternates: {
-    canonical: "https://homelinker.co.za/properties",
+    canonical: `${SITE_URL}/properties`,
   },
   openGraph: {
     title: "Properties for Sale & Rent Across South Africa | HomeLinker",
     description:
       "Find houses, apartments, flats, rooms and properties to rent or buy anywhere in South Africa on HomeLinker.",
-    url: "https://homelinker.co.za/properties",
+    url: `${SITE_URL}/properties`,
     siteName: "HomeLinker",
     locale: "en_ZA",
     type: "website",
@@ -99,8 +101,13 @@ export default async function PropertiesPage({
         </div>
 
         {/* SEARCH */}
-        <div className="mb-5 rounded-2xl border border-[#E9E1CA] bg-white p-2 shadow-sm sm:mb-8 sm:rounded-3xl sm:p-4">
+        <div className="mb-4 rounded-2xl border border-[#E9E1CA] bg-white p-2 shadow-sm sm:mb-5 sm:rounded-3xl sm:p-4">
           <PropertySearchBar sticky />
+        </div>
+
+        {/* FILTERS */}
+        <div className="mb-5 sm:mb-8">
+          <PropertyFilters />
         </div>
 
         {/* RESULTS */}
@@ -150,6 +157,7 @@ export default async function PropertiesPage({
                   <PropertyCard
                     id={property.id}
                     slug={property.slug}
+                    status={property.status}
                     images={
                       property.image_urls?.length
                         ? property.image_urls
@@ -181,6 +189,7 @@ export default async function PropertiesPage({
                   key={property.id}
                   id={property.id}
                   slug={property.slug}
+                  status={property.status}
                   images={
                     property.image_urls?.length
                       ? property.image_urls
