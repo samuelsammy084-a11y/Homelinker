@@ -18,36 +18,50 @@ const reasons = [
   "Other",
 ];
 
-export default function ReportListingButton({ propertyId }: ReportListingButtonProps) {
+export default function ReportListingButton({
+  propertyId,
+}: ReportListingButtonProps) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState(reasons[0]);
   const [details, setDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
+    if (!propertyId || submitting) return;
+
     setSubmitting(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    const { error } = await supabase.from("property_reports").insert({
-      property_id: propertyId,
-      reporter_id: user?.id ?? null,
-      reason,
-      details,
-      status: "open",
-    });
+      const { error } = await supabase
+        .from("property_reports")
+        .insert({
+          property_id: propertyId,
+          reporter_id: user?.id ?? null,
+          reason,
+          details: details.trim() || null,
+          status: "open",
+        });
 
-    setSubmitting(false);
+      if (error) {
+        console.error("REPORT ERROR:", error);
+        alert("Unable to submit your report right now.");
+        return;
+      }
 
-    if (!error) {
       setOpen(false);
       setReason(reasons[0]);
       setDetails("");
+
       alert("Thanks — your report has been submitted for review.");
-    } else {
+    } catch (error) {
+      console.error("REPORT SUBMISSION ERROR:", error);
       alert("Unable to submit your report right now.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -65,13 +79,17 @@ export default function ReportListingButton({ propertyId }: ReportListingButtonP
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-            <h3 className="text-2xl font-bold text-slate-900">Report this listing</h3>
+            <h3 className="text-2xl font-bold text-slate-900">
+              Report this listing
+            </h3>
+
             <p className="mt-2 text-sm text-slate-600">
               Help us keep the marketplace trustworthy.
             </p>
 
             <label className="mt-5 block text-sm font-semibold text-slate-700">
               Reason
+
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -87,6 +105,7 @@ export default function ReportListingButton({ propertyId }: ReportListingButtonP
 
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Details
+
               <textarea
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
@@ -100,15 +119,17 @@ export default function ReportListingButton({ propertyId }: ReportListingButtonP
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
+                disabled={submitting}
+                className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 disabled:opacity-50"
               >
                 Cancel
               </button>
+
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="rounded-xl bg-[#C9A227] px-4 py-2 font-semibold text-white"
+                className="rounded-xl bg-[#C9A227] px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? "Submitting..." : "Submit Report"}
               </button>
