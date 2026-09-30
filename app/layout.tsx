@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { GoogleAnalytics } from "@next/third-parties/google";
 import { Toaster } from "sonner";
 import Navbar from "./components/Navbar";
+import CookieConsent from "./components/CookieConsent";
+import GoogleAnalyticsConsent from "./components/GoogleAnalyticsConsent";
 import "./globals.css";
 import "leaflet/dist/leaflet.css";
 
@@ -15,6 +16,12 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+export const viewport: Viewport = {
+  themeColor: "#F8F6F1",
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.homelinker.co.za"),
@@ -103,6 +110,10 @@ export const metadata: Metadata = {
   },
 
   category: "Real Estate",
+
+  verification: {
+    google: "YOUR_GOOGLE_SEARCH_CONSOLE_CODE",
+  },
 };
 
 export default function RootLayout({
@@ -115,9 +126,18 @@ export default function RootLayout({
       lang="en-ZA"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-screen bg-[#F8F6F1]">
+      <head>
+        <link
+          rel="preconnect"
+          href="https://ycxbuwgighvqwkrfyanf.supabase.co"
+        />
+        <link
+          rel="dns-prefetch"
+          href="https://ycxbuwgighvqwkrfyanf.supabase.co"
+        />
+      </head>
 
-        {/* GEO / Structured Data - HomeLinker Organization */}
+      <body className="min-h-screen bg-[#F8F6F1]">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -149,6 +169,32 @@ export default function RootLayout({
           }}
         />
 
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              "@id": "https://www.homelinker.co.za/#website",
+              url: "https://www.homelinker.co.za",
+              name: "HomeLinker",
+              publisher: {
+                "@id": "https://www.homelinker.co.za/#organization",
+              },
+              potentialAction: {
+                "@type": "SearchAction",
+                target: {
+                  "@type": "EntryPoint",
+                  urlTemplate:
+                    "https://www.homelinker.co.za/properties?search={search_term_string}",
+                },
+                "query-input":
+                  "required name=search_term_string",
+              },
+            }),
+          }}
+        />
+
         <Navbar />
 
         <main className="flex-1">{children}</main>
@@ -160,11 +206,9 @@ export default function RootLayout({
           duration={3000}
         />
 
-        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
-          <GoogleAnalytics
-            gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}
-          />
-        )}
+        <GoogleAnalyticsConsent />
+
+        <CookieConsent />
       </body>
     </html>
   );

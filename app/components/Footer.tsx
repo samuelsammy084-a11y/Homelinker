@@ -1,3 +1,4 @@
+import CookieSettings from "./CookieSettings";
 import Link from "next/link";
 import {
   MessageCircle,
