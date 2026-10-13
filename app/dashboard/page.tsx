@@ -76,13 +76,52 @@ export default function DashboardPage() {
         setRole(userRole);
 
         const { data, error } = await supabase
-          .from("properties")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", {
-            ascending: false,
-          });
-
+  .from("properties")
+  .select(`
+    id,
+    title,
+    description,
+    price,
+    province,
+    city,
+    location,
+    property_type,
+    bedrooms,
+    bathrooms,
+    parking,
+    image_url,
+    featured,
+    verified,
+    created_at,
+    user_id,
+    image_urls,
+    latitude,
+    longitude,
+    street_address,
+    suburb,
+    status,
+    plan,
+    payment_status,
+    expires_at,
+    featured_until,
+    published_at,
+    listing_type,
+    deposit,
+    available_from,
+    floor_size,
+    land_size,
+    condition,
+    rates,
+    levies,
+    furnished,
+    pet_friendly,
+    is_promoted,
+    show_contact_phone
+  `)
+  .eq("user_id", user.id)
+  .order("created_at", {
+    ascending: false,
+  });
         if (error) {
           console.error(
             "HomeLinker properties error:",
