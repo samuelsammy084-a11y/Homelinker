@@ -1,46 +1,37 @@
 import type { Metadata } from "next";
-import type { Property } from "@/app/types/property";
-import PropertyCard from "../components/PropertyCard";
-import PropertySearchBar from "../components/PropertySearchBar";
-import PropertyFilters from "../components/PropertyFilters";
+import Link from "next/link";
+import {
+  MapPin,
+  BedDouble,
+  Bath,
+  CarFront,
+  Search,
+} from "lucide-react";
+
+import PropertySearchBar from "@/app/components/PropertySearchBar";
 import { getProperties } from "@/lib/getProperties";
 
-const SITE_URL = "https://www.homelinker.co.za";
-
 export const metadata: Metadata = {
-  title: "Properties for Sale & Rent Across South Africa | HomeLinker",
+  title:
+    "Properties for Sale & Rent Across South Africa | HomeLinker",
+
   description:
-    "Find houses, apartments, flats, rooms and properties to rent or buy anywhere in South Africa. Browse property listings across cities, suburbs and provinces on HomeLinker.",
+    "Find rooms, flats, apartments and houses to rent or buy across South Africa. Search by province, city, suburb, property type and price on HomeLinker.",
+
   alternates: {
-    canonical: `${SITE_URL}/properties`,
+    canonical: "https://www.homelinker.co.za/properties",
   },
+
   openGraph: {
-    title: "Properties for Sale & Rent Across South Africa | HomeLinker",
+    title:
+      "Properties for Sale & Rent Across South Africa | HomeLinker",
+
     description:
-      "Find houses, apartments, flats, rooms and properties to rent or buy anywhere in South Africa on HomeLinker.",
-    url: `${SITE_URL}/properties`,
+      "Explore property listings throughout South Africa. Find a place to rent or buy, or browse available homes and rooms on HomeLinker.",
+
+    url: "https://www.homelinker.co.za/properties",
     siteName: "HomeLinker",
-    locale: "en_ZA",
     type: "website",
-    images: [
-      {
-        url: "/og-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "HomeLinker - South Africa's Property Marketplace",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Properties for Sale & Rent Across South Africa | HomeLinker",
-    description:
-      "Find houses, apartments, flats, rooms and properties to rent or buy anywhere in South Africa on HomeLinker.",
-    images: ["/og-image.jpg"],
-  },
-  robots: {
-    index: true,
-    follow: true,
   },
 };
 
@@ -49,172 +40,392 @@ type Props = {
     province?: string;
     city?: string;
     type?: string;
+    listingType?: string;
+    minPrice?: string;
     maxPrice?: string;
   }>;
 };
+
+function parsePrice(value?: string): number | undefined {
+  if (!value?.trim()) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function formatPrice(price: number): string {
+  return `R${Number(price || 0).toLocaleString("en-ZA")}`;
+}
+
+function getListingLabel(
+  listingType?: string | null
+): string {
+  const value = listingType?.toLowerCase().trim();
+
+  if (value === "sale" || value === "for sale") {
+    return "For Sale";
+  }
+
+  if (value === "rent" || value === "for rent") {
+    return "For Rent";
+  }
+
+  return listingType || "Property";
+}
+
+function isRental(
+  listingType?: string | null
+): boolean {
+  const value = listingType?.toLowerCase().trim();
+
+  return value === "rent" || value === "for rent";
+}
 
 export default async function PropertiesPage({
   searchParams,
 }: Props) {
   const params = await searchParams;
 
+  const listingType =
+    params.listingType === "rent" ||
+    params.listingType === "sale"
+      ? params.listingType
+      : undefined;
+
+  const minPrice = parsePrice(params.minPrice);
+  const maxPrice = parsePrice(params.maxPrice);
+
   const properties = await getProperties({
     province: params.province,
     city: params.city,
     type: params.type,
-    maxPrice: params.maxPrice
-      ? Number(params.maxPrice)
-      : undefined,
+    listingType,
+    minPrice,
+    maxPrice,
   });
 
+  const hasFilters = Boolean(
+    params.province ||
+      params.city ||
+      params.type ||
+      params.listingType ||
+      params.minPrice ||
+      params.maxPrice
+  );
+
+  const heading = listingType
+    ? listingType === "rent"
+      ? "Properties to Rent"
+      : "Properties for Sale"
+    : "Find Your Next Property";
+
   return (
-    <main className="min-h-screen bg-[#F8F6F1]">
-      <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-6 sm:py-10 lg:px-8">
+    <main className="min-h-screen bg-[#F8F6F1] text-slate-900">
+      {/* HERO + SEARCH */}
 
-        {/* HEADER */}
-        <div className="mb-5 sm:mb-8">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="mb-1 text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227] sm:text-sm">
-                Explore HomeLinker
-              </p>
-
-              <h1 className="text-3xl font-black tracking-tight text-black sm:text-5xl">
-                Browse Properties
-              </h1>
-
-              <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:mt-3 sm:text-base">
-                Find your next home anywhere in South Africa.
-              </p>
-            </div>
-
-            <div className="hidden rounded-2xl bg-white px-4 py-3 text-right shadow-sm sm:block">
-              <p className="text-2xl font-black text-[#C9A227]">
-                {properties.length}
-              </p>
-
-              <p className="text-xs font-semibold text-slate-500">
-                properties
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* SEARCH */}
-        <div className="mb-4 rounded-2xl border border-[#E9E1CA] bg-white p-2 shadow-sm sm:mb-5 sm:rounded-3xl sm:p-4">
-          <PropertySearchBar sticky />
-        </div>
-
-        {/* FILTERS */}
-        <div className="mb-5 sm:mb-8">
-          <PropertyFilters />
-        </div>
-
-        {/* RESULTS */}
-        <div className="mb-4 flex items-center justify-between sm:mb-6">
-          <div>
-            <p className="text-sm font-bold text-black sm:text-base">
-              {properties.length}{" "}
-              {properties.length === 1
-                ? "property"
-                : "properties"}{" "}
-              found
+      <section className="border-b border-[#C9A227]/20 bg-gradient-to-br from-[#FCFAF5] to-[#F3EBD5]">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+          <div className="mb-8">
+            <p className="mb-3 text-sm font-bold uppercase tracking-[0.2em] text-[#9A7411]">
+              HomeLinker · South Africa
             </p>
 
-            <p className="mt-0.5 text-xs text-slate-500 sm:hidden">
-              Scroll down to explore properties
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">
+              {heading}
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+              Search rooms, apartments, flats and houses
+              across South Africa. Find a place that suits
+              your needs and budget.
             </p>
           </div>
+
+          <PropertySearchBar />
+        </div>
+      </section>
+
+      {/* PROPERTIES */}
+
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold">
+            Available Properties
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-600">
+            {properties.length}{" "}
+            {properties.length === 1
+              ? "property"
+              : "properties"}{" "}
+            found
+          </p>
         </div>
 
-        {/* NO RESULTS */}
-        {properties.length === 0 ? (
-          <div className="rounded-3xl bg-white p-8 text-center shadow-lg sm:p-12">
+        {/* ACTIVE SEARCH FILTERS */}
 
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF9E8] text-2xl">
-              🏠
-            </div>
+        {hasFilters && (
+          <div className="mb-6 flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-semibold text-slate-600">
+              Your search:
+            </span>
 
-            <h2 className="mt-5 text-2xl font-bold text-black sm:text-3xl">
-              No properties found
-            </h2>
+            {listingType && (
+              <span className="rounded-full border border-[#C9A227]/40 bg-white px-3 py-1">
+                {listingType === "rent"
+                  ? "For Rent"
+                  : "For Sale"}
+              </span>
+            )}
 
-            <p className="mt-3 text-sm text-gray-600 sm:text-base">
-              Try changing your search filters.
-            </p>
+            {params.province && (
+              <span className="rounded-full border border-[#C9A227]/40 bg-white px-3 py-1">
+                {params.province}
+              </span>
+            )}
 
+            {params.city && (
+              <span className="rounded-full border border-[#C9A227]/40 bg-white px-3 py-1">
+                {params.city}
+              </span>
+            )}
+
+            {params.type && (
+              <span className="rounded-full border border-[#C9A227]/40 bg-white px-3 py-1">
+                {params.type}
+              </span>
+            )}
+
+            {minPrice !== undefined && (
+              <span className="rounded-full border border-[#C9A227]/40 bg-white px-3 py-1">
+                From {formatPrice(minPrice)}
+              </span>
+            )}
+
+            {maxPrice !== undefined && (
+              <span className="rounded-full border border-[#C9A227]/40 bg-white px-3 py-1">
+                Up to {formatPrice(maxPrice)}
+              </span>
+            )}
+
+            <Link
+              href="/properties"
+              className="ml-1 font-semibold text-[#8A6810] underline underline-offset-4 transition hover:text-black"
+            >
+              Clear search
+            </Link>
           </div>
-        ) : (
-          <>
-            {/* MOBILE - 1 LISTING PER ROW */}
-            <div className="grid grid-cols-1 gap-3 sm:hidden">
-
-              {properties.map((property: Property) => (
-                <div
-                  key={property.id}
-                  className="min-w-0"
-                >
-                  <PropertyCard
-                    id={property.id}
-                    slug={property.slug}
-                    status={property.status}
-                    images={
-                      property.image_urls?.length
-                        ? property.image_urls
-                        : [
-                            property.image_url ||
-                              "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
-                          ]
-                    }
-                    price={property.price}
-                    title={property.title}
-                    location={`${property.city}, ${property.province}`}
-                    bedrooms={property.bedrooms ?? 0}
-                    bathrooms={property.bathrooms ?? 0}
-                    parking={property.parking ?? 0}
-                    featured={property.featured}
-                    verified={property.verified}
-                    phoneNumber={property.contact_phone}
-                  />
-                </div>
-              ))}
-
-            </div>
-
-            {/* LAPTOP / DESKTOP - 3 LISTINGS PER ROW */}
-            <div className="hidden sm:grid sm:grid-cols-3 sm:gap-6">
-
-              {properties.map((property: Property) => (
-                <PropertyCard
-                  key={property.id}
-                  id={property.id}
-                  slug={property.slug}
-                  status={property.status}
-                  images={
-                    property.image_urls?.length
-                      ? property.image_urls
-                      : [
-                          property.image_url ||
-                            "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
-                        ]
-                  }
-                  price={property.price}
-                  title={property.title}
-                  location={`${property.city}, ${property.province}`}
-                  bedrooms={property.bedrooms ?? 0}
-                  bathrooms={property.bathrooms ?? 0}
-                  parking={property.parking ?? 0}
-                  featured={property.featured}
-                  verified={property.verified}
-                  phoneNumber={property.contact_phone}
-                />
-              ))}
-
-            </div>
-          </>
         )}
 
-      </div>
+        {/* NO RESULTS */}
+
+        {properties.length === 0 ? (
+          <div className="rounded-3xl border border-slate-200 bg-white px-6 py-14 text-center shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#F8F6F1]">
+              <Search className="h-6 w-6 text-[#9A7411]" />
+            </div>
+
+            <h3 className="mt-5 text-xl font-bold">
+              No properties found
+            </h3>
+
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
+              Try another city or suburb, choose a
+              different property type, or adjust your
+              price range.
+            </p>
+
+            <Link
+              href="/properties"
+              className="mt-6 inline-flex rounded-xl bg-[#C9A227] px-6 py-3 font-bold text-white transition hover:bg-[#A67C00]"
+            >
+              View all properties
+            </Link>
+          </div>
+        ) : (
+          /* PROPERTY GRID */
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {properties.map((property) => {
+              const image =
+                property.image_urls?.find(
+                  (url: string | null) => Boolean(url)
+                ) || property.image_url;
+
+              const rental = isRental(
+                property.listing_type
+              );
+
+              const location = [
+                property.suburb,
+                property.city,
+                property.province,
+              ]
+                .filter(Boolean)
+                .filter(
+                  (value, index, values) =>
+                    values.indexOf(value) === index
+                )
+                .join(", ");
+
+              const propertyHref = property.slug
+                ? `/properties/${property.slug}`
+                : `/properties/${property.id}`;
+
+              const verified =
+                property.verified === true ||
+                String(
+                  property.verification_status || ""
+                ).toLowerCase() === "verified";
+
+              return (
+                <article
+                  key={property.id}
+                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <Link
+                    href={propertyHref}
+                    className="block"
+                    aria-label={`View ${property.title}`}
+                  >
+                    {/* IMAGE */}
+
+                    <div className="relative h-56 overflow-hidden bg-slate-100">
+                      {image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={image}
+                          alt={property.title}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-400">
+                          <MapPin className="h-8 w-8" />
+
+                          <span className="text-sm">
+                            Photo unavailable
+                          </span>
+                        </div>
+                      )}
+
+                      {/* RENT / SALE */}
+
+                      <span className="absolute left-3 top-3 rounded-lg bg-black/80 px-3 py-1.5 text-xs font-bold text-white">
+                        {getListingLabel(
+                          property.listing_type
+                        )}
+                      </span>
+
+                      {/* FEATURED */}
+
+                      {property.featured && (
+                        <span className="absolute right-3 top-3 rounded-lg bg-[#C9A227] px-3 py-1.5 text-xs font-bold text-white">
+                          Featured
+                        </span>
+                      )}
+
+                      {/* VERIFIED */}
+
+                      {verified && (
+                        <span className="absolute bottom-3 left-3 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
+                          Verified
+                        </span>
+                      )}
+                    </div>
+
+                    {/* DETAILS */}
+
+                    <div className="p-5">
+                      <p className="text-xl font-extrabold text-[#96700B]">
+                        {formatPrice(
+                          Number(property.price)
+                        )}
+
+                        {rental && (
+                          <span className="text-sm font-medium text-slate-500">
+                            {" "}
+                            / month
+                          </span>
+                        )}
+                      </p>
+
+                      <h3 className="mt-2 line-clamp-2 text-lg font-bold leading-6 transition group-hover:text-[#96700B]">
+                        {property.title}
+                      </h3>
+
+                      {/* LOCATION */}
+
+                      {location && (
+                        <p className="mt-2 flex items-start gap-2 text-sm text-slate-500">
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#C9A227]" />
+
+                          <span>{location}</span>
+                        </p>
+                      )}
+
+                      {/* PROPERTY TYPE */}
+
+                      {property.property_type && (
+                        <p className="mt-3 text-sm font-medium text-slate-600">
+                          {property.property_type}
+                        </p>
+                      )}
+
+                      {/* PROPERTY FEATURES */}
+
+                      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
+                        {property.bedrooms != null && (
+                          <span className="flex items-center gap-1.5">
+                            <BedDouble className="h-4 w-4 text-[#9A7411]" />
+
+                            {property.bedrooms} beds
+                          </span>
+                        )}
+
+                        {property.bathrooms != null && (
+                          <span className="flex items-center gap-1.5">
+                            <Bath className="h-4 w-4 text-[#9A7411]" />
+
+                            {property.bathrooms} baths
+                          </span>
+                        )}
+
+                        {property.parking != null && (
+                          <span className="flex items-center gap-1.5">
+                            <CarFront className="h-4 w-4 text-[#9A7411]" />
+
+                            {property.parking} parking
+                          </span>
+                        )}
+                      </div>
+
+                      {/* VIEW PROPERTY */}
+
+                      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+                        <span className="text-xs font-medium text-slate-500">
+                          Listed on HomeLinker
+                        </span>
+
+                        <span className="text-sm font-bold text-[#96700B]">
+                          View property →
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </main>
   );
 }
