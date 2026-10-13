@@ -18,44 +18,59 @@ export async function getProperties(
   unstable_noStore();
 
   /*
-   * IMPORTANT:
-   * Do not use select("*") here.
+   * PUBLIC PROPERTY QUERY
    *
-   * This function powers public property browsing.
-   * Private owner information such as contact_phone
-   * must never be returned with every listing.
+   * Never use select("*") here.
+   *
+   * Sensitive fields deliberately excluded:
+   * - contact_phone
+   * - contact_number
+   * - payment_reference
+   * - stripe_session_id
    */
   let query = supabase.from("properties").select(`
     id,
     title,
     description,
     price,
-    city,
     province,
-    suburb,
-    address,
-    street_address,
+    city,
+    location,
     property_type,
     bedrooms,
     bathrooms,
     parking,
     image_url,
-    image_urls,
     featured,
     verified,
-    is_promoted,
+    created_at,
     user_id,
+    image_urls,
     latitude,
     longitude,
-    property_condition,
-    pet_friendly,
+    street_address,
+    suburb,
+    status,
+    plan,
+    payment_status,
+    expires_at,
+    featured_until,
+    published_at,
     listing_type,
-    bond_price,
-    verification_status,
-    created_at,
-    contact_name
+    deposit,
+    available_from,
+    floor_size,
+    land_size,
+    condition,
+    rates,
+    levies,
+    furnished,
+    pet_friendly,
+    is_promoted,
+    show_contact_phone
   `);
 
+  // Province
   if (filters?.province?.trim()) {
     query = query.ilike(
       "province",
@@ -63,16 +78,18 @@ export async function getProperties(
     );
   }
 
+  // City / suburb / location / street search
   if (filters?.city?.trim()) {
-    const location = filters.city
+    const searchLocation = filters.city
       .trim()
       .replace(/[%_]/g, "\\$&");
 
     query = query.or(
-      `city.ilike.%${location}%,suburb.ilike.%${location}%,address.ilike.%${location}%,street_address.ilike.%${location}%`
+      `city.ilike.%${searchLocation}%,suburb.ilike.%${searchLocation}%,location.ilike.%${searchLocation}%,street_address.ilike.%${searchLocation}%`
     );
   }
 
+  // Property type
   if (filters?.type?.trim()) {
     query = query.ilike(
       "property_type",
@@ -80,6 +97,7 @@ export async function getProperties(
     );
   }
 
+  // Rent / Sale
   if (filters?.listingType) {
     query = query.ilike(
       "listing_type",
@@ -87,6 +105,7 @@ export async function getProperties(
     );
   }
 
+  // Minimum price
   if (
     typeof filters?.minPrice === "number" &&
     Number.isFinite(filters.minPrice) &&
@@ -98,6 +117,7 @@ export async function getProperties(
     );
   }
 
+  // Maximum price
   if (
     typeof filters?.maxPrice === "number" &&
     Number.isFinite(filters.maxPrice) &&
@@ -144,14 +164,10 @@ export async function getProperties(
             ? [typedProperty.image_url]
             : [],
 
-      owner_name:
-        typedProperty.contact_name ||
-        "HomeLinker User",
+      owner_name: "HomeLinker User",
 
       owner_verified:
-        typedProperty.verified === true ||
-        typedProperty.verification_status ===
-          "verified",
+        typedProperty.verified === true,
     };
   });
 }
