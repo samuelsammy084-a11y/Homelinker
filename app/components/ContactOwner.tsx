@@ -25,7 +25,8 @@ function formatWhatsAppNumber(value: string) {
 
   if (!digits) return "";
 
-  // South African local number: 0612345678 -> 27612345678
+  // South African local number:
+  // 0612345678 -> 27612345678
   if (digits.startsWith("0")) {
     return `27${digits.slice(1)}`;
   }
@@ -35,7 +36,6 @@ function formatWhatsAppNumber(value: string) {
     return digits;
   }
 
-  // Fallback
   return digits;
 }
 
@@ -50,58 +50,102 @@ export default function ContactOwner({
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
-  const [showMessageBox, setShowMessageBox] = useState(false);
+  const [showMessageBox, setShowMessageBox] =
+    useState(false);
   const [sharing, setSharing] = useState(false);
 
-  // Use the number passed from the property page first.
-  // If it is not available, get the SAME contact_phone
-  // field used by the working PropertyCard WhatsApp button.
-  const [contactPhone, setContactPhone] = useState<string | null>(
-    contactNumber ?? null
-  );
+  /*
+   * Public phone number returned by the protected
+   * Supabase function.
+   *
+   * The function returns a phone number only when
+   * show_contact_phone = true.
+   */
+  const [publicPhone, setPublicPhone] =
+    useState<string | null>(
+      contactNumber?.trim() || null
+    );
+
+  const [phoneLoading, setPhoneLoading] =
+    useState(true);
 
   const [message, setMessage] = useState(
     `Hi, I found your property "${title}" on HomeLinker and I'm interested. Is it still available?`
   );
 
+  /*
+   * Securely request the public contact number.
+   *
+   * IMPORTANT:
+   * We do NOT select contact_phone or contact_number
+   * directly from the properties table.
+   */
   useEffect(() => {
-    if (contactNumber?.trim()) {
-      setContactPhone(contactNumber);
-      return;
-    }
+    let cancelled = false;
 
-    async function loadContactPhone() {
-      const { data, error } = await supabase
-        .from("properties")
-        .select("contact_phone")
-        .eq("id", propertyId)
-        .maybeSingle();
+    async function loadPublicPhone() {
+      setPhoneLoading(true);
 
-      if (error) {
+      try {
+        const { data, error } =
+          await supabase.rpc(
+            "get_public_property_phone",
+            {
+              p_property_id: propertyId,
+            }
+          );
+
+        if (cancelled) return;
+
+        if (error) {
+          console.error(
+            "HomeLinker public phone RPC error:",
+            error
+          );
+
+          setPublicPhone(null);
+          return;
+        }
+
+        const phone =
+          typeof data === "string"
+            ? data.trim()
+            : "";
+
+        setPublicPhone(phone || null);
+      } catch (error) {
+        if (cancelled) return;
+
         console.error(
-          "HomeLinker WhatsApp number error:",
+          "HomeLinker public phone lookup error:",
           error
         );
-        return;
-      }
 
-      if (data?.contact_phone) {
-        setContactPhone(data.contact_phone);
+        setPublicPhone(null);
+      } finally {
+        if (!cancelled) {
+          setPhoneLoading(false);
+        }
       }
     }
 
-    void loadContactPhone();
-  }, [propertyId, contactNumber]);
+    loadPublicPhone();
 
-  const hasPhone = Boolean(contactPhone?.trim());
+    return () => {
+      cancelled = true;
+    };
+  }, [propertyId]);
 
-  const whatsappNumber = hasPhone
-    ? formatWhatsAppNumber(contactPhone!.trim())
-    : "";
+  const contactPhone =
+    publicPhone?.trim() || null;
 
-  /*
-   * Get the exact property URL the user is currently viewing.
-   */
+  const hasPhone = Boolean(contactPhone);
+
+  const whatsappNumber =
+    contactPhone
+      ? formatWhatsAppNumber(contactPhone)
+      : "";
+
   const propertyUrl =
     typeof window !== "undefined"
       ? window.location.href
@@ -127,7 +171,9 @@ ${propertyUrl}`;
         : "";
 
     if (!shareUrl) {
-      toast.error("Unable to get the property link.");
+      toast.error(
+        "Unable to get the property link."
+      );
       return;
     }
 
@@ -139,7 +185,7 @@ ${propertyUrl}`;
         navigator.share
       ) {
         await navigator.share({
-          title: title,
+          title,
           text: `Check out this property on HomeLinker: ${title}`,
           url: shareUrl,
         });
@@ -151,7 +197,9 @@ ${propertyUrl}`;
         typeof navigator !== "undefined" &&
         navigator.clipboard
       ) {
-        await navigator.clipboard.writeText(shareUrl);
+        await navigator.clipboard.writeText(
+          shareUrl
+        );
 
         toast.success(
           "Property link copied! You can now share it anywhere."
@@ -348,16 +396,16 @@ ${propertyUrl}`;
         return;
       }
 
-      const {
-        error: updateError,
-      } = await supabase
-        .from("conversations")
-        .update({
-          last_message: message.trim(),
-          last_message_at:
-            new Date().toISOString(),
-        })
-        .eq("id", conversationId);
+      const { error: updateError } =
+        await supabase
+          .from("conversations")
+          .update({
+            last_message:
+              message.trim(),
+            last_message_at:
+              new Date().toISOString(),
+          })
+          .eq("id", conversationId);
 
       if (updateError) {
         console.error(
@@ -428,13 +476,16 @@ ${propertyUrl}`;
             Posted{" "}
             {new Date(
               createdAt
-            ).toLocaleDateString("en-ZA")}
+            ).toLocaleDateString(
+              "en-ZA"
+            )}
           </p>
         ) : null}
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
         {/* MESSAGE OWNER */}
+
         <button
           type="button"
           onClick={() =>
@@ -453,6 +504,7 @@ ${propertyUrl}`;
         </button>
 
         {/* WHATSAPP */}
+
         {whatsappUrl && (
           <a
             href={whatsappUrl}
@@ -465,7 +517,8 @@ ${propertyUrl}`;
           </a>
         )}
 
-        {/* SHARE LISTING */}
+        {/* SHARE */}
+
         <button
           type="button"
           onClick={handleShareListing}
@@ -480,6 +533,7 @@ ${propertyUrl}`;
         </button>
 
         {/* CALL OWNER */}
+
         {hasPhone && (
           <a
             href={`tel:${contactPhone}`}
@@ -490,6 +544,8 @@ ${propertyUrl}`;
           </a>
         )}
       </div>
+
+      {/* MESSAGE BOX */}
 
       {showMessageBox && (
         <div className="mt-6 rounded-2xl border border-[#E8D8A5] bg-[#FFFDF8] p-5">
@@ -533,13 +589,25 @@ ${propertyUrl}`;
         </div>
       )}
 
-      {!hasPhone ? (
+      {/* CONTACT STATUS */}
+
+      {phoneLoading ? (
+        <div className="mt-5 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+          Checking contact options...
+        </div>
+      ) : !hasPhone ? (
         <div className="mt-5 rounded-xl bg-[#FFF9E8] px-4 py-3 text-sm text-[#A16207]">
-          Phone and WhatsApp contact details are not available for this listing.
+          Phone and WhatsApp contact
+          details are not available for
+          this listing. You can still
+          contact the owner securely
+          through HomeLinker.
         </div>
       ) : (
         <p className="mt-5 text-sm text-slate-500">
-          You can call or WhatsApp the owner directly, or send a message through HomeLinker.
+          You can call or WhatsApp the
+          owner directly, or send a
+          message through HomeLinker.
         </p>
       )}
     </section>

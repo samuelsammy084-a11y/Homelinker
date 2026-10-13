@@ -2,20 +2,89 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(
-  process.env.STRIPE_SECRET_KEY!
-);
-
-const supabaseAdmin =
-  createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
-    const { sessionId } =
-      await req.json();
+    /*
+     * Read and validate server environment variables
+     * inside the request handler.
+     *
+     * This prevents Next.js from crashing during
+     * build-time module evaluation.
+     */
+    const stripeSecretKey =
+      process.env.STRIPE_SECRET_KEY;
+
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    const supabaseServiceRoleKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!stripeSecretKey) {
+      console.error(
+        "Missing STRIPE_SECRET_KEY."
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Payment service is not configured.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (
+      !supabaseUrl ||
+      !supabaseServiceRoleKey
+    ) {
+      console.error(
+        "Missing Supabase server environment variables."
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Database service is not configured.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    /*
+     * Server-only clients.
+     *
+     * Never expose SUPABASE_SERVICE_ROLE_KEY
+     * to client components.
+     */
+    const stripe = new Stripe(
+      stripeSecretKey
+    );
+
+    const supabaseAdmin =
+      createClient(
+        supabaseUrl,
+        supabaseServiceRoleKey,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          },
+        }
+      );
+
+    const body = await req.json();
+
+    const sessionId =
+      typeof body?.sessionId === "string"
+        ? body.sessionId.trim()
+        : "";
 
     if (!sessionId) {
       return NextResponse.json(
@@ -29,14 +98,18 @@ export async function POST(req: Request) {
       );
     }
 
+    /*
+     * Ask Stripe directly for the session.
+     * Do not trust payment information sent
+     * from the browser.
+     */
     const session =
       await stripe.checkout.sessions.retrieve(
         sessionId
       );
 
     if (
-      session.payment_status !==
-      "paid"
+      session.payment_status !== "paid"
     ) {
       return NextResponse.json(
         {
@@ -82,6 +155,9 @@ export async function POST(req: Request) {
       );
     }
 
+    /*
+     * Confirm the property actually exists.
+     */
     const {
       data: property,
       error: propertyError,
@@ -120,15 +196,21 @@ export async function POST(req: Request) {
       );
     }
 
-    const {
-      error: updateError,
-    } = await supabaseAdmin
-      .from("properties")
-      .update({
-        status: "active",
-        plan,
-      })
-      .eq("id", propertyId);
+    /*
+     * Payment is confirmed by Stripe,
+     * so activate the paid listing.
+     */
+    const { error: updateError } =
+      await supabaseAdmin
+        .from("properties")
+        .update({
+          status: "active",
+          plan,
+          payment_status: "paid",
+          stripe_session_id:
+            session.id,
+        })
+        .eq("id", propertyId);
 
     if (updateError) {
       console.error(
