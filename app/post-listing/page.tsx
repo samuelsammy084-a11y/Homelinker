@@ -84,21 +84,6 @@ export default function PostListingPage() {
     });
   }
 
-  function isDuplicateError(error: {
-    code?: string;
-    message?: string;
-    details?: string;
-  }) {
-    const combined = `${error.message ?? ""} ${
-      error.details ?? ""
-    }`.toLowerCase();
-
-    return (
-      error.code === "23505" &&
-      combined.includes("properties_duplicate_key_unique_idx")
-    );
-  }
-
   async function publishListing() {
     if (publishing) {
       return;
@@ -449,18 +434,20 @@ export default function PostListingPage() {
       // This is only for a nicer user experience.
       // The UNIQUE database index remains the real protection.
 
-      const { data: possibleDuplicate, error: duplicateCheckError } =
-        await supabase
-          .from("properties")
-          .select("id")
-          .eq("user_id", user.id)
-          .ilike("title", cleanTitle)
-          .ilike("city", city.trim())
-          .ilike("street_address", address.trim())
-          .eq("price", numericPrice)
-          .eq("listing_type", listingType)
-          .limit(1)
-          .maybeSingle();
+      const {
+        data: possibleDuplicate,
+        error: duplicateCheckError,
+      } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("user_id", user.id)
+        .ilike("title", cleanTitle)
+        .ilike("city", city.trim())
+        .ilike("street_address", address.trim())
+        .eq("price", numericPrice)
+        .eq("listing_type", listingType)
+        .limit(1)
+        .maybeSingle();
 
       if (duplicateCheckError) {
         console.warn(
@@ -552,112 +539,152 @@ export default function PostListingPage() {
       imageUrl = imageUrls[0];
 
       // --------------------------------------------------
-      // CREATE PROPERTY
+      // GET AUTHENTICATED SESSION
       // --------------------------------------------------
 
-      const { data: insertedProperty, error } =
-        await supabase
-          .from("properties")
-          .insert([
-            {
-              user_id: user.id,
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-              listing_type: listingType,
-              property_type: propertyType.trim(),
-
-              title: cleanTitle,
-              description: cleanDescription,
-
-              province: province.trim(),
-              city: city.trim(),
-              suburb: suburb.trim(),
-
-              street_address: address.trim(),
-
-              latitude,
-              longitude,
-
-              price: numericPrice,
-
-              bedrooms: numericBedrooms,
-              bathrooms: numericBathrooms,
-              parking: numericParking,
-
-              deposit: numericDeposit,
-
-              available_from: availableFrom || null,
-
-              floor_size: numericFloorSize,
-              land_size: numericLandSize,
-
-              condition: condition.trim() || null,
-
-              rates: numericRates,
-              levies: numericLevies,
-
-              furnished,
-              pet_friendly: petFriendly,
-
-              image_url: imageUrl,
-              image_urls: imageUrls,
-
-              contact_phone: cleanPhone,
-
-              // Phone remains private by default.
-              show_contact_phone: false,
-
-              // IMPORTANT:
-              // Do not send status, verified, featured,
-              // payment_status, plan or promotion fields.
-              // Those are controlled by database defaults
-              // and trusted HomeLinker server processes.
-            },
-          ])
-          .select("id")
-          .single();
-
-      if (error) {
+      if (sessionError || !session?.access_token) {
         console.error(
-          "Property insert error:",
-          error
+          "Listing session error:",
+          sessionError
         );
 
-        // If the database rejected this as a duplicate,
-        // remove the newly uploaded unused images.
         if (uploadedPaths.length > 0) {
           await supabase.storage
             .from("property-images")
             .remove(uploadedPaths);
         }
 
-        if (isDuplicateError(error)) {
+        showError(
+          "Session Expired",
+          "Please sign in again before posting your property."
+        );
+        return;
+      }
+
+      // --------------------------------------------------
+      // CREATE PENDING PROPERTY
+      // --------------------------------------------------
+      //
+      // The trusted API creates this listing as pending.
+      // The browser cannot choose status, plan, payment
+      // status, featured or promotion fields.
+
+      const createResponse = await fetch(
+        "/api/create-listing",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+
+          body: JSON.stringify({
+            listing_type: listingType,
+            property_type: propertyType.trim(),
+
+            title: cleanTitle,
+            description: cleanDescription,
+
+            province: province.trim(),
+            city: city.trim(),
+            suburb: suburb.trim(),
+
+            street_address: address.trim(),
+
+            latitude,
+            longitude,
+
+            price: numericPrice,
+
+            bedrooms: numericBedrooms,
+            bathrooms: numericBathrooms,
+            parking: numericParking,
+
+            deposit: numericDeposit,
+
+            available_from:
+              availableFrom || null,
+
+            floor_size: numericFloorSize,
+            land_size: numericLandSize,
+
+            condition:
+              condition.trim() || null,
+
+            rates: numericRates,
+            levies: numericLevies,
+
+            furnished,
+            pet_friendly: petFriendly,
+
+            image_url: imageUrl,
+            image_urls: imageUrls,
+
+            contact_phone: cleanPhone,
+          }),
+        }
+      );
+
+      let createData: {
+        success?: boolean;
+        propertyId?: number;
+        status?: string;
+        error?: string;
+        code?: string;
+      } = {};
+
+      try {
+        createData =
+          await createResponse.json();
+      } catch {
+        createData = {};
+      }
+
+      if (
+        !createResponse.ok ||
+        !createData.propertyId
+      ) {
+        console.error(
+          "Create listing API error:",
+          createData
+        );
+
+        // The listing was not created, so remove the
+        // newly uploaded unused photos.
+        if (uploadedPaths.length > 0) {
+          await supabase.storage
+            .from("property-images")
+            .remove(uploadedPaths);
+        }
+
+        if (
+          createData.code ===
+          "DUPLICATE_LISTING"
+        ) {
           showError(
             "Property Already Listed",
-            "This property is already listed on HomeLinker. Please check your dashboard instead of posting it again."
+            createData.error ||
+              "This property is already listed on HomeLinker. Please check your dashboard instead of posting it again."
           );
           return;
         }
 
         showError(
           "Something Went Wrong",
-          "Your property could not be published. Please check your information and try again."
+          createData.error ||
+            "Your property could not be created. Please check your information and try again."
         );
         return;
       }
 
-      if (!insertedProperty) {
-        if (uploadedPaths.length > 0) {
-          await supabase.storage
-            .from("property-images")
-            .remove(uploadedPaths);
-        }
-
-        showError(
-          "Listing Error",
-          "The property could not be created."
-        );
-        return;
-      }
+      const propertyId = createData.propertyId;
 
       // --------------------------------------------------
       // SAVE PROPERTY ID
@@ -665,15 +692,18 @@ export default function PostListingPage() {
 
       sessionStorage.setItem(
         "propertyId",
-        String(insertedProperty.id)
+        String(propertyId)
       );
 
       // --------------------------------------------------
-      // GO TO DASHBOARD
+      // CHOOSE LISTING PLAN
       // --------------------------------------------------
+      //
+      // The property remains pending/private here.
+      // The pricing flow determines how it is activated.
 
       router.push(
-        `/dashboard?newListing=${insertedProperty.id}`
+        `/pricing?propertyId=${propertyId}`
       );
     } catch (err: unknown) {
       console.error(
@@ -683,7 +713,7 @@ export default function PostListingPage() {
 
       showError(
         "Unexpected Error",
-        "Something unexpected happened while publishing your listing. Please try again."
+        "Something unexpected happened while creating your listing. Please try again."
       );
     } finally {
       setPublishing(false);
@@ -930,7 +960,7 @@ export default function PostListingPage() {
 
         {publishing && step === 7 && (
           <div className="mt-6 rounded-2xl border border-[#E8D9A8] bg-white p-4 text-center font-semibold text-[#555555]">
-            Publishing your property…
+            Creating your listing…
           </div>
         )}
       </div>
