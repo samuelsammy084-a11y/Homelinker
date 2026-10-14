@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { Check, Crown, Sparkles, ArrowLeft } from "lucide-react";
+import {
+  Check,
+  Crown,
+  Sparkles,
+  ArrowLeft,
+} from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -31,24 +35,31 @@ function PricingContent() {
     setLoadingPlan("free");
 
     try {
-      const { data: updatedProperty, error } = await supabase
-        .from("properties")
-        .update({
-          status: "active",
-          plan: "free",
-        })
-        .eq("id", propertyId)
-        .select("id")
-        .single();
+      const { data: updatedProperty, error } =
+        await supabase
+          .from("properties")
+          .update({
+            status: "active",
+            plan: "free",
+          })
+          .eq("id", propertyId)
+          .select("id")
+          .single();
 
       if (error) {
-        console.error("Free plan activation error:", error);
+        console.error(
+          "Free plan activation error:",
+          error
+        );
+
         alert(error.message);
         return;
       }
 
       if (!updatedProperty) {
-        alert("The property could not be activated.");
+        alert(
+          "The property could not be activated."
+        );
         return;
       }
 
@@ -56,14 +67,22 @@ function PricingContent() {
 
       window.location.href = "/dashboard";
     } catch (error) {
-      console.error(error);
-      alert("Something went wrong activating your listing.");
+      console.error(
+        "Free plan activation error:",
+        error
+      );
+
+      alert(
+        "Something went wrong activating your listing."
+      );
     } finally {
       setLoadingPlan(null);
     }
   }
 
-  async function checkout(plan: "premium" | "pro") {
+  async function checkout(
+    plan: "premium" | "pro"
+  ) {
     if (!propertyId) {
       alert(
         "No property was found. Please go back and post your property again."
@@ -74,13 +93,64 @@ function PricingContent() {
     setLoadingPlan(plan);
 
     try {
+      /*
+       * Get the current authenticated Supabase
+       * session before requesting a Stripe
+       * Checkout Session.
+       */
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        console.error(
+          "Checkout session error:",
+          sessionError
+        );
+
+        alert(
+          "Unable to verify your login. Please sign in again."
+        );
+        return;
+      }
+
+      if (!session?.access_token) {
+        alert(
+          "Please sign in before purchasing a listing plan."
+        );
+
+        const returnUrl =
+          `/pricing?propertyId=${encodeURIComponent(
+            String(propertyId)
+          )}`;
+
+        window.location.href =
+          `/login?redirect=${encodeURIComponent(
+            returnUrl
+          )}`;
+
+        return;
+      }
+
+      /*
+       * The API now authenticates this token
+       * and verifies that this user owns the
+       * property before Stripe Checkout is
+       * created.
+       */
       const response = await fetch(
         "/api/create-checkout-session",
         {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json",
+
+            Authorization:
+              `Bearer ${session.access_token}`,
           },
+
           body: JSON.stringify({
             plan,
             propertyId,
@@ -91,22 +161,39 @@ function PricingContent() {
       const data = await response.json();
 
       if (!response.ok) {
+        console.error(
+          "Checkout API error:",
+          data
+        );
+
         alert(
           data.error ||
             "Failed to create checkout session."
         );
+
         return;
       }
 
-      if (!data.url) {
-        alert("Payment page could not be created.");
+      if (
+        !data.url ||
+        typeof data.url !== "string"
+      ) {
+        alert(
+          "Payment page could not be created."
+        );
         return;
       }
 
       window.location.href = data.url;
     } catch (error) {
-      console.error(error);
-      alert("Something went wrong starting payment.");
+      console.error(
+        "Checkout error:",
+        error
+      );
+
+      alert(
+        "Something went wrong starting payment."
+      );
     } finally {
       setLoadingPlan(null);
     }
@@ -128,14 +215,14 @@ function PricingContent() {
         </h1>
 
         <p className="mx-auto mt-4 max-w-2xl text-lg text-[#666666]">
-          Your property has been saved. Choose how you
-          want to publish it on HomeLinker.
+          Your property has been saved. Choose how
+          you want to publish it on HomeLinker.
         </p>
 
         <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-[#E8D9A8] bg-[#FFF9E8] p-4 text-sm text-[#6B5A20]">
           Your listing is currently saved but{" "}
-          <strong>not live</strong>. Choose a plan below
-          to activate it.
+          <strong>not live</strong>. Choose a plan
+          below to activate it.
         </div>
       </div>
 
