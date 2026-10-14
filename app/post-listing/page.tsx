@@ -17,6 +17,7 @@ export default function PostListingPage() {
   const router = useRouter();
 
   const [step, setStep] = useState(1);
+  const [publishing, setPublishing] = useState(false);
 
   const [popup, setPopup] = useState<{
     show: boolean;
@@ -83,7 +84,26 @@ export default function PostListingPage() {
     });
   }
 
+  function isDuplicateError(error: {
+    code?: string;
+    message?: string;
+    details?: string;
+  }) {
+    const combined = `${error.message ?? ""} ${
+      error.details ?? ""
+    }`.toLowerCase();
+
+    return (
+      error.code === "23505" &&
+      combined.includes("properties_duplicate_key_unique_idx")
+    );
+  }
+
   async function publishListing() {
+    if (publishing) {
+      return;
+    }
+
     const {
       data: { user },
       error: authError,
@@ -419,13 +439,51 @@ export default function PostListingPage() {
       }
     }
 
+    setPublishing(true);
+
     try {
-      let imageUrl = "";
-      const imageUrls: string[] = [];
+      // --------------------------------------------------
+      // DUPLICATE PRE-CHECK
+      // --------------------------------------------------
+      //
+      // This is only for a nicer user experience.
+      // The UNIQUE database index remains the real protection.
+
+      const { data: possibleDuplicate, error: duplicateCheckError } =
+        await supabase
+          .from("properties")
+          .select("id")
+          .eq("user_id", user.id)
+          .ilike("title", cleanTitle)
+          .ilike("city", city.trim())
+          .ilike("street_address", address.trim())
+          .eq("price", numericPrice)
+          .eq("listing_type", listingType)
+          .limit(1)
+          .maybeSingle();
+
+      if (duplicateCheckError) {
+        console.warn(
+          "Duplicate pre-check could not be completed:",
+          duplicateCheckError
+        );
+      }
+
+      if (possibleDuplicate) {
+        showError(
+          "Property Already Listed",
+          "This property appears to already be listed on HomeLinker. Please check your dashboard before posting it again."
+        );
+        return;
+      }
 
       // --------------------------------------------------
       // UPLOAD IMAGES
       // --------------------------------------------------
+
+      let imageUrl = "";
+      const imageUrls: string[] = [];
+      const uploadedPaths: string[] = [];
 
       const compressionOptions = {
         maxSizeMB: 1,
@@ -469,12 +527,20 @@ export default function PostListingPage() {
             uploadError
           );
 
+          if (uploadedPaths.length > 0) {
+            await supabase.storage
+              .from("property-images")
+              .remove(uploadedPaths);
+          }
+
           showError(
             "Upload Failed",
             "One of your property photos could not be uploaded. Please try again."
           );
           return;
         }
+
+        uploadedPaths.push(fileName);
 
         const { data } = supabase.storage
           .from("property-images")
@@ -519,14 +585,12 @@ export default function PostListingPage() {
 
               deposit: numericDeposit,
 
-              available_from:
-                availableFrom || null,
+              available_from: availableFrom || null,
 
               floor_size: numericFloorSize,
               land_size: numericLandSize,
 
-              condition:
-                condition.trim() || null,
+              condition: condition.trim() || null,
 
               rates: numericRates,
               levies: numericLevies,
@@ -542,7 +606,11 @@ export default function PostListingPage() {
               // Phone remains private by default.
               show_contact_phone: false,
 
-              status: "active",
+              // IMPORTANT:
+              // Do not send status, verified, featured,
+              // payment_status, plan or promotion fields.
+              // Those are controlled by database defaults
+              // and trusted HomeLinker server processes.
             },
           ])
           .select("id")
@@ -554,6 +622,22 @@ export default function PostListingPage() {
           error
         );
 
+        // If the database rejected this as a duplicate,
+        // remove the newly uploaded unused images.
+        if (uploadedPaths.length > 0) {
+          await supabase.storage
+            .from("property-images")
+            .remove(uploadedPaths);
+        }
+
+        if (isDuplicateError(error)) {
+          showError(
+            "Property Already Listed",
+            "This property is already listed on HomeLinker. Please check your dashboard instead of posting it again."
+          );
+          return;
+        }
+
         showError(
           "Something Went Wrong",
           "Your property could not be published. Please check your information and try again."
@@ -562,6 +646,12 @@ export default function PostListingPage() {
       }
 
       if (!insertedProperty) {
+        if (uploadedPaths.length > 0) {
+          await supabase.storage
+            .from("property-images")
+            .remove(uploadedPaths);
+        }
+
         showError(
           "Listing Error",
           "The property could not be created."
@@ -595,6 +685,8 @@ export default function PostListingPage() {
         "Unexpected Error",
         "Something unexpected happened while publishing your listing. Please try again."
       );
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -834,6 +926,12 @@ export default function PostListingPage() {
             onBack={() => setStep(6)}
             onPublish={publishListing}
           />
+        )}
+
+        {publishing && step === 7 && (
+          <div className="mt-6 rounded-2xl border border-[#E8D9A8] bg-white p-4 text-center font-semibold text-[#555555]">
+            Publishing your property…
+          </div>
         )}
       </div>
     </main>

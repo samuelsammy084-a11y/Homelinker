@@ -10,8 +10,6 @@ type Props = {
   }>;
 };
 
-// Must match metadataBase in app/layout.tsx and SITE_URL used across
-// the rest of the site — keeps SEO signals on one consistent domain.
 const SITE_URL = "https://www.homelinker.co.za";
 
 function slugToCityName(slug: string) {
@@ -40,11 +38,10 @@ export async function generateMetadata({
   const { city } = await params;
   const cityName = slugToCityName(city);
 
-  const title =
-    `Houses, Apartments & Property for Sale in ${cityName} | HomeLinker`;
+  const title = `Houses, Apartments & Property for Sale in ${cityName} | HomeLinker`;
 
   const description =
-    `Find houses, apartments, flats, homes and other properties for sale in ${cityName}, South Africa. Browse property listings on HomeLinker and find your next home.`;
+    `Find houses, apartments, flats and other properties for sale in ${cityName}, South Africa. Browse property listings on HomeLinker and find your next home or investment.`;
 
   const canonicalUrl =
     `${SITE_URL}/sale/${city.toLowerCase()}`;
@@ -56,24 +53,18 @@ export async function generateMetadata({
     keywords: [
       `houses for sale in ${cityName}`,
       `houses to buy in ${cityName}`,
-      `homes for sale in ${cityName}`,
-      `homes to buy in ${cityName}`,
       `apartments for sale in ${cityName}`,
       `apartments to buy in ${cityName}`,
       `flats for sale in ${cityName}`,
-      `flats to buy in ${cityName}`,
       `property for sale in ${cityName}`,
-      `property to buy in ${cityName}`,
       `properties for sale in ${cityName}`,
-      `properties to buy in ${cityName}`,
+      `property to buy in ${cityName}`,
+      `homes for sale in ${cityName}`,
       `${cityName} property for sale`,
-      `${cityName} houses for sale`,
-      `${cityName} apartments for sale`,
-      `${cityName} homes for sale`,
-      "property for sale South Africa",
       "houses for sale South Africa",
-      "homes for sale South Africa",
       "apartments for sale South Africa",
+      "property for sale South Africa",
+      "properties for sale South Africa",
       "South Africa property",
       "HomeLinker",
     ],
@@ -91,7 +82,7 @@ export async function generateMetadata({
       type: "website",
       images: [
         {
-          url: "/og-image.jpg",
+          url: "/og-image.png",
           width: 1200,
           height: 630,
           alt: `Properties for sale in ${cityName} on HomeLinker`,
@@ -103,7 +94,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: ["/og-image.jpg"],
+      images: ["/og-image.png"],
     },
 
     robots: {
@@ -153,7 +144,7 @@ export default async function CitySalePage({
         "@type": "CollectionPage",
         name: `Properties for Sale in ${cityName}`,
         description:
-          `Find houses, apartments, flats, homes and other properties for sale in ${cityName}, South Africa on HomeLinker.`,
+          `Find houses, apartments, flats and properties for sale in ${cityName}, South Africa on HomeLinker.`,
         url: canonicalUrl,
         isPartOf: {
           "@type": "WebSite",
@@ -246,11 +237,10 @@ export default async function CitySalePage({
             </h1>
 
             <p className="mt-5 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
-              Discover houses, apartments, flats, homes
-              and other properties for sale in{" "}
-              {cityName}, South Africa. Browse HomeLinker
-              listings, compare properties and find your
-              next home.
+              Find houses, apartments, flats and other
+              properties for sale in {cityName}, South Africa.
+              Browse HomeLinker listings, compare properties
+              and find your next home or investment.
             </p>
           </div>
         </div>
@@ -278,7 +268,7 @@ export default async function CitySalePage({
           </p>
         </div>
 
-        {/* PROPERTY TYPES FOUND */}
+        {/* PROPERTY TYPES */}
         {propertyTypes.length > 0 ? (
           <div className="mb-8 flex flex-wrap gap-2">
             {propertyTypes.map((propertyType) => (
@@ -292,6 +282,7 @@ export default async function CitySalePage({
           </div>
         ) : null}
 
+        {/* PROPERTY GRID */}
         {properties.length > 0 ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {properties.map(
@@ -301,12 +292,13 @@ export default async function CitySalePage({
                   id={property.id}
                   slug={property.slug}
                   status={property.status}
+                  listingType="sale"
                   images={
                     property.image_urls?.length
                       ? property.image_urls
                       : [
                           property.image_url ||
-                            "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
+                            "/og-image.png",
                         ]
                   }
                   price={property.price}
@@ -324,7 +316,7 @@ export default async function CitySalePage({
         ) : (
           <div className="rounded-3xl border border-[#E8D8A5] bg-white px-6 py-16 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF9E8] text-2xl">
-              🏠
+              🏡
             </div>
 
             <h2 className="mt-5 text-2xl font-black text-[#1B1B1B]">
@@ -355,20 +347,19 @@ export default async function CitySalePage({
           </h2>
 
           <p className="mt-4 leading-8 text-slate-600">
-            Looking for a house, apartment, flat or home
-            to buy in {cityName}, South Africa? HomeLinker
-            helps you discover properties for sale across
-            cities, suburbs and provinces throughout the
-            country.
+            Looking for a house, apartment, flat or other
+            property for sale in {cityName}, South Africa?
+            HomeLinker helps you discover properties for sale
+            across cities, suburbs and provinces throughout
+            South Africa.
           </p>
 
           <p className="mt-4 leading-8 text-slate-600">
-            Browse available homes, compare prices and view
-            property details before contacting the owner.
-            Whether you are looking for a family home, an
-            apartment, a flat or another type of property,
-            HomeLinker makes it easier to discover properties
-            for sale in {cityName}.
+            Whether you are searching for your first home, a
+            family property or an investment opportunity,
+            browse available properties in {cityName}, compare
+            prices and view property details before contacting
+            the owner.
           </p>
 
           <h2 className="mt-10 text-2xl font-black text-[#1B1B1B]">
@@ -378,16 +369,16 @@ export default async function CitySalePage({
           <p className="mt-4 leading-8 text-slate-600">
             HomeLinker brings different types of properties
             together in one South African property marketplace.
-            Search for houses, apartments, flats, homes and
-            other properties based on the location and property
-            that suits your needs.
+            Search for houses, apartments, flats and other
+            properties based on the location and property that
+            suits your needs.
           </p>
 
           <p className="mt-4 leading-8 text-slate-600">
             HomeLinker is a South African property marketplace
-            where property owners can list houses, apartments,
-            flats, rooms and other properties for people looking
-            to rent or buy across South Africa.
+            where property owners can list homes and other
+            properties for people looking to buy or rent across
+            South Africa.
           </p>
         </div>
       </section>

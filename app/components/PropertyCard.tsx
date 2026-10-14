@@ -12,6 +12,7 @@ import {
   MapPin,
   MessageCircle,
 } from "lucide-react";
+
 import { supabase } from "@/lib/supabase";
 
 type Props = {
@@ -27,7 +28,7 @@ type Props = {
   featured?: boolean;
   verified?: boolean;
   status?: string | null;
-  phoneNumber?: string | null;
+  listingType?: "rent" | "sale" | string | null;
 };
 
 export default function PropertyCard({
@@ -43,92 +44,111 @@ export default function PropertyCard({
   featured,
   verified,
   status,
-  phoneNumber,
+  listingType,
 }: Props) {
   const [currentImage, setCurrentImage] = useState(0);
-
-  const [contactPhone, setContactPhone] = useState<
-    string | null
-  >(phoneNumber ?? null);
+  const [contactPhone, setContactPhone] = useState<string | null>(null);
 
   const safeImages =
-    images?.length > 0
-      ? images
-      : [
-          "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
-        ];
+    images?.filter(
+      (image): image is string =>
+        typeof image === "string" && image.trim().length > 0
+    ) ?? [];
+
+  const displayImages =
+    safeImages.length > 0 ? safeImages : ["/og-image.png"];
+
+  const safeCurrentImage =
+    currentImage < displayImages.length ? currentImage : 0;
 
   const listingUrl = slug
     ? `/properties/${slug}`
     : `/properties/${id}`;
 
-  // Descriptive alt text — includes location and bed/bath count so image
-  // search (Google Images) has real context to rank on, not just the title.
-  const imageAlt =
-    `${title} — ${bedrooms} bed, ${bathrooms} bath property in ${location}`;
+  const imageAlt = `${title} — ${bedrooms} bed, ${bathrooms} bath property in ${location}`;
 
-  // --------------------------------------------------
-  // Get WhatsApp number
-  // --------------------------------------------------
+  const normalizedListingType =
+    listingType?.trim().toLowerCase() ?? "";
 
+  const isSale = normalizedListingType === "sale";
+  const isRent = !isSale;
+
+  const isUnavailable =
+    status === "sold" || status === "rented";
+
+  // Get the phone number safely through the public RPC.
+  // The RPC only returns it if the property owner has
+  // chosen to make their phone number public.
   useEffect(() => {
-    if (phoneNumber?.trim()) {
-      setContactPhone(phoneNumber);
-      return;
-    }
+    let cancelled = false;
 
     async function loadContactPhone() {
-      const { data, error } = await supabase
-        .from("properties")
-        .select("contact_phone")
-        .eq("id", id)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc(
+        "get_public_property_phone",
+        {
+          p_property_id: id,
+        }
+      );
 
-      if (error) {
-        console.error(
-          "HomeLinker WhatsApp number error:",
-          error
-        );
+      if (cancelled) {
         return;
       }
 
-      if (data?.contact_phone) {
-        setContactPhone(data.contact_phone);
+      if (error) {
+        console.error(
+          "HomeLinker public contact error:",
+          error
+        );
+
+        setContactPhone(null);
+        return;
       }
+
+      const phone =
+        typeof data === "string" ? data.trim() : "";
+
+      setContactPhone(phone || null);
     }
 
     void loadContactPhone();
-  }, [id, phoneNumber]);
 
-  // --------------------------------------------------
-  // Format South African WhatsApp number
-  // --------------------------------------------------
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   function formatWhatsAppNumber(
     phone: string
   ): string | null {
     const cleaned = phone.replace(/\D/g, "");
 
-    if (!cleaned) return null;
+    if (!cleaned) {
+      return null;
+    }
 
-    if (cleaned.startsWith("27")) {
+    // Already in South African international format.
+    if (
+      cleaned.startsWith("27") &&
+      cleaned.length === 11
+    ) {
       return cleaned;
     }
 
-    if (cleaned.startsWith("0")) {
+    // Example: 0821234567 -> 27821234567
+    if (
+      cleaned.startsWith("0") &&
+      cleaned.length === 10
+    ) {
       return `27${cleaned.slice(1)}`;
     }
 
+    // Example: 821234567 -> 27821234567
     if (cleaned.length === 9) {
       return `27${cleaned}`;
     }
 
     return null;
   }
-
-  // --------------------------------------------------
-  // WhatsApp
-  // --------------------------------------------------
 
   function openWhatsApp(
     event: React.MouseEvent<HTMLButtonElement>
@@ -137,9 +157,6 @@ export default function PropertyCard({
     event.stopPropagation();
 
     if (!contactPhone?.trim()) {
-      alert(
-        "The owner has not provided a WhatsApp number for this property."
-      );
       return;
     }
 
@@ -177,7 +194,7 @@ export default function PropertyCard({
     event.stopPropagation();
 
     setCurrentImage((previous) =>
-      previous === safeImages.length - 1
+      previous === displayImages.length - 1
         ? 0
         : previous + 1
     );
@@ -191,23 +208,22 @@ export default function PropertyCard({
 
     setCurrentImage((previous) =>
       previous === 0
-        ? safeImages.length - 1
+        ? displayImages.length - 1
         : previous - 1
     );
   }
 
   return (
     <article className="group overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_10px_35px_-20px_rgba(0,0,0,0.35)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-22px_rgba(0,0,0,0.3)]">
-
       {/* IMAGE */}
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
         <Image
-          src={safeImages[currentImage]}
+          src={displayImages[safeCurrentImage]}
           alt={imageAlt}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className={`object-cover transition duration-500 group-hover:scale-[1.03] ${
-            status === "sold" || status === "rented"
+            isUnavailable
               ? "grayscale-[40%] brightness-75"
               : ""
           }`}
@@ -225,7 +241,8 @@ export default function PropertyCard({
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
 
-        {(status === "sold" || status === "rented") && (
+        {/* SOLD / RENTED */}
+        {isUnavailable && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/35">
             <span className="rotate-[-8deg] rounded-lg border-2 border-white bg-black/80 px-5 py-1.5 text-sm font-black uppercase tracking-[0.2em] text-white shadow-lg">
               {status === "sold" ? "Sold" : "Rented"}
@@ -235,6 +252,16 @@ export default function PropertyCard({
 
         {/* BADGES */}
         <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-2">
+          <span
+            className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-lg ${
+              isSale
+                ? "bg-blue-600"
+                : "bg-emerald-600"
+            }`}
+          >
+            {isSale ? "For Sale" : "For Rent"}
+          </span>
+
           {featured && (
             <span className="rounded-full bg-[#C9A227] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-lg">
               Featured
@@ -242,7 +269,7 @@ export default function PropertyCard({
           )}
 
           {verified && (
-            <span className="rounded-full bg-emerald-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-lg">
+            <span className="rounded-full bg-emerald-700 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-lg">
               Verified
             </span>
           )}
@@ -250,14 +277,14 @@ export default function PropertyCard({
 
         {/* PHOTO COUNT */}
         <div className="absolute bottom-3 right-3 z-10 rounded-full bg-black/65 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
-          {safeImages.length}{" "}
-          {safeImages.length === 1
+          {displayImages.length}{" "}
+          {displayImages.length === 1
             ? "photo"
             : "photos"}
         </div>
 
         {/* IMAGE CONTROLS */}
-        {safeImages.length > 1 && (
+        {displayImages.length > 1 && (
           <>
             <button
               type="button"
@@ -280,41 +307,44 @@ export default function PropertyCard({
         )}
 
         {/* IMAGE DOTS */}
-        {safeImages.length > 1 && (
+        {displayImages.length > 1 && (
           <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1.5">
-            {safeImages.slice(0, 5).map((_, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setCurrentImage(index);
-                }}
-                aria-label={`Show photo ${index + 1}`}
-                className={`h-1.5 rounded-full transition-all ${
-                  currentImage === index
-                    ? "w-5 bg-white"
-                    : "w-1.5 bg-white/60"
-                }`}
-              />
-            ))}
+            {displayImages
+              .slice(0, 5)
+              .map((_, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setCurrentImage(index);
+                  }}
+                  aria-label={`Show photo ${index + 1}`}
+                  className={`h-1.5 rounded-full transition-all ${
+                    safeCurrentImage === index
+                      ? "w-5 bg-white"
+                      : "w-1.5 bg-white/60"
+                  }`}
+                />
+              ))}
           </div>
         )}
       </div>
 
       {/* CONTENT */}
       <div className="p-3.5 sm:p-5">
-
         {/* PRICE */}
         <div>
           <p className="text-[22px] font-black leading-none text-[#C9A227] sm:text-2xl">
             R{Number(price).toLocaleString("en-ZA")}
           </p>
 
-          <p className="mt-1 text-[11px] text-slate-500 sm:text-xs">
-            per month
-          </p>
+          {isRent && (
+            <p className="mt-1 text-[11px] text-slate-500 sm:text-xs">
+              per month
+            </p>
+          )}
         </div>
 
         {/* TITLE */}
@@ -336,7 +366,6 @@ export default function PropertyCard({
 
         {/* FEATURES */}
         <div className="mt-4 grid grid-cols-3 gap-1.5 sm:mt-5 sm:gap-2">
-
           <div className="rounded-xl bg-[#F8F6F1] px-1.5 py-2.5 text-center sm:px-2 sm:py-3">
             <BedDouble
               size={16}
@@ -381,13 +410,10 @@ export default function PropertyCard({
               Parking
             </p>
           </div>
-
         </div>
 
         {/* ACTIONS */}
         <div className="mt-4 grid grid-cols-1 gap-2 sm:mt-5">
-
-          {/* VIEW LISTING */}
           <Link
             href={listingUrl}
             className="flex min-w-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-xl bg-[#C9A227] px-2 py-2.5 text-[12px] font-bold text-white transition hover:bg-[#A67C00] hover:shadow-lg sm:py-3 sm:text-sm"
@@ -396,21 +422,36 @@ export default function PropertyCard({
           </Link>
 
           {/* WHATSAPP */}
-          <button
-            type="button"
-            onClick={openWhatsApp}
-            className="flex min-w-0 items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap rounded-xl bg-[#25D366] px-2 py-2.5 text-[12px] font-bold text-white transition hover:bg-[#1ebe5d] hover:shadow-lg sm:gap-2 sm:py-3 sm:text-sm"
-          >
-            <MessageCircle
-              size={16}
-              className="shrink-0 sm:size-[17px]"
-            />
+          {contactPhone ? (
+            <button
+              type="button"
+              onClick={openWhatsApp}
+              className="flex min-w-0 items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap rounded-xl bg-[#25D366] px-2 py-2.5 text-[12px] font-bold text-white transition hover:bg-[#1ebe5d] hover:shadow-lg sm:gap-2 sm:py-3 sm:text-sm"
+            >
+              <MessageCircle
+                size={16}
+                className="shrink-0 sm:size-[17px]"
+              />
 
-            <span className="truncate">
-              WhatsApp
-            </span>
-          </button>
+              <span className="truncate">
+                WhatsApp
+              </span>
+            </button>
+          ) : (
+            <div
+              className="flex min-w-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-2 py-2.5 text-[12px] font-semibold text-slate-500 sm:gap-2 sm:py-3 sm:text-sm"
+              title="The owner has chosen not to make their phone number public."
+            >
+              <MessageCircle
+                size={16}
+                className="shrink-0"
+              />
 
+              <span className="truncate">
+                WhatsApp unavailable
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </article>

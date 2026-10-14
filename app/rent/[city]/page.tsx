@@ -89,7 +89,7 @@ export async function generateMetadata({
       type: "website",
       images: [
         {
-          url: "/og-image.jpg",
+          url: "/og-image.png",
           width: 1200,
           height: 630,
           alt: `Properties to rent in ${cityName} on HomeLinker`,
@@ -101,7 +101,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: ["/og-image.jpg"],
+      images: ["/og-image.png"],
     },
 
     robots: {
@@ -299,12 +299,13 @@ export default async function CityRentPage({
                   id={property.id}
                   slug={property.slug}
                   status={property.status}
+                  listingType="rent"
                   images={
                     property.image_urls?.length
                       ? property.image_urls
                       : [
                           property.image_url ||
-                            "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
+                            "/og-image.png",
                         ]
                   }
                   price={property.price}

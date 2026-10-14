@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import type { Property } from "@/app/types/property";
 
 import { redirect } from "next/navigation";
+import Link from "next/link";
+
 import { supabase } from "@/lib/supabase";
 
 import {
   createPropertySlug,
   getPropertyIdFromSlug,
 } from "@/lib/property-slug";
-
-import Link from "next/link";
 
 import {
   BedDouble,
@@ -35,9 +35,11 @@ type PropertyDetails = Property & {
   latitude?: number | null;
   longitude?: number | null;
   show_contact_phone?: boolean;
+  published_at?: string | null;
 };
 
 const SITE_URL = "https://www.homelinker.co.za";
+const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`;
 
 /*
  * Public-safe property query.
@@ -57,63 +59,125 @@ async function getPropertyBySlugOrId(
     return null;
   }
 
-  const { data: property, error } =
-    await supabase
-      .from("properties")
-      .select(`
-        id,
-        title,
-        description,
-        price,
-        province,
-        city,
-        location,
-        property_type,
-        bedrooms,
-        bathrooms,
-        parking,
-        image_url,
-        featured,
-        verified,
-        created_at,
-        user_id,
-        image_urls,
-        latitude,
-        longitude,
-        street_address,
-        suburb,
-        status,
-        plan,
-        payment_status,
-        expires_at,
-        featured_until,
-        published_at,
-        listing_type,
-        deposit,
-        available_from,
-        floor_size,
-        land_size,
-        condition,
-        rates,
-        levies,
-        furnished,
-        pet_friendly,
-        is_promoted,
-        show_contact_phone
-      `)
-      .eq("id", numericId)
-      .maybeSingle();
+  const { data: property, error } = await supabase
+    .from("properties")
+    .select(`
+      id,
+      title,
+      description,
+      price,
+      province,
+      city,
+      location,
+      property_type,
+      bedrooms,
+      bathrooms,
+      parking,
+      image_url,
+      featured,
+      verified,
+      created_at,
+      user_id,
+      image_urls,
+      latitude,
+      longitude,
+      street_address,
+      suburb,
+      status,
+      plan,
+      payment_status,
+      expires_at,
+      featured_until,
+      published_at,
+      listing_type,
+      deposit,
+      available_from,
+      floor_size,
+      land_size,
+      condition,
+      rates,
+      levies,
+      furnished,
+      pet_friendly,
+      is_promoted,
+      show_contact_phone
+    `)
+    .eq("id", numericId)
+    .maybeSingle();
 
   if (error) {
-    console.error(
-      "Property fetch error:",
-      error
-    );
-
+    console.error("Property fetch error:", error);
     return null;
   }
 
   return property as PropertyDetails | null;
+}
+
+/*
+ * Clean text before it is used in SEO metadata.
+ *
+ * We intentionally do not use the advertiser's full
+ * property description as the meta description.
+ */
+function cleanMetaText(value?: string | null) {
+  if (!value) return "";
+
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function createMetaDescription(property: PropertyDetails) {
+  const propertyType =
+    cleanMetaText(property.property_type) || "property";
+
+  const city =
+    cleanMetaText(property.city) || "South Africa";
+
+  const province =
+    cleanMetaText(property.province) || "South Africa";
+
+  const suburb = cleanMetaText(property.suburb);
+
+  const location = suburb
+    ? `${suburb}, ${city}, ${province}`
+    : `${city}, ${province}`;
+
+  const formattedPrice = Number.isFinite(
+    Number(property.price)
+  )
+    ? `R${Number(property.price).toLocaleString("en-ZA")}`
+    : null;
+
+  if (property.listing_type === "sale") {
+    return `View this ${propertyType} for sale in ${location}${
+      formattedPrice ? ` for ${formattedPrice}` : ""
+    }. See photos, property details and location on HomeLinker.`;
+  }
+
+  return `View this ${propertyType} for rent in ${location}${
+    formattedPrice ? ` for ${formattedPrice} per month` : ""
+  }. See photos, property details and location on HomeLinker.`;
+}
+
+function makeAbsoluteImageUrl(url?: string | null) {
+  if (!url) {
+    return DEFAULT_OG_IMAGE;
+  }
+
+  if (
+    url.startsWith("http://") ||
+    url.startsWith("https://")
+  ) {
+    return url;
+  }
+
+  if (url.startsWith("/")) {
+    return `${SITE_URL}${url}`;
+  }
+
+  return `${SITE_URL}/${url}`;
 }
 
 export async function generateMetadata({
@@ -121,89 +185,95 @@ export async function generateMetadata({
 }: Props): Promise<Metadata> {
   const { id } = await params;
 
-  const property =
-    await getPropertyBySlugOrId(id);
+  const property = await getPropertyBySlugOrId(id);
 
   if (!property) {
     return {
-      title:
-        "Property Not Found | HomeLinker",
-
+      title: "Property Not Found | HomeLinker",
       description:
-        "The requested property could not be found.",
-
-      alternates: {
-        canonical: `${SITE_URL}/properties`,
+        "The requested property could not be found on HomeLinker.",
+      robots: {
+        index: false,
+        follow: false,
       },
     };
   }
 
-  const title =
-    `${property.title} in ${property.city} | HomeLinker`;
+  const isSale = property.listing_type === "sale";
 
-  const description =
-    property.description?.trim() ||
-    `View this ${
-      property.property_type || "property"
-    } in ${property.city}, ${
-      property.province
-    }. See photos, price and property details on HomeLinker.`;
+  const propertyType =
+    cleanMetaText(property.property_type) || "Property";
 
-  const images = Array.isArray(
-    property.image_urls
-  )
+  const city =
+    cleanMetaText(property.city) || "South Africa";
+
+  const title = isSale
+    ? `${property.title} for Sale in ${city} | HomeLinker`
+    : `${property.title} for Rent in ${city} | HomeLinker`;
+
+  const description = createMetaDescription(property);
+
+  const propertyImages = Array.isArray(property.image_urls)
     ? property.image_urls.filter(
         (url): url is string =>
           typeof url === "string" &&
-          url.length > 0
+          url.trim().length > 0
       )
     : [];
 
-  const image =
-    images.length > 0
-      ? images[0]
-      : property.image_url ||
-        "/og-image.jpg";
+  const image = makeAbsoluteImageUrl(
+    propertyImages[0] || property.image_url
+  );
 
-  const canonicalSlug =
-    createPropertySlug(
-      property.title,
-      property.city,
-      property.id
-    );
+  const canonicalSlug = createPropertySlug(
+    property.title,
+    property.city,
+    property.id
+  );
 
   const canonicalUrl =
     `${SITE_URL}/properties/${canonicalSlug}`;
 
   const keywords = [
     property.title,
-    property.city,
+    `${propertyType} ${
+      isSale ? "for sale" : "for rent"
+    } in ${city}`,
+    property.suburb
+      ? `${propertyType} ${
+          isSale ? "for sale" : "for rent"
+        } in ${property.suburb}`
+      : null,
+    `${
+      isSale ? "property for sale" : "property for rent"
+    } ${city}`,
+    `${
+      isSale ? "property for sale" : "property for rent"
+    } South Africa`,
     property.province,
-    property.property_type,
     "HomeLinker",
-    "South Africa property",
-    property.listing_type === "sale"
-      ? "property for sale South Africa"
-      : "property for rent South Africa",
-    property.listing_type === "sale"
-      ? "houses for sale South Africa"
-      : "houses for rent South Africa",
-    property.listing_type === "sale"
-      ? "apartments for sale South Africa"
-      : "apartments for rent South Africa",
   ].filter(
     (keyword): keyword is string =>
-      Boolean(keyword)
+      typeof keyword === "string" &&
+      keyword.trim().length > 0
   );
+
+  const shouldIndex =
+    property.status === "active" ||
+    property.status == null;
 
   return {
     title,
     description,
-
     keywords,
 
     alternates: {
       canonical: canonicalUrl,
+    },
+
+    robots: {
+      index: shouldIndex,
+      follow: true,
     },
 
     openGraph: {
@@ -211,14 +281,15 @@ export async function generateMetadata({
       description,
       url: canonicalUrl,
       siteName: "HomeLinker",
-      type: "article",
+      type: "website",
+      locale: "en_ZA",
 
       images: [
         {
           url: image,
           width: 1200,
           height: 630,
-          alt: property.title,
+          alt: `${property.title} in ${city}`,
         },
       ],
     },
@@ -237,8 +308,7 @@ export default async function PropertyDetails({
 }: Props) {
   const { id } = await params;
 
-  const property =
-    await getPropertyBySlugOrId(id);
+  const property = await getPropertyBySlugOrId(id);
 
   if (!property) {
     return (
@@ -249,8 +319,7 @@ export default async function PropertyDetails({
           </h1>
 
           <p className="mt-4 text-lg text-gray-600">
-            The listing you requested
-            could not be found.
+            The listing you requested could not be found.
           </p>
 
           <Link
@@ -265,35 +334,29 @@ export default async function PropertyDetails({
   }
 
   /*
-   * Property images
+   * PROPERTY IMAGES
    */
-  const propertyImages = Array.isArray(
-    property.image_urls
-  )
+  const propertyImages = Array.isArray(property.image_urls)
     ? property.image_urls.filter(
         (url): url is string =>
           typeof url === "string" &&
-          url.length > 0
+          url.trim().length > 0
       )
     : [];
 
   const images =
     propertyImages.length > 0
       ? propertyImages
-      : [
-          property.image_url ||
-            "/og-image.jpg",
-        ];
+      : [property.image_url || "/og-image.png"];
 
   /*
-   * Canonical property URL
+   * CANONICAL PROPERTY URL
    */
-  const canonicalSlug =
-    createPropertySlug(
-      property.title,
-      property.city,
-      property.id
-    );
+  const canonicalSlug = createPropertySlug(
+    property.title,
+    property.city,
+    property.id
+  );
 
   const canonicalUrl =
     `${SITE_URL}/properties/${canonicalSlug}`;
@@ -306,7 +369,7 @@ export default async function PropertyDetails({
   }
 
   /*
-   * Address
+   * ADDRESS
    */
   const streetAddress =
     property.street_address ||
@@ -316,41 +379,52 @@ export default async function PropertyDetails({
   /*
    * IMPORTANT:
    *
-   * The public property query intentionally
-   * does NOT retrieve contact_phone or
-   * contact_number.
+   * The public property query intentionally does NOT
+   * retrieve contact_phone or contact_number.
    *
-   * We will restore Call / WhatsApp through
-   * a protected server-side endpoint next.
+   * ContactOwner is responsible for retrieving any
+   * publicly available contact number through the
+   * protected contact flow.
    */
-  const contactNumber: string | null =
-    null;
+  const contactNumber: string | null = null;
 
   /*
-   * For now we use the generic advertiser
-   * name because contact information should
-   * not be inferred from private fields.
+   * Do not infer private user information.
    */
   const contactName =
-    property.owner_name ||
-    "Advertiser";
+    property.owner_name || "Advertiser";
 
-  const isVerified =
-    property.verified === true;
+  const isVerified = property.verified === true;
 
   /*
-   * Structured data
+   * STRUCTURED DATA
    */
+  const normalizedPropertyType =
+    property.property_type?.toLowerCase().trim();
+
   const propertySchemaType =
-    property.property_type?.toLowerCase() ===
-    "house"
+    normalizedPropertyType === "house"
       ? "SingleFamilyResidence"
-      : property.property_type?.toLowerCase() ===
-            "apartment" ||
-          property.property_type?.toLowerCase() ===
-            "flat"
+      : normalizedPropertyType === "apartment" ||
+          normalizedPropertyType === "flat"
         ? "Apartment"
         : "Residence";
+
+  const isSale =
+    property.listing_type === "sale";
+
+  const schemaAvailability =
+    property.status === "sold" ||
+    property.status === "rented"
+      ? "https://schema.org/SoldOut"
+      : "https://schema.org/InStock";
+
+  const schemaDescription =
+    createMetaDescription(property);
+
+  const schemaImages = images.map(
+    makeAbsoluteImageUrl
+  );
 
   const schema = {
     "@context": "https://schema.org",
@@ -388,45 +462,51 @@ export default async function PropertyDetails({
         "@id": `${canonicalUrl}#listing`,
         url: canonicalUrl,
         name: property.title,
-
-        description:
-          property.description ||
-          undefined,
-
-        image: images,
+        description: schemaDescription,
+        image: schemaImages,
 
         datePosted:
+          property.published_at ||
           property.created_at ||
           undefined,
 
         about: {
           "@type": propertySchemaType,
-
           name: property.title,
 
           numberOfRooms:
-            property.bedrooms ??
-            undefined,
+            property.bedrooms ?? undefined,
 
           numberOfBathroomsTotal:
-            property.bathrooms ??
-            undefined,
+            property.bathrooms ?? undefined,
 
           address: {
-            "@type":
-              "PostalAddress",
+            "@type": "PostalAddress",
 
-            streetAddress:
-              streetAddress,
+            ...(streetAddress
+              ? {
+                  streetAddress,
+                }
+              : {}),
 
-            addressLocality:
-              property.city,
+            ...(property.suburb
+              ? {
+                  addressLocality:
+                    property.suburb,
+                }
+              : {
+                  addressLocality:
+                    property.city,
+                }),
 
-            addressRegion:
-              property.province,
+            ...(property.province
+              ? {
+                  addressRegion:
+                    property.province,
+                }
+              : {}),
 
-            addressCountry:
-              "ZA",
+            addressCountry: "ZA",
           },
 
           ...(property.latitude != null &&
@@ -448,39 +528,31 @@ export default async function PropertyDetails({
 
         offers: {
           "@type": "Offer",
-
           price: property.price,
-
           priceCurrency: "ZAR",
+          availability: schemaAvailability,
+          url: canonicalUrl,
 
-          availability:
-            "https://schema.org/InStock",
-
-          businessFunction:
-            property.listing_type ===
-            "sale"
-              ? "http://purl.org/goodrelations/v1#Sell"
-              : "http://purl.org/goodrelations/v1#LeaseOut",
+          businessFunction: isSale
+            ? "http://purl.org/goodrelations/v1#Sell"
+            : "http://purl.org/goodrelations/v1#LeaseOut",
         },
       },
     ],
   };
 
   const formattedPrice =
-    `R${Number(
-      property.price
-    ).toLocaleString("en-ZA")}`;
-
-  const isSale =
-    property.listing_type === "sale";
+    `R${Number(property.price).toLocaleString("en-ZA")}`;
 
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html:
-            JSON.stringify(schema),
+          __html: JSON.stringify(schema).replace(
+            /</g,
+            "\\u003c"
+          ),
         }}
       />
 
@@ -560,16 +632,12 @@ export default async function PropertyDetails({
 
               <div className="flex items-center gap-2">
                 <FavoriteButton
-                  propertyId={
-                    property.id
-                  }
+                  propertyId={property.id}
                   className="rounded-full border border-[#E8D8A5] bg-white p-2.5 text-[#C9A227] shadow-sm transition hover:scale-105 sm:p-3"
                 />
 
                 <ReportListingButton
-                  propertyId={
-                    property.id
-                  }
+                  propertyId={property.id}
                 />
               </div>
             </div>
@@ -577,28 +645,24 @@ export default async function PropertyDetails({
             {/* BADGES */}
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {(property.status ===
-                "sold" ||
-                property.status ===
-                  "rented") && (
+              {(property.status === "sold" ||
+                property.status === "rented") && (
                 <span className="rounded-full bg-black px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                  {property.status ===
-                  "sold"
+                  {property.status === "sold"
                     ? "Sold"
                     : "Rented"}
                 </span>
               )}
 
               {isVerified && (
-  <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
-    ✔ Verified Property
-  </span>
-)}
+                <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
+                  ✔ Verified Property
+                </span>
+              )}
 
               {property.user_id ? (
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                  Registered
-                  Advertiser
+                  Registered Advertiser
                 </span>
               ) : null}
             </div>
@@ -625,8 +689,7 @@ export default async function PropertyDetails({
                 />
 
                 <p className="mt-1.5 text-base font-bold text-[#1B1B1B] sm:text-lg">
-                  {property.bedrooms ??
-                    0}
+                  {property.bedrooms ?? 0}
                 </p>
 
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
@@ -641,8 +704,7 @@ export default async function PropertyDetails({
                 />
 
                 <p className="mt-1.5 text-base font-bold text-[#1B1B1B] sm:text-lg">
-                  {property.bathrooms ??
-                    0}
+                  {property.bathrooms ?? 0}
                 </p>
 
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
@@ -657,8 +719,7 @@ export default async function PropertyDetails({
                 />
 
                 <p className="mt-1.5 text-base font-bold text-[#1B1B1B] sm:text-lg">
-                  {property.parking ??
-                    0}
+                  {property.parking ?? 0}
                 </p>
 
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
@@ -700,25 +761,15 @@ export default async function PropertyDetails({
 
             <div className="mt-8 lg:hidden">
               <ContactOwner
-                propertyId={
-                  property.id
-                }
-                title={
-                  property.title
-                }
-                contactNumber={
-                  contactNumber
-                }
-                contactName={
-                  contactName
-                }
+                propertyId={property.id}
+                title={property.title}
+                contactNumber={contactNumber}
+                contactName={contactName}
                 ownerId={
-                  property.user_id ??
-                  null
+                  property.user_id ?? null
                 }
                 createdAt={
-                  property.created_at ??
-                  null
+                  property.created_at ?? null
                 }
               />
             </div>
@@ -726,23 +777,16 @@ export default async function PropertyDetails({
             {/* MAP */}
 
             {property.latitude != null &&
-            property.longitude !=
-              null ? (
+            property.longitude != null ? (
               <div className="mt-8">
                 <h2 className="mb-3 text-xl font-bold text-[#1B1B1B] sm:text-2xl">
                   Location
                 </h2>
 
                 <PropertyMap
-                  latitude={
-                    property.latitude
-                  }
-                  longitude={
-                    property.longitude
-                  }
-                  title={
-                    property.title
-                  }
+                  latitude={property.latitude}
+                  longitude={property.longitude}
+                  title={property.title}
                 />
               </div>
             ) : null}
@@ -754,8 +798,7 @@ export default async function PropertyDetails({
                 href="/properties"
                 className="inline-flex rounded-xl border border-[#1B1B1B] px-6 py-3 text-sm font-semibold text-[#1B1B1B] transition hover:bg-[#1B1B1B] hover:text-white"
               >
-                ← Back to all
-                properties
+                ← Back to all properties
               </Link>
             </div>
           </div>
@@ -796,25 +839,15 @@ export default async function PropertyDetails({
 
               <div className="mt-5">
                 <ContactOwner
-                  propertyId={
-                    property.id
-                  }
-                  title={
-                    property.title
-                  }
-                  contactNumber={
-                    contactNumber
-                  }
-                  contactName={
-                    contactName
-                  }
+                  propertyId={property.id}
+                  title={property.title}
+                  contactNumber={contactNumber}
+                  contactName={contactName}
                   ownerId={
-                    property.user_id ??
-                    null
+                    property.user_id ?? null
                   }
                   createdAt={
-                    property.created_at ??
-                    null
+                    property.created_at ?? null
                   }
                 />
               </div>

@@ -19,14 +19,14 @@ import {
   Bell,
   Building2,
   UserCircle,
+  CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import type { Property } from "@/app/types/property";
-import { CheckCircle2, RotateCcw } from "lucide-react";
 
 type Role =
-
   | "home_seeker"
   | "property_owner"
   | "estate_agent";
@@ -36,7 +36,12 @@ export default function DashboardPage() {
   const [role, setRole] = useState<Role>("home_seeker");
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(
+    null
+  );
+  const [updatingStatusId, setUpdatingStatusId] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     async function loadData() {
@@ -76,52 +81,53 @@ export default function DashboardPage() {
         setRole(userRole);
 
         const { data, error } = await supabase
-  .from("properties")
-  .select(`
-    id,
-    title,
-    description,
-    price,
-    province,
-    city,
-    location,
-    property_type,
-    bedrooms,
-    bathrooms,
-    parking,
-    image_url,
-    featured,
-    verified,
-    created_at,
-    user_id,
-    image_urls,
-    latitude,
-    longitude,
-    street_address,
-    suburb,
-    status,
-    plan,
-    payment_status,
-    expires_at,
-    featured_until,
-    published_at,
-    listing_type,
-    deposit,
-    available_from,
-    floor_size,
-    land_size,
-    condition,
-    rates,
-    levies,
-    furnished,
-    pet_friendly,
-    is_promoted,
-    show_contact_phone
-  `)
-  .eq("user_id", user.id)
-  .order("created_at", {
-    ascending: false,
-  });
+          .from("properties")
+          .select(`
+            id,
+            title,
+            description,
+            price,
+            province,
+            city,
+            location,
+            property_type,
+            bedrooms,
+            bathrooms,
+            parking,
+            image_url,
+            featured,
+            verified,
+            created_at,
+            user_id,
+            image_urls,
+            latitude,
+            longitude,
+            street_address,
+            suburb,
+            status,
+            plan,
+            payment_status,
+            expires_at,
+            featured_until,
+            published_at,
+            listing_type,
+            deposit,
+            available_from,
+            floor_size,
+            land_size,
+            condition,
+            rates,
+            levies,
+            furnished,
+            pet_friendly,
+            is_promoted,
+            show_contact_phone
+          `)
+          .eq("user_id", user.id)
+          .order("created_at", {
+            ascending: false,
+          });
+
         if (error) {
           console.error(
             "HomeLinker properties error:",
@@ -158,123 +164,103 @@ export default function DashboardPage() {
     currentStatus: string | null,
     listingType: string | null
   ) {
-    const isSold =
+    if (!user) {
+      toast.error("You must be logged in.");
+      return;
+    }
+
+    const isUnavailable =
       currentStatus === "sold" ||
       currentStatus === "rented";
 
-    let newStatus = "active";
+    const newStatus = isUnavailable
+      ? "active"
+      : listingType === "sale"
+        ? "sold"
+        : "rented";
 
-    if (!isSold) {
-      newStatus =
-        listingType === "sale" ? "sold" : "rented";
-    }
+    setUpdatingStatusId(propertyId);
 
     try {
-      const { error } = await supabase
-        .from("properties")
-        .update({ status: newStatus })
-        .eq("id", propertyId);
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (error) throw error;
-
-      setProperties((current) =>
-        current.map((p) =>
-          p.id === propertyId
-            ? { ...p, status: newStatus }
-            : p
-        )
-      );
-
-      toast.success(
-        isSold
-          ? "Property listed as active again!"
-          : `Property marked as ${newStatus}!`
-      );
-
-      // Notify everyone who favorited this property — but only when it's
-      // newly marked unavailable, not when it's reverted back to active.
-      if (!isSold) {
-        void notifyFavoritersOfStatusChange(
-          propertyId,
-          newStatus
-        );
-      }
-    } catch (error) {
-      console.error("Error toggling status:", error);
-      toast.error("Failed to update status.");
-    }
-  }
-
-  async function notifyFavoritersOfStatusChange(
-    propertyId: number,
-    newStatus: string
-  ) {
-    try {
-      const property = properties.find(
-        (p) => p.id === propertyId
-      );
-
-      const propertyTitle =
-        property?.title || "A property you saved";
-
-      const { data: favoriteRows, error: favoritesError } =
-        await supabase
-          .from("favorites")
-          .select("user_id")
-          .eq("property_id", propertyId);
-
-      if (favoritesError) {
-        console.error(
-          "HomeLinker favorites lookup error:",
-          favoritesError
+      if (
+        sessionError ||
+        !session?.access_token
+      ) {
+        toast.error(
+          "Your session has expired. Please sign in again."
         );
         return;
       }
 
-      const favoriterIds = Array.from(
-        new Set(
-          (favoriteRows ?? [])
-            .map((row) => row.user_id)
-            .filter(Boolean)
+      const response = await fetch(
+        "/api/update-listing-status",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            propertyId,
+            status: newStatus,
+          }),
+        }
+      );
+
+      const result = (await response.json()) as {
+        success?: boolean;
+        status?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.error ||
+            "Unable to update the listing status."
+        );
+      }
+
+      const confirmedStatus =
+        result.status || newStatus;
+
+      setProperties((current) =>
+        current.map((property) =>
+          property.id === propertyId
+            ? {
+                ...property,
+                status: confirmedStatus,
+              }
+            : property
         )
       );
 
-      if (favoriterIds.length === 0) return;
-
-      const statusLabel =
-        newStatus === "sold" ? "sold" : "rented";
-
-      const notificationRows = favoriterIds.map(
-        (userId) => ({
-          user_id: userId,
-          title: `A saved property was marked as ${statusLabel}`,
-          message: `"${propertyTitle}" has just been marked as ${statusLabel} by the owner.`,
-          type: "listing_status",
-          is_read: false,
-          listing_id: String(propertyId),
-        })
+      toast.success(
+        confirmedStatus === "active"
+          ? "Property listed as active again!"
+          : `Property marked as ${confirmedStatus}!`
       );
-
-      const { error: insertError } = await supabase
-        .from("notifications")
-        .insert(notificationRows);
-
-      if (insertError) {
-        console.error(
-          "HomeLinker notify favoriters error:",
-          insertError
-        );
-      }
     } catch (error) {
       console.error(
-        "Unexpected error notifying favoriters:",
+        "HomeLinker listing status error:",
         error
       );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to update status."
+      );
+    } finally {
+      setUpdatingStatusId(null);
     }
   }
 
   async function handleDeleteProperty(
-
     propertyId: number
   ) {
     if (!user) {
@@ -405,7 +391,6 @@ export default function DashboardPage() {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
         <div className="mx-auto max-w-7xl">
-
           {/* TOP NAVIGATION */}
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <Link
@@ -445,9 +430,10 @@ export default function DashboardPage() {
                 </h1>
 
                 <p className="mt-3 max-w-xl text-slate-300">
-                  Find a place you'll love to call home.
-                  Browse properties, save your favourites,
-                  and chat directly with owners and agents.
+                  Find a place you&apos;ll love to call
+                  home. Browse properties, save your
+                  favourites, and chat directly with
+                  owners and agents.
                 </p>
               </div>
 
@@ -507,7 +493,8 @@ export default function DashboardPage() {
 
                 <p className="mt-2 text-slate-600">
                   Start browsing properties across South
-                  Africa and contact the people listing them.
+                  Africa and contact the people listing
+                  them.
                 </p>
               </div>
 
@@ -531,13 +518,11 @@ export default function DashboardPage() {
   /*
    * PROPERTY OWNER / ESTATE AGENT DASHBOARD
    */
-
   const isAgent = role === "estate_agent";
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-7xl">
-
         {/* TOP NAVIGATION */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <Link
@@ -603,8 +588,6 @@ export default function DashboardPage() {
 
         {/* QUICK ACTIONS */}
         <div className="mb-8 grid grid-cols-2 gap-3 sm:mb-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-
-          {/* ADD PROPERTY */}
           <DashboardAction
             href="/post-listing"
             icon={<Plus size={22} />}
@@ -613,7 +596,6 @@ export default function DashboardPage() {
             primary
           />
 
-          {/* NOTIFICATIONS */}
           <DashboardAction
             href="/notifications"
             icon={<Bell size={22} />}
@@ -621,7 +603,6 @@ export default function DashboardPage() {
             description="See new enquiries"
           />
 
-          {/* PROFILE */}
           <DashboardAction
             href="/profile"
             icon={<UserCircle size={22} />}
@@ -703,6 +684,9 @@ export default function DashboardPage() {
               const isDeleting =
                 deletingId === property.id;
 
+              const isUpdatingStatus =
+                updatingStatusId === property.id;
+
               return (
                 <motion.div
                   key={property.id}
@@ -721,7 +705,7 @@ export default function DashboardPage() {
                       unoptimized
                     />
 
-                                        <div className="absolute left-2 top-2 flex max-w-[80%] flex-wrap gap-1 sm:left-4 sm:top-4 sm:gap-2">
+                    <div className="absolute left-2 top-2 flex max-w-[80%] flex-wrap gap-1 sm:left-4 sm:top-4 sm:gap-2">
                       {(property.status === "sold" ||
                         property.status ===
                           "rented") && (
@@ -733,7 +717,6 @@ export default function DashboardPage() {
                       )}
 
                       {property.featured && (
-
                         <span className="rounded-full bg-[#C9A227] px-2 py-1 text-[7px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.2em]">
                           Featured
                         </span>
@@ -789,7 +772,7 @@ export default function DashboardPage() {
                       />
                     </div>
 
-                                        {/* ACTIONS */}
+                    {/* ACTIONS */}
                     <div className="mt-3 flex flex-col gap-2 sm:mt-8">
                       <div className="flex gap-2 sm:gap-3">
                         <Link
@@ -820,6 +803,7 @@ export default function DashboardPage() {
 
                       <button
                         type="button"
+                        disabled={isUpdatingStatus}
                         onClick={() =>
                           handleToggleStatus(
                             property.id,
@@ -828,16 +812,18 @@ export default function DashboardPage() {
                               null
                           )
                         }
-                        className={`flex w-full items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[9px] font-bold transition sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm ${
+                        className={`flex w-full items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[9px] font-bold transition disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm ${
                           property.status === "sold" ||
                           property.status === "rented"
                             ? "border-2 border-[#C9A227] bg-white text-[#C9A227] hover:bg-[#C9A227] hover:text-white"
                             : "bg-[#C9A227] text-white hover:bg-[#A67C00]"
                         }`}
                       >
-                        {property.status === "sold" ||
-                        property.status ===
-                          "rented" ? (
+                        {isUpdatingStatus ? (
+                          <>Updating...</>
+                        ) : property.status === "sold" ||
+                          property.status ===
+                            "rented" ? (
                           <>
                             <RotateCcw size={14} />
                             Mark as Available
@@ -854,7 +840,6 @@ export default function DashboardPage() {
                         )}
                       </button>
                     </div>
-
                   </div>
                 </motion.div>
               );

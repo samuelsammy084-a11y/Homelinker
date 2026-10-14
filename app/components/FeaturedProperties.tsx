@@ -10,12 +10,10 @@ export default async function FeaturedProperties() {
   /*
    * POPULAR LISTINGS
    *
-   * Only listings marked as promoted are intended
-   * to appear in this homepage section.
-   *
-   * If there are currently no promoted listings,
-   * use the first available listings so the section
-   * never looks empty during development.
+   * Promoted properties get priority.
+   * If there are no promoted properties yet,
+   * show up to 6 normal listings so the homepage
+   * does not have an empty section.
    */
   const promotedProperties = properties.filter(
     (property: Property) => property.is_promoted === true
@@ -23,13 +21,12 @@ export default async function FeaturedProperties() {
 
   const displayProperties =
     promotedProperties.length > 0
-      ? promotedProperties
+      ? promotedProperties.slice(0, 6)
       : properties.slice(0, 6);
 
   return (
     <section className="bg-[#F8F6F1] py-12 sm:py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-
         {/* SECTION HEADER */}
         <div className="mb-7 flex flex-col gap-5 sm:mb-10 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -57,107 +54,58 @@ export default async function FeaturedProperties() {
           </Link>
         </div>
 
-        {/* LISTINGS CONTAINER */}
+        {/* LISTINGS */}
         <div className="rounded-[26px] border border-[#F0E7CF] bg-[#FFFDF8] p-3 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.18)] sm:rounded-[34px] sm:p-6">
-
-          {/* MOBILE */}
-          <div className="sm:hidden">
-
-                        {/* NORMAL VERTICAL MOBILE GRID */}
-            <div className="grid grid-cols-1 gap-3">
-
-              {displayProperties.map((property: Property) => (
-                <div key={property.id} className="min-w-0">
-                  <PropertyCard
-                    id={property.id}
-                    slug={property.slug}
-                    images={
-                      property.image_urls?.length
-                        ? property.image_urls
-                        : [
-                            property.image_url ||
-                              "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
-                          ]
-                    }
-                    price={property.price}
-                    title={property.title}
-                    location={`${property.city}, ${property.province}`}
-                    bedrooms={property.bedrooms ?? 0}
-                    bathrooms={property.bathrooms ?? 0}
-                    parking={property.parking ?? 0}
-                    featured={property.featured}
-                    verified={property.verified}
-                  />
-                </div>
-              ))}
-
-              {/* VIEW MORE CARD */}
-              <Link
-                href="/properties"
-                className="
-                  flex
-                  min-h-[260px]
-                  flex-col
-                  items-center
-                  justify-center
-                  rounded-[20px]
-                  border
-                  border-[#E8D8A5]
-                  bg-[#FFF9E8]
-                  px-4
-                  py-8
-                  text-center
-                  transition
-                  hover:border-[#C9A227]
-                  hover:bg-[#FFF5D0]
-                "
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#C9A227] text-white shadow-md">
-                  <ArrowRight size={21} />
-                </div>
-
-                <h3 className="mt-4 text-base font-black text-[#1B1B1B]">
-                  View more
-                </h3>
-
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  Explore more properties on HomeLinker.
-                </p>
-
-                <span className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#C9A227] px-4 py-2.5 text-xs font-bold text-white">
-                  Browse
-                  <ArrowRight size={14} />
-                </span>
-              </Link>
-
-            </div>
-          </div>
-
-          {/* TABLET / DESKTOP */}
-          <div className="hidden gap-6 sm:grid sm:grid-cols-2 lg:grid-cols-3">
-            {displayProperties.slice(0, 6).map((property: Property) => (
-              <PropertyCard
-                key={property.id}
-                id={property.id}
-                slug={property.slug}
-                images={
-                  property.image_urls?.length
-                    ? property.image_urls
-                    : [
-                        property.image_url ||
-                          "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d",
-                      ]
-                }
-                price={property.price}
-                title={property.title}
-                location={`${property.city}, ${property.province}`}
-                bedrooms={property.bedrooms ?? 0}
-                bathrooms={property.bathrooms ?? 0}
-                parking={property.parking ?? 0}
-                featured={property.featured}
-                verified={property.verified}
-              />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+            {displayProperties.map((property: Property) => (
+              <div key={property.id} className="min-w-0">
+                <PropertyCard
+                  id={property.id}
+                  slug={property.slug}
+                  status={property.status}
+                  listingType={property.listing_type}
+                  images={
+                    property.image_urls?.length
+                      ? property.image_urls
+                      : [
+                          property.image_url ||
+                            "/og-image.png",
+                        ]
+                  }
+                  price={property.price}
+                  title={property.title}
+                  location={`${property.city}, ${property.province}`}
+                  bedrooms={property.bedrooms ?? 0}
+                  bathrooms={property.bathrooms ?? 0}
+                  parking={property.parking ?? 0}
+                  featured={property.featured}
+                  verified={property.verified}
+                />
+              </div>
             ))}
+
+            {/* MOBILE VIEW MORE CARD */}
+            <Link
+              href="/properties"
+              className="flex min-h-[260px] flex-col items-center justify-center rounded-[20px] border border-[#E8D8A5] bg-[#FFF9E8] px-4 py-8 text-center transition hover:border-[#C9A227] hover:bg-[#FFF5D0] sm:hidden"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#C9A227] text-white shadow-md">
+                <ArrowRight size={21} />
+              </div>
+
+              <h3 className="mt-4 text-base font-black text-[#1B1B1B]">
+                View more
+              </h3>
+
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Explore more properties on HomeLinker.
+              </p>
+
+              <span className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#C9A227] px-4 py-2.5 text-xs font-bold text-white">
+                Browse
+                <ArrowRight size={14} />
+              </span>
+            </Link>
           </div>
         </div>
 
@@ -171,7 +119,6 @@ export default async function FeaturedProperties() {
             <ArrowRight size={16} />
           </Link>
         </div>
-
       </div>
     </section>
   );
