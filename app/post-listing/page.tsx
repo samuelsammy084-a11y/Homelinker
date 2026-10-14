@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { createPropertySlug } from "@/lib/property-slug";
 import imageCompression from "browser-image-compression";
 
 import ListingTypeStep from "./components/ListingTypeStep";
@@ -19,7 +18,6 @@ export default function PostListingPage() {
 
   const [step, setStep] = useState(1);
 
-  // Success & Error Popup
   const [popup, setPopup] = useState<{
     show: boolean;
     type: "success" | "error";
@@ -45,11 +43,8 @@ export default function PostListingPage() {
   const [suburb, setSuburb] = useState("");
   const [address, setAddress] = useState("");
 
-  const [latitude, setLatitude] =
-    useState<number | null>(null);
-
-  const [longitude, setLongitude] =
-    useState<number | null>(null);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   // STEP 4
   const [price, setPrice] = useState("");
@@ -58,8 +53,7 @@ export default function PostListingPage() {
   const [parking, setParking] = useState("");
 
   const [deposit, setDeposit] = useState("");
-  const [availableFrom, setAvailableFrom] =
-    useState("");
+  const [availableFrom, setAvailableFrom] = useState("");
 
   const [floorSize, setFloorSize] = useState("");
   const [landSize, setLandSize] = useState("");
@@ -67,49 +61,362 @@ export default function PostListingPage() {
   const [rates, setRates] = useState("");
   const [levies, setLevies] = useState("");
 
-  const [petFriendly, setPetFriendly] =
-    useState(false);
-
-  const [furnished, setFurnished] =
-    useState(false);
+  const [petFriendly, setPetFriendly] = useState(false);
+  const [furnished, setFurnished] = useState(false);
 
   // STEP 5
   const [images, setImages] = useState<File[]>([]);
 
   // STEP 6
   const [title, setTitle] = useState("");
-  const [description, setDescription] =
-    useState("");
+  const [description, setDescription] = useState("");
 
   // CONTACT / WHATSAPP
-  const [phoneNumber, setPhoneNumber] =
-    useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+
+  function showError(title: string, message: string) {
+    setPopup({
+      show: true,
+      type: "error",
+      title,
+      message,
+    });
+  }
 
   async function publishListing() {
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      setPopup({
-        show: true,
-        type: "error",
-        title: "Login Required",
-        message:
-          "Please login before posting a property.",
-      });
+    if (authError || !user) {
+      showError(
+        "Login Required",
+        "Please login before posting a property."
+      );
       return;
     }
 
-    if (!phoneNumber.trim()) {
-      setPopup({
-        show: true,
-        type: "error",
-        title: "Phone Number Required",
-        message:
-          "Please enter a phone number so people can contact you through WhatsApp.",
-      });
+    // --------------------------------------------------
+    // REQUIRED FIELD VALIDATION
+    // --------------------------------------------------
+
+    if (listingType !== "rent" && listingType !== "sale") {
+      showError(
+        "Listing Type Required",
+        "Please choose whether the property is for rent or for sale."
+      );
       return;
+    }
+
+    if (!propertyType.trim()) {
+      showError(
+        "Property Type Required",
+        "Please select a property type."
+      );
+      return;
+    }
+
+    if (!province.trim() || !city.trim()) {
+      showError(
+        "Location Required",
+        "Please select a province and city."
+      );
+      return;
+    }
+
+    if (!suburb.trim()) {
+      showError(
+        "Suburb Required",
+        "Please enter the suburb where the property is located."
+      );
+      return;
+    }
+
+    if (!address.trim()) {
+      showError(
+        "Address Required",
+        "Please enter the property's street address."
+      );
+      return;
+    }
+
+    // --------------------------------------------------
+    // MAP VALIDATION
+    // --------------------------------------------------
+
+    if (latitude === null || longitude === null) {
+      showError(
+        "Map Location Required",
+        "Please select the property's location on the map."
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      showError(
+        "Invalid Location",
+        "The selected map location is invalid."
+      );
+      return;
+    }
+
+    // --------------------------------------------------
+    // TITLE / DESCRIPTION VALIDATION
+    // --------------------------------------------------
+
+    const cleanTitle = title.trim();
+    const cleanDescription = description.trim();
+
+    if (cleanTitle.length < 5) {
+      showError(
+        "Title Too Short",
+        "Please enter a property title of at least 5 characters."
+      );
+      return;
+    }
+
+    if (cleanTitle.length > 150) {
+      showError(
+        "Title Too Long",
+        "Property titles cannot be longer than 150 characters."
+      );
+      return;
+    }
+
+    if (cleanDescription.length < 20) {
+      showError(
+        "Description Too Short",
+        "Please provide at least 20 characters describing the property."
+      );
+      return;
+    }
+
+    if (cleanDescription.length > 5000) {
+      showError(
+        "Description Too Long",
+        "Property descriptions cannot exceed 5,000 characters."
+      );
+      return;
+    }
+
+    // --------------------------------------------------
+    // PRICE VALIDATION
+    // --------------------------------------------------
+
+    const numericPrice = Number(price);
+
+    if (
+      !price.trim() ||
+      !Number.isFinite(numericPrice) ||
+      numericPrice <= 0
+    ) {
+      showError(
+        "Invalid Price",
+        "Please enter a valid property price greater than R0."
+      );
+      return;
+    }
+
+    if (numericPrice > 1_000_000_000) {
+      showError(
+        "Invalid Price",
+        "The property price is too large. Please check the amount."
+      );
+      return;
+    }
+
+    // --------------------------------------------------
+    // BEDROOM / BATHROOM / PARKING VALIDATION
+    // --------------------------------------------------
+
+    const numericBedrooms =
+      bedrooms.trim() === "" ? 0 : Number(bedrooms);
+
+    const numericBathrooms =
+      bathrooms.trim() === "" ? 0 : Number(bathrooms);
+
+    const numericParking =
+      parking.trim() === "" ? 0 : Number(parking);
+
+    if (
+      !Number.isFinite(numericBedrooms) ||
+      numericBedrooms < 0 ||
+      numericBedrooms > 100 ||
+      !Number.isInteger(numericBedrooms)
+    ) {
+      showError(
+        "Invalid Bedrooms",
+        "Please enter a valid number of bedrooms."
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(numericBathrooms) ||
+      numericBathrooms < 0 ||
+      numericBathrooms > 100
+    ) {
+      showError(
+        "Invalid Bathrooms",
+        "Please enter a valid number of bathrooms."
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(numericParking) ||
+      numericParking < 0 ||
+      numericParking > 100 ||
+      !Number.isInteger(numericParking)
+    ) {
+      showError(
+        "Invalid Parking",
+        "Please enter a valid number of parking spaces."
+      );
+      return;
+    }
+
+    // --------------------------------------------------
+    // OPTIONAL NUMBER VALIDATION
+    // --------------------------------------------------
+
+    function parseOptionalNumber(value: string): number | null {
+      if (!value.trim()) {
+        return null;
+      }
+
+      const parsed = Number(value);
+
+      if (!Number.isFinite(parsed)) {
+        return null;
+      }
+
+      return parsed;
+    }
+
+    const numericDeposit = parseOptionalNumber(deposit);
+    const numericFloorSize = parseOptionalNumber(floorSize);
+    const numericLandSize = parseOptionalNumber(landSize);
+    const numericRates = parseOptionalNumber(rates);
+    const numericLevies = parseOptionalNumber(levies);
+
+    const optionalNumbers = [
+      {
+        label: "deposit",
+        raw: deposit,
+        value: numericDeposit,
+      },
+      {
+        label: "floor size",
+        raw: floorSize,
+        value: numericFloorSize,
+      },
+      {
+        label: "land size",
+        raw: landSize,
+        value: numericLandSize,
+      },
+      {
+        label: "rates",
+        raw: rates,
+        value: numericRates,
+      },
+      {
+        label: "levies",
+        raw: levies,
+        value: numericLevies,
+      },
+    ];
+
+    for (const field of optionalNumbers) {
+      if (
+        field.raw.trim() &&
+        (field.value === null || field.value < 0)
+      ) {
+        showError(
+          "Invalid Property Details",
+          `Please enter a valid ${field.label}.`
+        );
+        return;
+      }
+    }
+
+    // --------------------------------------------------
+    // PHONE VALIDATION
+    // --------------------------------------------------
+
+    const cleanPhone = phoneNumber
+      .trim()
+      .replace(/[\s()-]/g, "");
+
+    const phoneRegex = /^(?:\+27|27|0)[6-8][0-9]{8}$/;
+
+    if (!cleanPhone) {
+      showError(
+        "Phone Number Required",
+        "Please enter a South African contact number."
+      );
+      return;
+    }
+
+    if (!phoneRegex.test(cleanPhone)) {
+      showError(
+        "Invalid Phone Number",
+        "Please enter a valid South African mobile number, for example 0821234567 or +27821234567."
+      );
+      return;
+    }
+
+    // --------------------------------------------------
+    // IMAGE VALIDATION
+    // --------------------------------------------------
+
+    if (images.length === 0) {
+      showError(
+        "Photos Required",
+        "Please upload at least one property photo."
+      );
+      return;
+    }
+
+    if (images.length > 20) {
+      showError(
+        "Too Many Photos",
+        "You can upload a maximum of 20 property photos."
+      );
+      return;
+    }
+
+    const allowedImageTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    for (const image of images) {
+      if (!allowedImageTypes.includes(image.type)) {
+        showError(
+          "Invalid Photo",
+          "Only JPG, PNG and WebP property photos are allowed."
+        );
+        return;
+      }
+
+      if (image.size > 10 * 1024 * 1024) {
+        showError(
+          "Photo Too Large",
+          `${image.name} is larger than 10 MB. Please choose a smaller image.`
+        );
+        return;
+      }
     }
 
     try {
@@ -120,65 +427,66 @@ export default function PostListingPage() {
       // UPLOAD IMAGES
       // --------------------------------------------------
 
-      if (images.length > 0) {
-        const compressionOptions = {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1920,
-          useWebWorker: true,
-        };
+      const compressionOptions = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+      };
 
-        for (const image of images) {
-          let imageToUpload = image;
+      for (const image of images) {
+        let imageToUpload = image;
 
-          try {
-            imageToUpload = await imageCompression(
-              image,
-              compressionOptions
-            );
-          } catch (e) {
-            console.error(
-              "Image compression failed:",
-              e
-            );
-          }
-
-          const fileName = `${Date.now()}-${Math.random()}-${image.name}`;
-
-          const { error: uploadError } =
-            await supabase.storage
-              .from("property-images")
-              .upload(
-                fileName,
-                imageToUpload
-              );
-
-          if (uploadError) {
-            setPopup({
-              show: true,
-              type: "error",
-              title: "Upload Failed",
-              message: uploadError.message,
-            });
-
-            return;
-          }
-
-          const { data } =
-            supabase.storage
-              .from("property-images")
-              .getPublicUrl(fileName);
-
-          imageUrls.push(data.publicUrl);
+        try {
+          imageToUpload = await imageCompression(
+            image,
+            compressionOptions
+          );
+        } catch (compressionError) {
+          console.error(
+            "Image compression failed:",
+            compressionError
+          );
         }
 
-        imageUrl = imageUrls[0];
+        const safeOriginalName = image.name
+          .replace(/[^a-zA-Z0-9._-]/g, "-")
+          .slice(-100);
+
+        const fileName =
+          `${user.id}/${crypto.randomUUID()}-${safeOriginalName}`;
+
+        const { error: uploadError } =
+          await supabase.storage
+            .from("property-images")
+            .upload(fileName, imageToUpload, {
+              upsert: false,
+              contentType: imageToUpload.type,
+            });
+
+        if (uploadError) {
+          console.error(
+            "Property image upload error:",
+            uploadError
+          );
+
+          showError(
+            "Upload Failed",
+            "One of your property photos could not be uploaded. Please try again."
+          );
+          return;
+        }
+
+        const { data } = supabase.storage
+          .from("property-images")
+          .getPublicUrl(fileName);
+
+        imageUrls.push(data.publicUrl);
       }
+
+      imageUrl = imageUrls[0];
 
       // --------------------------------------------------
       // CREATE PROPERTY
-      //
-      // IMPORTANT:
-      // The property is active as soon as it's posted.
       // --------------------------------------------------
 
       const { data: insertedProperty, error } =
@@ -189,70 +497,56 @@ export default function PostListingPage() {
               user_id: user.id,
 
               listing_type: listingType,
-              property_type: propertyType,
+              property_type: propertyType.trim(),
 
-              title,
-              description,
+              title: cleanTitle,
+              description: cleanDescription,
 
-              province,
-              city,
-              suburb,
+              province: province.trim(),
+              city: city.trim(),
+              suburb: suburb.trim(),
 
-              street_address: address,
+              street_address: address.trim(),
 
               latitude,
               longitude,
 
-              price: Number(price),
+              price: numericPrice,
 
-              bedrooms: Number(bedrooms),
-              bathrooms: Number(bathrooms),
-              parking: Number(parking),
+              bedrooms: numericBedrooms,
+              bathrooms: numericBathrooms,
+              parking: numericParking,
 
-              deposit: deposit
-                ? Number(deposit)
-                : null,
+              deposit: numericDeposit,
 
               available_from:
                 availableFrom || null,
 
-              floor_size: floorSize
-                ? Number(floorSize)
-                : null,
-
-              land_size: landSize
-                ? Number(landSize)
-                : null,
+              floor_size: numericFloorSize,
+              land_size: numericLandSize,
 
               condition:
-                condition || null,
+                condition.trim() || null,
 
-              rates: rates
-                ? Number(rates)
-                : null,
-
-              levies: levies
-                ? Number(levies)
-                : null,
+              rates: numericRates,
+              levies: numericLevies,
 
               furnished,
-
               pet_friendly: petFriendly,
 
               image_url: imageUrl,
-
               image_urls: imageUrls,
 
-              contact_phone:
-                phoneNumber.trim(),
+              contact_phone: cleanPhone,
 
-              // Make it active immediately
+              // Phone remains private by default.
+              show_contact_phone: false,
+
               status: "active",
             },
           ])
-          .select()
+          .select("id")
           .single();
-
 
       if (error) {
         console.error(
@@ -260,67 +554,28 @@ export default function PostListingPage() {
           error
         );
 
-        setPopup({
-          show: true,
-          type: "error",
-          title: "Something went wrong",
-          message: error.message,
-        });
-
+        showError(
+          "Something Went Wrong",
+          "Your property could not be published. Please check your information and try again."
+        );
         return;
       }
 
       if (!insertedProperty) {
-        setPopup({
-          show: true,
-          type: "error",
-          title: "Listing Error",
-          message:
-            "The property could not be created.",
-        });
-
+        showError(
+          "Listing Error",
+          "The property could not be created."
+        );
         return;
       }
 
       // --------------------------------------------------
-      // GENERATE PROPERTY SLUG
-      // --------------------------------------------------
-
-      const generatedSlug =
-        createPropertySlug(
-          title,
-          city,
-          insertedProperty.id
-        );
-
-      const { error: slugError } =
-        await supabase
-          .from("properties")
-          .update({
-            slug: generatedSlug,
-          })
-          .eq(
-            "id",
-            insertedProperty.id
-          );
-
-      if (slugError) {
-        console.error(
-          "Slug update error:",
-          slugError
-        );
-      }
-
-      // --------------------------------------------------
       // SAVE PROPERTY ID
-      //
-      // This allows the pricing page to find
-      // the property even if the URL changes.
       // --------------------------------------------------
 
       sessionStorage.setItem(
         "propertyId",
-        insertedProperty.id
+        String(insertedProperty.id)
       );
 
       // --------------------------------------------------
@@ -330,33 +585,25 @@ export default function PostListingPage() {
       router.push(
         `/dashboard?newListing=${insertedProperty.id}`
       );
-
     } catch (err: unknown) {
       console.error(
         "Unexpected listing error:",
         err
       );
 
-      setPopup({
-        show: true,
-        type: "error",
-        title: "Unexpected Error",
-        message:
-          err instanceof Error
-            ? err.message
-            : String(err),
-      });
+      showError(
+        "Unexpected Error",
+        "Something unexpected happened while publishing your listing. Please try again."
+      );
     }
   }
 
   return (
     <main className="min-h-screen bg-[#F8F6F1] px-6 py-12">
-
       {/* SUCCESS / ERROR POPUP */}
       {popup.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
-
             <div
               className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full text-5xl ${
                 popup.type === "success"
@@ -364,9 +611,7 @@ export default function PostListingPage() {
                   : "bg-red-100"
               }`}
             >
-              {popup.type === "success"
-                ? "✅"
-                : "❌"}
+              {popup.type === "success" ? "✅" : "❌"}
             </div>
 
             <h2 className="mt-6 text-center text-3xl font-black text-[#111111]">
@@ -378,6 +623,7 @@ export default function PostListingPage() {
             </p>
 
             <button
+              type="button"
               onClick={() =>
                 setPopup({
                   show: false,
@@ -395,7 +641,6 @@ export default function PostListingPage() {
       )}
 
       <div className="mx-auto max-w-6xl">
-
         {/* HEADER */}
         <div className="mb-10 text-center">
           <h1 className="text-5xl font-black text-[#111111]">
@@ -409,9 +654,7 @@ export default function PostListingPage() {
 
         {/* PROGRESS */}
         <div className="mb-12">
-
           <div className="mb-6 flex items-center justify-between">
-
             {[
               "Listing",
               "Property",
@@ -433,13 +676,11 @@ export default function PostListingPage() {
                       current < step
                         ? "bg-[#C9A227] text-white shadow-lg"
                         : current === step
-                        ? "scale-110 border-4 border-[#C9A227] bg-[#111111] text-white shadow-xl"
-                        : "border border-[#E8D9A8] bg-[#F6F2E8] text-[#777777]"
+                          ? "scale-110 border-4 border-[#C9A227] bg-[#111111] text-white shadow-xl"
+                          : "border border-[#E8D9A8] bg-[#F6F2E8] text-[#777777]"
                     }`}
                   >
-                    {current < step
-                      ? "✓"
-                      : current}
+                    {current < step ? "✓" : current}
                   </div>
 
                   <span
@@ -457,29 +698,20 @@ export default function PostListingPage() {
           </div>
 
           <div className="relative h-4 overflow-hidden rounded-full bg-[#EFE6C9]">
-
             <div
               className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-[#C9A227] to-[#E5C65B] transition-all duration-500"
               style={{
                 width: `${((step - 1) / 6) * 100}%`,
               }}
             />
-
           </div>
 
           <div className="mt-3 flex justify-between text-sm font-medium text-[#666666]">
+            <span>Step {step} of 7</span>
 
             <span>
-              Step {step} of 7
+              {Math.round(((step - 1) / 6) * 100)}% Complete
             </span>
-
-            <span>
-              {Math.round(
-                ((step - 1) / 6) * 100
-              )}
-              % Complete
-            </span>
-
           </div>
         </div>
 
@@ -495,15 +727,9 @@ export default function PostListingPage() {
         {/* STEP 2 */}
         {step === 2 && (
           <PropertyTypeStep
-            listingType={
-              listingType as
-                | "rent"
-                | "sale"
-            }
+            listingType={listingType as "rent" | "sale"}
             propertyType={propertyType}
-            setPropertyType={
-              setPropertyType
-            }
+            setPropertyType={setPropertyType}
             onBack={() => setStep(1)}
             onNext={() => setStep(3)}
           />
@@ -532,11 +758,7 @@ export default function PostListingPage() {
         {/* STEP 4 */}
         {step === 4 && (
           <PropertyDetailsStep
-            listingType={
-              listingType as
-                | "rent"
-                | "sale"
-            }
+            listingType={listingType as "rent" | "sale"}
             price={price}
             setPrice={setPrice}
             bedrooms={bedrooms}
@@ -551,12 +773,8 @@ export default function PostListingPage() {
             setPetFriendly={setPetFriendly}
             deposit={deposit}
             setDeposit={setDeposit}
-            availableFrom={
-              availableFrom
-            }
-            setAvailableFrom={
-              setAvailableFrom
-            }
+            availableFrom={availableFrom}
+            setAvailableFrom={setAvailableFrom}
             floorSize={floorSize}
             setFloorSize={setFloorSize}
             landSize={landSize}
@@ -588,13 +806,9 @@ export default function PostListingPage() {
             title={title}
             setTitle={setTitle}
             description={description}
-            setDescription={
-              setDescription
-            }
+            setDescription={setDescription}
             phoneNumber={phoneNumber}
-            setPhoneNumber={
-              setPhoneNumber
-            }
+            setPhoneNumber={setPhoneNumber}
             onBack={() => setStep(5)}
             onNext={() => setStep(7)}
           />
@@ -618,12 +832,9 @@ export default function PostListingPage() {
             phoneNumber={phoneNumber}
             images={images}
             onBack={() => setStep(6)}
-            onPublish={
-              publishListing
-            }
+            onPublish={publishListing}
           />
         )}
-
       </div>
     </main>
   );

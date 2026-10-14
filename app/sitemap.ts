@@ -3,11 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { createPropertySlug } from "@/lib/property-slug";
 import { blogPosts } from "@/lib/blog-posts";
 
-// Must match metadataBase in app/layout.tsx and SITE_URL in the property
-// detail page — using the same www domain everywhere avoids splitting
-// SEO signals between two URL versions of the same site.
 const BASE_URL = "https://www.homelinker.co.za";
-
 
 function createCitySlug(city: string) {
   return city
@@ -21,11 +17,20 @@ function createCitySlug(city: string) {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-    const { data: properties, error } = await supabase
-    .from("properties")
-    .select("id, title, city, created_at, slug")
-    .order("created_at", { ascending: false });
+  /*
+   * --------------------------------------------------
+   * FETCH ACTIVE PROPERTIES
+   * --------------------------------------------------
+   *
+   * There is intentionally NO "slug" column here.
+   * Property slugs are generated from title + city + id.
+   */
 
+  const { data: properties, error } = await supabase
+    .from("properties")
+    .select("id, title, city, created_at, listing_type")
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Sitemap property fetch error:", error);
@@ -86,13 +91,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${BASE_URL}/register`,
       lastModified: now,
       changeFrequency: "monthly",
-      priority: 0.7,
+      priority: 0.6,
     },
     {
       url: `${BASE_URL}/login`,
       lastModified: now,
       changeFrequency: "monthly",
-      priority: 0.6,
+      priority: 0.5,
     },
     {
       url: `${BASE_URL}/privacy`,
@@ -106,16 +111,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly",
       priority: 0.4,
     },
+    {
+      url: `${BASE_URL}/cookie-policy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.4,
+    },
   ];
 
   /*
    * --------------------------------------------------
-   * SOUTH AFRICAN CITY PAGES
-   *
-   * Each city gets BOTH:
-   *
-   * /rent/city
-   * /sale/city
+   * CITY INFORMATION
    * --------------------------------------------------
    */
 
@@ -124,6 +130,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     {
       city: string;
       lastModified: Date;
+      hasRent: boolean;
+      hasSale: boolean;
     }
   >();
 
@@ -140,43 +148,75 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ? new Date(property.created_at)
       : now;
 
+    const listingType = property.listing_type
+      ?.trim()
+      .toLowerCase();
+
     const existing = cityMap.get(slug);
 
-    if (!existing || createdAt > existing.lastModified) {
+    if (!existing) {
       cityMap.set(slug, {
         city,
         lastModified: createdAt,
+        hasRent: listingType === "rent",
+        hasSale: listingType === "sale",
       });
+
+      continue;
+    }
+
+    if (createdAt > existing.lastModified) {
+      existing.lastModified = createdAt;
+    }
+
+    if (listingType === "rent") {
+      existing.hasRent = true;
+    }
+
+    if (listingType === "sale") {
+      existing.hasSale = true;
     }
   }
 
   /*
+   * --------------------------------------------------
    * RENT CITY PAGES
+   * --------------------------------------------------
+   *
+   * Only include a rent city URL when that city actually
+   * has at least one active rental listing.
    */
 
-  const rentCityPages: MetadataRoute.Sitemap =
-    Array.from(cityMap.entries()).map(
-      ([slug, city]) => ({
-        url: `${BASE_URL}/rent/${slug}`,
-        lastModified: city.lastModified,
-        changeFrequency: "daily",
-        priority: 0.8,
-      })
-    );
+  const rentCityPages: MetadataRoute.Sitemap = Array.from(
+    cityMap.entries()
+  )
+    .filter(([, city]) => city.hasRent)
+    .map(([slug, city]) => ({
+      url: `${BASE_URL}/rent/${slug}`,
+      lastModified: city.lastModified,
+      changeFrequency: "daily",
+      priority: 0.8,
+    }));
 
   /*
+   * --------------------------------------------------
    * SALE CITY PAGES
+   * --------------------------------------------------
+   *
+   * Only include a sale city URL when that city actually
+   * has at least one active sale listing.
    */
 
-  const saleCityPages: MetadataRoute.Sitemap =
-    Array.from(cityMap.entries()).map(
-      ([slug, city]) => ({
-        url: `${BASE_URL}/sale/${slug}`,
-        lastModified: city.lastModified,
-        changeFrequency: "daily",
-        priority: 0.8,
-      })
-    );
+  const saleCityPages: MetadataRoute.Sitemap = Array.from(
+    cityMap.entries()
+  )
+    .filter(([, city]) => city.hasSale)
+    .map(([slug, city]) => ({
+      url: `${BASE_URL}/sale/${slug}`,
+      lastModified: city.lastModified,
+      changeFrequency: "daily",
+      priority: 0.8,
+    }));
 
   /*
    * --------------------------------------------------
@@ -184,38 +224,44 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
    * --------------------------------------------------
    */
 
-    const propertyPages: MetadataRoute.Sitemap =
-    safeProperties
-      .filter((property) => property.id && property.title)
-      .map((property) => ({
-        url: `${BASE_URL}/properties/${
-          property.slug ||
-          createPropertySlug(
-            property.title,
-            property.city || "",
-            property.id
-          )
-        }`,
+  const propertyPages: MetadataRoute.Sitemap = safeProperties
+    .filter(
+      (property) =>
+        property.id !== null &&
+        property.id !== undefined &&
+        Boolean(property.title?.trim())
+    )
+    .map((property) => {
+      const propertySlug = createPropertySlug(
+        property.title,
+        property.city || "",
+        property.id
+      );
+
+      return {
+        url: `${BASE_URL}/properties/${propertySlug}`,
         lastModified: property.created_at
           ? new Date(property.created_at)
           : now,
-        changeFrequency: "daily",
+        changeFrequency: "daily" as const,
         priority: 0.8,
-      }));
-
+      };
+    });
 
   /*
    * --------------------------------------------------
-   * BLOG POST PAGES
+   * BLOG POSTS
    * --------------------------------------------------
    */
 
-  const blogPostPages: MetadataRoute.Sitemap = blogPosts.map((post) => ({
-    url: `${BASE_URL}/blog/${post.slug}`,
-    lastModified: new Date(post.publishedAt),
-    changeFrequency: "monthly",
-    priority: 0.6,
-  }));
+  const blogPostPages: MetadataRoute.Sitemap = blogPosts.map(
+    (post) => ({
+      url: `${BASE_URL}/blog/${post.slug}`,
+      lastModified: new Date(post.publishedAt),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    })
+  );
 
   /*
    * --------------------------------------------------

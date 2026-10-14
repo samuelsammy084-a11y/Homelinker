@@ -1,5 +1,5 @@
-import CookieSettings from "./CookieSettings";
-import Link from "next/link";
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           import Link from "next/link";
+
 import {
   MessageCircle,
   MapPin,
@@ -14,17 +14,18 @@ export default function Footer() {
   return (
     <footer className="mt-16 bg-[#111111] text-white">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
-        {/* Main footer */}
+        {/* MAIN FOOTER */}
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-12">
-          {/* Brand */}
+          {/* BRAND */}
           <div className="sm:col-span-2 lg:col-span-1">
             <h2 className="text-3xl font-black text-[#C9A227]">
               HomeLinker
             </h2>
 
             <p className="mt-4 max-w-sm text-sm leading-6 text-gray-400">
-              Helping South Africans find quality rental accommodation
-              faster, easier, and with confidence.
+              Helping South Africans find houses, apartments,
+              flats, rooms and other properties to rent or buy
+              across South Africa.
             </p>
 
             <Link
@@ -36,7 +37,7 @@ export default function Footer() {
             </Link>
           </div>
 
-          {/* Quick Links */}
+          {/* QUICK LINKS */}
           <div>
             <h3 className="mb-5 text-lg font-bold text-white">
               Quick Links
@@ -58,10 +59,31 @@ export default function Footer() {
               </Link>
 
               <Link
+                href="/rent"
+                className="transition hover:text-[#C9A227]"
+              >
+                Properties to Rent
+              </Link>
+
+              <Link
+                href="/sale"
+                className="transition hover:text-[#C9A227]"
+              >
+                Properties for Sale
+              </Link>
+
+              <Link
                 href="/post-listing"
                 className="transition hover:text-[#C9A227]"
               >
                 Post Listing
+              </Link>
+
+              <Link
+                href="/dashboard"
+                className="transition hover:text-[#C9A227]"
+              >
+                Dashboard
               </Link>
 
               <Link
@@ -77,24 +99,10 @@ export default function Footer() {
               >
                 Register
               </Link>
-
-              <Link
-                href="/dashboard"
-                className="transition hover:text-[#C9A227]"
-              >
-                Dashboard
-              </Link>
-
-              <Link
-                href="/contact"
-                className="transition hover:text-[#C9A227]"
-              >
-                Contact
-              </Link>
             </div>
           </div>
 
-          {/* Company */}
+          {/* COMPANY */}
           <div>
             <h3 className="mb-5 text-lg font-bold text-white">
               Company
@@ -106,6 +114,20 @@ export default function Footer() {
                 className="transition hover:text-[#C9A227]"
               >
                 About HomeLinker
+              </Link>
+
+              <Link
+                href="/contact"
+                className="transition hover:text-[#C9A227]"
+              >
+                Contact
+              </Link>
+
+              <Link
+                href="/faq"
+                className="transition hover:text-[#C9A227]"
+              >
+                FAQ
               </Link>
 
               <Link
@@ -123,29 +145,15 @@ export default function Footer() {
               </Link>
 
               <Link
-                href="/faq"
+                href="/cookie-policy"
                 className="transition hover:text-[#C9A227]"
               >
-                FAQ
-              </Link>
-
-              <Link
-                href="/safety"
-                className="transition hover:text-[#C9A227]"
-              >
-                Safety Tips
-              </Link>
-
-              <Link
-                href="/report"
-                className="transition hover:text-[#C9A227]"
-              >
-                Report Listing
+                Cookie Policy
               </Link>
             </div>
           </div>
 
-          {/* Contact */}
+          {/* CONTACT */}
           <div>
             <h3 className="mb-5 text-lg font-bold text-white">
               Contact
@@ -157,6 +165,7 @@ export default function Footer() {
                   size={18}
                   className="mt-0.5 shrink-0 text-[#C9A227]"
                 />
+
                 <span>
                   Johannesburg, Gauteng,
                   <br />
@@ -172,6 +181,7 @@ export default function Footer() {
                   size={17}
                   className="shrink-0 text-[#C9A227]"
                 />
+
                 061 444 5545
               </a>
 
@@ -183,13 +193,14 @@ export default function Footer() {
                   size={17}
                   className="shrink-0 text-[#C9A227]"
                 />
+
                 info@homelinker.co.za
               </a>
             </div>
           </div>
         </div>
 
-        {/* Browse CTA */}
+        {/* BROWSE CTA */}
         <div className="mt-10 rounded-[24px] border border-[#C9A227]/20 bg-[#C9A227]/10 p-5 sm:mt-14 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-6">
           <div>
             <h4 className="text-lg font-bold text-[#C9A227]">
@@ -197,8 +208,8 @@ export default function Footer() {
             </h4>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">
-              Browse rooms, apartments, houses and properties
-              across South Africa.
+              Browse houses, apartments, flats, rooms and
+              properties across South Africa.
             </p>
           </div>
 
@@ -210,13 +221,14 @@ export default function Footer() {
           </Link>
         </div>
 
-        {/* Trust Section */}
+        {/* TRUST SECTION */}
         <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
             <BadgeCheck
               size={22}
               className="shrink-0 text-[#C9A227]"
             />
+
             <span className="text-xs font-semibold sm:text-sm">
               Verified Listings
             </span>
@@ -227,6 +239,7 @@ export default function Footer() {
               size={22}
               className="shrink-0 text-[#C9A227]"
             />
+
             <span className="text-xs font-semibold sm:text-sm">
               Secure Accounts
             </span>
@@ -237,13 +250,17 @@ export default function Footer() {
               size={22}
               className="shrink-0 text-[#C9A227]"
             />
+
             <span className="text-xs font-semibold sm:text-sm">
               Free Property Posting
             </span>
           </div>
 
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <span className="text-xl">🇿🇦</span>
+            <span className="text-xl">
+              🇿🇦
+            </span>
+
             <span className="text-xs font-semibold sm:text-sm">
               Proudly South African
             </span>
@@ -251,10 +268,12 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* Bottom bar */}
+      {/* BOTTOM BAR */}
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 text-center text-xs text-gray-500 sm:px-6 md:flex-row md:items-center md:justify-between md:text-left">
-          <p>© 2026 HomeLinker. All rights reserved.</p>
+          <p>
+            © 2026 HomeLinker. All rights reserved.
+          </p>
 
           <div className="flex items-center justify-center gap-4 sm:gap-6">
             <Link
@@ -272,14 +291,16 @@ export default function Footer() {
             </Link>
 
             <Link
-              href="/cookies"
+              href="/cookie-policy"
               className="transition hover:text-[#C9A227]"
             >
               Cookies
             </Link>
           </div>
 
-          <p>Made with ❤️ in South Africa</p>
+          <p>
+            Made with ❤️ in South Africa
+          </p>
         </div>
       </div>
     </footer>
