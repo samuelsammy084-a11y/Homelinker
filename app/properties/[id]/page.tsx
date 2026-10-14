@@ -589,16 +589,11 @@ export default async function PropertyDetails({
                 </span>
               )}
 
-              {isVerified ? (
-                <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
-                  ✔ Verified Property
-                </span>
-              ) : (
-                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                  ⏳ Pending
-                  Verification
-                </span>
-              )}
+              {isVerified && (
+  <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
+    ✔ Verified Property
+  </span>
+)}
 
               {property.user_id ? (
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
