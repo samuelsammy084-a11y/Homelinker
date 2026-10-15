@@ -3,19 +3,13 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-const ALLOWED_STATUSES = [
-  "active",
-  "sold",
-  "rented",
-] as const;
+const ALLOWED_STATUSES = ["active", "sold", "rented"] as const;
 
-type AllowedStatus =
-  (typeof ALLOWED_STATUSES)[number];
+type AllowedStatus = (typeof ALLOWED_STATUSES)[number];
 
 export async function POST(req: Request) {
   try {
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
     const supabaseAnonKey =
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -28,14 +22,11 @@ export async function POST(req: Request) {
       !supabaseAnonKey ||
       !supabaseServiceRoleKey
     ) {
-      console.error(
-        "Missing Supabase environment variables."
-      );
+      console.error("Missing Supabase environment variables.");
 
       return NextResponse.json(
         {
-          error:
-            "Database service is not configured.",
+          error: "Database service is not configured.",
         },
         {
           status: 500,
@@ -44,14 +35,18 @@ export async function POST(req: Request) {
     }
 
     /*
-     * Read the authenticated user's access token.
+     * -------------------------------------------------------
+     * AUTHENTICATION
+     * -------------------------------------------------------
      *
-     * The browser sends this token to the API.
-     * We validate it before allowing any privileged
-     * service-role operation.
+     * The browser must send the authenticated user's
+     * Supabase access token.
+     *
+     * We validate that token before using the service-role
+     * client for any privileged database operation.
      */
-    const authorization =
-      req.headers.get("authorization");
+
+    const authorization = req.headers.get("authorization");
 
     if (
       !authorization ||
@@ -85,9 +80,10 @@ export async function POST(req: Request) {
     /*
      * Normal Supabase client.
      *
-     * This client is used only to validate the
-     * access token and identify the user.
+     * Used only to validate the access token and identify
+     * the authenticated user.
      */
+
     const supabaseAuth = createClient(
       supabaseUrl,
       supabaseAnonKey,
@@ -102,15 +98,12 @@ export async function POST(req: Request) {
     const {
       data: { user },
       error: authError,
-    } = await supabaseAuth.auth.getUser(
-      accessToken
-    );
+    } = await supabaseAuth.auth.getUser(accessToken);
 
     if (authError || !user) {
       return NextResponse.json(
         {
-          error:
-            "Your session is invalid or has expired.",
+          error: "Your session is invalid or has expired.",
         },
         {
           status: 401,
@@ -121,9 +114,16 @@ export async function POST(req: Request) {
     /*
      * Server-only privileged client.
      *
-     * SUPABASE_SERVICE_ROLE_KEY must NEVER be
-     * exposed to client components.
+     * IMPORTANT:
+     *
+     * The service-role key bypasses Row Level Security.
+     * Therefore every privileged operation below must
+     * perform its own ownership and transition checks.
+     *
+     * Never expose SUPABASE_SERVICE_ROLE_KEY to a
+     * client component.
      */
+
     const supabaseAdmin = createClient(
       supabaseUrl,
       supabaseServiceRoleKey,
@@ -135,21 +135,40 @@ export async function POST(req: Request) {
       }
     );
 
-    const body = await req.json();
+    /*
+     * -------------------------------------------------------
+     * REQUEST VALIDATION
+     * -------------------------------------------------------
+     */
 
-    const propertyId = Number(
-      body?.propertyId
-    );
+    let body: unknown;
+
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        {
+          error: "Invalid request body.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const requestBody =
+      body && typeof body === "object"
+        ? (body as Record<string, unknown>)
+        : {};
+
+    const propertyId = Number(requestBody.propertyId);
 
     const requestedStatus =
-      typeof body?.status === "string"
-        ? body.status.trim().toLowerCase()
+      typeof requestBody.status === "string"
+        ? requestBody.status.trim().toLowerCase()
         : "";
 
-    if (
-      !Number.isInteger(propertyId) ||
-      propertyId <= 0
-    ) {
+    if (!Number.isInteger(propertyId) || propertyId <= 0) {
       return NextResponse.json(
         {
           error: "Invalid property ID.",
@@ -175,15 +194,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const newStatus =
-      requestedStatus as AllowedStatus;
+    const newStatus = requestedStatus as AllowedStatus;
 
     /*
-     * The admin client bypasses RLS.
+     * -------------------------------------------------------
+     * LOAD PROPERTY
+     * -------------------------------------------------------
      *
-     * Therefore ownership MUST be checked manually
-     * before performing the privileged update.
+     * Because the admin client bypasses RLS, ownership must
+     * be verified manually before anything is updated.
      */
+
     const {
       data: property,
       error: propertyError,
@@ -203,8 +224,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         {
-          error:
-            "Unable to verify the property.",
+          error: "Unable to verify the property.",
         },
         {
           status: 500,
@@ -223,6 +243,12 @@ export async function POST(req: Request) {
       );
     }
 
+    /*
+     * -------------------------------------------------------
+     * OWNERSHIP CHECK
+     * -------------------------------------------------------
+     */
+
     if (property.user_id !== user.id) {
       return NextResponse.json(
         {
@@ -235,23 +261,102 @@ export async function POST(req: Request) {
       );
     }
 
+    const oldStatus =
+      typeof property.status === "string"
+        ? property.status.trim().toLowerCase()
+        : "";
+
     /*
-     * Keep statuses consistent:
+     * -------------------------------------------------------
+     * PROTECT LISTING ACTIVATION
+     * -------------------------------------------------------
      *
-     * sale   -> active / sold
-     * rental -> active / rented
+     * CRITICAL SECURITY RULE:
+     *
+     * A pending listing must NEVER become active through
+     * this generic status endpoint.
+     *
+     * Initial activation must happen through the dedicated
+     * activation routes:
+     *
+     * FREE:
+     * /api/activate-free-listing
+     *
+     * PAID:
+     * Stripe checkout / webhook / paid activation flow
+     *
+     * This prevents a user from bypassing HomeLinker's
+     * listing/pricing flow by directly calling this API with:
+     *
+     * {
+     *   propertyId: 123,
+     *   status: "active"
+     * }
      */
-    const isSale =
-      property.listing_type === "sale";
+
+    if (oldStatus === "pending" && newStatus === "active") {
+      return NextResponse.json(
+        {
+          error:
+            "Pending listings must be activated through the listing activation process.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    /*
+     * We also reject attempts to mark a pending listing as
+     * sold or rented.
+     *
+     * A listing should first be legitimately activated
+     * before it can be marked unavailable.
+     */
 
     if (
-      (newStatus === "sold" && !isSale) ||
-      (newStatus === "rented" && isSale)
+      oldStatus === "pending" &&
+      (newStatus === "sold" || newStatus === "rented")
     ) {
       return NextResponse.json(
         {
           error:
-            "That status is not valid for this listing.",
+            "A pending listing cannot be marked as sold or rented.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    /*
+     * -------------------------------------------------------
+     * LISTING TYPE / STATUS CONSISTENCY
+     * -------------------------------------------------------
+     *
+     * Sale listings:
+     *
+     * active -> sold
+     * sold   -> active
+     *
+     * Rental listings:
+     *
+     * active -> rented
+     * rented -> active
+     */
+
+    const listingType =
+      typeof property.listing_type === "string"
+        ? property.listing_type.trim().toLowerCase()
+        : "";
+
+    const isSale = listingType === "sale";
+
+    if (newStatus === "sold" && !isSale) {
+      return NextResponse.json(
+        {
+          error:
+            "Only sale listings can be marked as sold.",
         },
         {
           status: 400,
@@ -259,15 +364,44 @@ export async function POST(req: Request) {
       );
     }
 
-    const oldStatus =
-      typeof property.status === "string"
-        ? property.status
-        : null;
+    if (newStatus === "rented" && isSale) {
+      return NextResponse.json(
+        {
+          error:
+            "Sale listings cannot be marked as rented.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     /*
-     * Avoid unnecessary updates and duplicate
-     * notifications.
+     * -------------------------------------------------------
+     * EXPLICIT STATUS TRANSITION RULES
+     * -------------------------------------------------------
+     *
+     * Rather than trusting any combination of allowed
+     * status values, explicitly define which transitions
+     * this endpoint is permitted to perform.
      */
+
+    const validTransition =
+      (oldStatus === "active" &&
+        ((isSale && newStatus === "sold") ||
+          (!isSale && newStatus === "rented"))) ||
+      (oldStatus === "sold" &&
+        isSale &&
+        newStatus === "active") ||
+      (oldStatus === "rented" &&
+        !isSale &&
+        newStatus === "active");
+
+    /*
+     * Same status is harmless and should not create
+     * duplicate notifications.
+     */
+
     if (oldStatus === newStatus) {
       return NextResponse.json({
         success: true,
@@ -277,20 +411,49 @@ export async function POST(req: Request) {
       });
     }
 
+    if (!validTransition) {
+      return NextResponse.json(
+        {
+          error:
+            "That listing status change is not allowed.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
     /*
-     * Update only the authenticated user's property.
+     * -------------------------------------------------------
+     * UPDATE PROPERTY
+     * -------------------------------------------------------
      *
-     * We still include user_id in the update filter
-     * as defense-in-depth.
+     * Defense in depth:
+     *
+     * We filter by:
+     *
+     * - property ID
+     * - authenticated owner ID
+     * - OLD status
+     *
+     * Including the old status reduces the chance of an
+     * unexpected concurrent request changing a listing
+     * from a state we did not validate.
      */
-    const { error: updateError } =
-      await supabaseAdmin
-        .from("properties")
-        .update({
-          status: newStatus,
-        })
-        .eq("id", propertyId)
-        .eq("user_id", user.id);
+
+    const {
+      data: updatedProperty,
+      error: updateError,
+    } = await supabaseAdmin
+      .from("properties")
+      .update({
+        status: newStatus,
+      })
+      .eq("id", propertyId)
+      .eq("user_id", user.id)
+      .eq("status", oldStatus)
+      .select("id, status")
+      .maybeSingle();
 
     if (updateError) {
       console.error(
@@ -300,8 +463,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         {
-          error:
-            "Unable to update the listing status.",
+          error: "Unable to update the listing status.",
         },
         {
           status: 500,
@@ -309,19 +471,38 @@ export async function POST(req: Request) {
       );
     }
 
+    /*
+     * If nothing was updated, the property's status may
+     * have changed between our initial read and update.
+     */
+
+    if (!updatedProperty) {
+      return NextResponse.json(
+        {
+          error:
+            "The listing changed before this request completed. Please refresh and try again.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
     let notificationsCreated = 0;
 
     /*
-     * Notify users only when the property becomes
+     * -------------------------------------------------------
+     * FAVORITE NOTIFICATIONS
+     * -------------------------------------------------------
+     *
+     * Notify users who saved the property when it becomes
      * unavailable.
      *
-     * We don't notify everyone when the owner
-     * changes it back to active.
+     * We intentionally do NOT notify everyone when an owner
+     * reactivates a sold/rented listing.
      */
-    if (
-      newStatus === "sold" ||
-      newStatus === "rented"
-    ) {
+
+    if (newStatus === "sold" || newStatus === "rented") {
       const {
         data: favoriteRows,
         error: favoritesError,
@@ -332,9 +513,10 @@ export async function POST(req: Request) {
 
       if (favoritesError) {
         /*
-         * The status update already succeeded.
-         * Notification failure should not undo it.
+         * The property status update already succeeded.
+         * Notification failure must not undo it.
          */
+
         console.error(
           "Favorites lookup error:",
           favoritesError
@@ -355,27 +537,23 @@ export async function POST(req: Request) {
 
         if (favoriterIds.length > 0) {
           const statusLabel =
-            newStatus === "sold"
-              ? "sold"
-              : "rented";
+            newStatus === "sold" ? "sold" : "rented";
 
-          const notificationRows =
-            favoriterIds.map((userId) => ({
+          const notificationRows = favoriterIds.map(
+            (userId) => ({
               user_id: userId,
 
-              title:
-                `A saved property was marked as ${statusLabel}`,
+              title: `A saved property was marked as ${statusLabel}`,
 
-              message:
-                `"${property.title}" has been marked as ${statusLabel} by the owner.`,
+              message: `"${property.title}" has been marked as ${statusLabel} by the owner.`,
 
               type: "listing_status",
 
               is_read: false,
 
-              listing_id:
-                String(propertyId),
-            }));
+              listing_id: String(propertyId),
+            })
+          );
 
           const {
             error: notificationError,
@@ -410,8 +588,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
-        error:
-          "Unable to update the listing status.",
+        error: "Unable to update the listing status.",
       },
       {
         status: 500,
