@@ -24,6 +24,10 @@ function PricingContent() {
     "free" | "premium" | "pro" | null
   >(null);
 
+  // ==================================================
+  // FREE PLAN
+  // ==================================================
+
   async function startFreePlan() {
     if (!propertyId) {
       alert(
@@ -35,34 +39,97 @@ function PricingContent() {
     setLoadingPlan("free");
 
     try {
-      const { data: updatedProperty, error } =
-        await supabase
-          .from("properties")
-          .update({
-            status: "active",
-            plan: "free",
-          })
-          .eq("id", propertyId)
-          .select("id")
-          .single();
+      // Get the authenticated Supabase session.
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (error) {
+      if (sessionError) {
         console.error(
-          "Free plan activation error:",
-          error
+          "Free plan session error:",
+          sessionError
         );
 
-        alert(error.message);
-        return;
-      }
-
-      if (!updatedProperty) {
         alert(
-          "The property could not be activated."
+          "Unable to verify your login. Please sign in again."
         );
         return;
       }
 
+      if (!session?.access_token) {
+        alert(
+          "Please sign in before publishing your listing."
+        );
+
+        const returnUrl =
+          `/pricing?propertyId=${encodeURIComponent(
+            String(propertyId)
+          )}`;
+
+        window.location.href =
+          `/login?redirect=${encodeURIComponent(
+            returnUrl
+          )}`;
+
+        return;
+      }
+
+      /*
+       * Free listings are activated by the trusted
+       * server API.
+       *
+       * The browser does NOT directly update status,
+       * plan, payment_status, featured or promotion
+       * fields.
+       */
+      const response = await fetch(
+        "/api/activate-free-listing",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+
+          body: JSON.stringify({
+            propertyId,
+          }),
+        }
+      );
+
+      let data: {
+        success?: boolean;
+        propertyId?: number;
+        status?: string;
+        plan?: string;
+        error?: string;
+      } = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      if (!response.ok || !data.success) {
+        console.error(
+          "Free plan activation API error:",
+          data
+        );
+
+        alert(
+          data.error ||
+            "The property could not be activated."
+        );
+
+        return;
+      }
+
+      // Listing is successfully active.
       sessionStorage.removeItem("propertyId");
 
       window.location.href = "/dashboard";
@@ -79,6 +146,10 @@ function PricingContent() {
       setLoadingPlan(null);
     }
   }
+
+  // ==================================================
+  // PREMIUM / PRO CHECKOUT
+  // ==================================================
 
   async function checkout(
     plan: "premium" | "pro"
@@ -112,6 +183,7 @@ function PricingContent() {
         alert(
           "Unable to verify your login. Please sign in again."
         );
+
         return;
       }
 
@@ -134,9 +206,9 @@ function PricingContent() {
       }
 
       /*
-       * The API now authenticates this token
-       * and verifies that this user owns the
-       * property before Stripe Checkout is
+       * The server authenticates this token and
+       * verifies that the authenticated user owns
+       * the property before Stripe Checkout is
        * created.
        */
       const response = await fetch(
@@ -158,7 +230,16 @@ function PricingContent() {
         }
       );
 
-      const data = await response.json();
+      let data: {
+        url?: string;
+        error?: string;
+      } = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
 
       if (!response.ok) {
         console.error(
@@ -181,6 +262,7 @@ function PricingContent() {
         alert(
           "Payment page could not be created."
         );
+
         return;
       }
 

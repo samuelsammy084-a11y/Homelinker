@@ -10,11 +10,10 @@ type AllowedPlan = (typeof ALLOWED_PLANS)[number];
 
 export async function POST(req: Request) {
   try {
-    /*
-     * Read server environment variables inside
-     * the request handler so missing variables
-     * do not crash Next.js during module loading.
-     */
+    // ==================================================
+    // ENVIRONMENT VARIABLES
+    // ==================================================
+
     const stripeSecretKey =
       process.env.STRIPE_SECRET_KEY;
 
@@ -63,9 +62,10 @@ export async function POST(req: Request) {
       );
     }
 
-    /*
-     * Require an authenticated HomeLinker user.
-     */
+    // ==================================================
+    // AUTHENTICATE USER
+    // ==================================================
+
     const authorization =
       req.headers.get("authorization");
 
@@ -98,12 +98,6 @@ export async function POST(req: Request) {
       );
     }
 
-    /*
-     * User-scoped Supabase client.
-     *
-     * This client is only used to authenticate
-     * the caller.
-     */
     const supabaseUser = createClient(
       supabaseUrl,
       supabaseAnonKey,
@@ -112,6 +106,7 @@ export async function POST(req: Request) {
           persistSession: false,
           autoRefreshToken: false,
         },
+
         global: {
           headers: {
             Authorization:
@@ -140,10 +135,26 @@ export async function POST(req: Request) {
       );
     }
 
-    /*
-     * Parse and validate request body.
-     */
-    const body = await req.json();
+    // ==================================================
+    // READ REQUEST
+    // ==================================================
+
+    let body: {
+      sessionId?: unknown;
+    };
+
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        {
+          error: "Invalid request body.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     const sessionId =
       typeof body?.sessionId === "string"
@@ -162,13 +173,10 @@ export async function POST(req: Request) {
       );
     }
 
-    /*
-     * Retrieve the Checkout Session directly
-     * from Stripe.
-     *
-     * Payment status, property ID and plan are
-     * never trusted from browser input.
-     */
+    // ==================================================
+    // VERIFY PAYMENT DIRECTLY WITH STRIPE
+    // ==================================================
+
     const stripe = new Stripe(
       stripeSecretKey
     );
@@ -197,6 +205,12 @@ export async function POST(req: Request) {
       );
     }
 
+    /*
+     * Never trust the browser to tell us whether
+     * payment succeeded.
+     *
+     * Stripe itself must report the session as paid.
+     */
     if (
       session.payment_status !== "paid"
     ) {
@@ -211,10 +225,10 @@ export async function POST(req: Request) {
       );
     }
 
-    /*
-     * Checkout creation stores all three values
-     * server-side in Stripe metadata.
-     */
+    // ==================================================
+    // VALIDATE STRIPE METADATA
+    // ==================================================
+
     const metadataPropertyId =
       session.metadata?.propertyId;
 
@@ -278,13 +292,14 @@ export async function POST(req: Request) {
     const plan =
       metadataPlan as AllowedPlan;
 
-    /*
-     * The Stripe session must belong to the
-     * currently authenticated HomeLinker user.
-     */
+    // ==================================================
+    // VERIFY PAYMENT BELONGS TO CURRENT USER
+    // ==================================================
+
     if (
       metadataUserId !== user.id ||
-      session.client_reference_id !== user.id
+      session.client_reference_id !==
+        user.id
     ) {
       return NextResponse.json(
         {
@@ -297,13 +312,10 @@ export async function POST(req: Request) {
       );
     }
 
-    /*
-     * Service-role client.
-     *
-     * This bypasses RLS, so every ownership
-     * condition must be explicitly checked
-     * before performing the update.
-     */
+    // ==================================================
+    // SERVER-ONLY SUPABASE CLIENT
+    // ==================================================
+
     const supabaseAdmin = createClient(
       supabaseUrl,
       supabaseServiceRoleKey,
@@ -315,10 +327,10 @@ export async function POST(req: Request) {
       }
     );
 
-    /*
-     * Independently verify that the property
-     * belongs to the authenticated user.
-     */
+    // ==================================================
+    // VERIFY PROPERTY OWNERSHIP
+    // ==================================================
+
     const {
       data: property,
       error: propertyError,
@@ -360,13 +372,16 @@ export async function POST(req: Request) {
       );
     }
 
+    // ==================================================
+    // IDEMPOTENCY
+    // ==================================================
+
     /*
-     * Make repeated success-page requests
-     * harmless.
+     * Stripe/web browsers can cause activation
+     * requests to happen more than once.
      *
-     * If this exact Stripe session already
-     * activated this exact plan, simply return
-     * success instead of writing again.
+     * If this exact payment already activated
+     * this exact plan, return success.
      */
     if (
       property.payment_status === "paid" &&
@@ -378,20 +393,21 @@ export async function POST(req: Request) {
         success: true,
         propertyId,
         plan,
+        status: property.status,
         alreadyActivated: true,
       });
     }
 
     /*
-     * Prevent a property that was already paid
-     * using a different Stripe Checkout Session
-     * from being silently overwritten.
+     * Do not overwrite a different completed
+     * Stripe payment already attached to this
+     * property.
      */
     if (
+      property.payment_status === "paid" &&
       property.stripe_session_id &&
       property.stripe_session_id !==
-        session.id &&
-      property.payment_status === "paid"
+        session.id
     ) {
       return NextResponse.json(
         {
@@ -404,9 +420,16 @@ export async function POST(req: Request) {
       );
     }
 
+    // ==================================================
+    // ACTIVATE PAID LISTING
+    // ==================================================
+
     /*
-     * Activate only the property owned by the
-     * authenticated user.
+     * Premium and Pro are both paid/promoted
+     * HomeLinker plans.
+     *
+     * Both therefore receive featured and
+     * promoted placement.
      */
     const {
       data: updatedProperty,
@@ -417,12 +440,16 @@ export async function POST(req: Request) {
         status: "active",
         plan,
         payment_status: "paid",
-        stripe_session_id:
-          session.id,
+        stripe_session_id: session.id,
+
+        featured: true,
+        is_promoted: true,
       })
       .eq("id", propertyId)
       .eq("user_id", user.id)
-      .select("id, status, plan")
+      .select(
+        "id, status, plan, payment_status, featured, is_promoted"
+      )
       .maybeSingle();
 
     if (updateError) {
@@ -454,14 +481,31 @@ export async function POST(req: Request) {
       );
     }
 
+    // ==================================================
+    // SUCCESS
+    // ==================================================
+
     return NextResponse.json({
       success: true,
+
       propertyId:
         updatedProperty.id,
+
       plan:
         updatedProperty.plan,
+
       status:
         updatedProperty.status,
+
+      paymentStatus:
+        updatedProperty.payment_status,
+
+      featured:
+        updatedProperty.featured,
+
+      isPromoted:
+        updatedProperty.is_promoted,
+
       alreadyActivated: false,
     });
   } catch (error) {
