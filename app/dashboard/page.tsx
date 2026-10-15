@@ -277,41 +277,56 @@ export default function DashboardPage() {
     setDeletingId(propertyId);
 
     try {
-      const { data, error } = await supabase
-        .from("properties")
-        .delete()
-        .eq("id", propertyId)
-        .eq("user_id", user.id)
-        .select("id");
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (error) {
-        console.error(
-          "HomeLinker delete property error:",
-          error
-        );
-
+      if (
+        sessionError ||
+        !session?.access_token
+      ) {
         toast.error(
-          `Could not delete property: ${error.message}`
+          "Your session has expired. Please sign in again."
         );
-
         return;
       }
 
-      if (!data || data.length === 0) {
-        console.error(
-          "Delete returned zero rows. Check Supabase RLS DELETE policy."
-        );
+      const response = await fetch(
+        "/api/delete-listing",
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            propertyId,
+          }),
+        }
+      );
 
-        toast.error(
-          "The property was not deleted. Please check your account permissions."
-        );
+      const result = (await response
+        .json()
+        .catch(() => null)) as
+        | {
+            success?: boolean;
+            propertyId?: number;
+            error?: string;
+          }
+        | null;
 
-        return;
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.error ||
+            "Unable to delete this property."
+        );
       }
 
       setProperties((current) =>
         current.filter(
-          (property) => property.id !== propertyId
+          (property) =>
+            property.id !== propertyId
         )
       );
 
@@ -320,12 +335,14 @@ export default function DashboardPage() {
       );
     } catch (error) {
       console.error(
-        "Unexpected property deletion error:",
+        "HomeLinker delete property error:",
         error
       );
 
       toast.error(
-        "Something went wrong deleting the property."
+        error instanceof Error
+          ? error.message
+          : "Something went wrong deleting the property."
       );
     } finally {
       setDeletingId(null);
