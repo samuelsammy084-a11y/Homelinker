@@ -144,6 +144,86 @@ export async function POST(request: Request) {
     }
 
     // --------------------------------------------------
+    // TRUSTED DATABASE CLIENT
+    // --------------------------------------------------
+
+    const admin = createClient(
+      supabaseUrl,
+      serviceRoleKey,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    );
+
+    // --------------------------------------------------
+    // REQUIRE ADVERTISER IDENTITY VERIFICATION
+    // --------------------------------------------------
+    //
+    // Home seekers do NOT need verification.
+    //
+    // Identity verification is required only when a user
+    // attempts to advertise a property.
+    //
+    // This check happens server-side so it cannot be
+    // bypassed by calling this API directly.
+
+    const {
+      data: profile,
+      error: profileError,
+    } = await admin
+      .from("profiles")
+      .select("is_verified, verification_status")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error(
+        "Create listing profile verification error:",
+        profileError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "We could not check your identity verification status.",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!profile) {
+      return NextResponse.json(
+        {
+          error:
+            "Your HomeLinker profile could not be found.",
+          code: "PROFILE_NOT_FOUND",
+        },
+        { status: 403 }
+      );
+    }
+
+    const identityVerified =
+      profile.is_verified === true &&
+      profile.verification_status === "verified";
+
+    if (!identityVerified) {
+      return NextResponse.json(
+        {
+          error:
+            "Identity verification is required before you can post a property.",
+          code: "IDENTITY_VERIFICATION_REQUIRED",
+          verificationStatus:
+            profile.verification_status ?? "unverified",
+          verificationUrl: "/verify",
+        },
+        { status: 403 }
+      );
+    }
+
+    // --------------------------------------------------
     // READ REQUEST
     // --------------------------------------------------
 
@@ -283,23 +363,14 @@ export async function POST(request: Request) {
       imageUrls[0];
 
     // --------------------------------------------------
-    // TRUSTED DATABASE CLIENT
-    // --------------------------------------------------
-
-    const admin = createClient(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      }
-    );
-
-    // --------------------------------------------------
     // CREATE AS PENDING
     // --------------------------------------------------
+    //
+    // At this point:
+    //
+    // 1. The user is authenticated.
+    // 2. Their identity is verified.
+    // 3. Their listing data has been validated.
     //
     // The browser is deliberately NOT allowed to choose
     // status, plan, payment_status, featured, verified
