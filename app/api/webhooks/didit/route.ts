@@ -29,30 +29,6 @@ type VerificationStatus =
   | "expired"
   | "cancelled";
 
-function shortenFloats(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(shortenFloats);
-  }
-
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(
-        ([key, item]) => [key, shortenFloats(item)]
-      )
-    );
-  }
-
-  if (
-    typeof value === "number" &&
-    !Number.isInteger(value) &&
-    value % 1 === 0
-  ) {
-    return Math.trunc(value);
-  }
-
-  return value;
-}
-
 function sortKeys(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(sortKeys);
@@ -72,7 +48,10 @@ function sortKeys(value: unknown): unknown {
   return value;
 }
 
-function safeCompareHex(expected: string, received: string): boolean {
+function safeCompareHex(
+  expected: string,
+  received: string
+): boolean {
   if (
     !/^[a-f0-9]{64}$/i.test(expected) ||
     !/^[a-f0-9]{64}$/i.test(received)
@@ -94,15 +73,22 @@ function verifySignatureV2(
   receivedSignature: string,
   secret: string
 ): boolean {
-  const canonical = JSON.stringify(
-    sortKeys(shortenFloats(payload))
-  );
+  /*
+   * JSON.parse already converts JSON numbers such as
+   * 1.0 to the JavaScript number 1. JSON.stringify
+   * therefore produces the compact numeric form needed
+   * when recreating the canonical payload.
+   */
+  const canonical = JSON.stringify(sortKeys(payload));
 
   const expectedSignature = createHmac("sha256", secret)
     .update(canonical, "utf8")
     .digest("hex");
 
-  return safeCompareHex(expectedSignature, receivedSignature);
+  return safeCompareHex(
+    expectedSignature,
+    receivedSignature
+  );
 }
 
 function mapStatus(
@@ -138,8 +124,11 @@ function mapStatus(
 
 export async function POST(request: NextRequest) {
   try {
-    const secret = process.env.DIDIT_WEBHOOK_SECRET;
-    const workflowId = process.env.DIDIT_WORKFLOW_ID;
+    const secret =
+      process.env.DIDIT_WEBHOOK_SECRET;
+
+    const workflowId =
+      process.env.DIDIT_WORKFLOW_ID;
 
     const supabaseUrl =
       process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -153,7 +142,9 @@ export async function POST(request: NextRequest) {
       !supabaseUrl ||
       !serviceRoleKey
     ) {
-      console.error("Didit webhook configuration missing.");
+      console.error(
+        "Didit webhook configuration missing."
+      );
 
       return NextResponse.json(
         { error: "Webhook unavailable" },
@@ -162,12 +153,16 @@ export async function POST(request: NextRequest) {
     }
 
     /*
-     * Read the raw request body first.
-     * Do not use request.json() before obtaining it.
+     * Keep the original request body available before
+     * parsing it. Do not log it because KYC webhooks can
+     * contain sensitive identity information.
      */
     const rawBody = await request.text();
 
-    if (Buffer.byteLength(rawBody, "utf8") > 512_000) {
+    if (
+      Buffer.byteLength(rawBody, "utf8") >
+      512_000
+    ) {
       return NextResponse.json(
         { error: "Payload too large" },
         { status: 413 }
@@ -182,7 +177,10 @@ export async function POST(request: NextRequest) {
 
     if (!timestampHeader || !signature) {
       return NextResponse.json(
-        { error: "Missing webhook authentication" },
+        {
+          error:
+            "Missing webhook authentication",
+        },
         { status: 401 }
       );
     }
@@ -191,7 +189,10 @@ export async function POST(request: NextRequest) {
 
     if (
       !Number.isSafeInteger(timestamp) ||
-      Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 300
+      Math.abs(
+        Math.floor(Date.now() / 1000) -
+          timestamp
+      ) > 300
     ) {
       return NextResponse.json(
         { error: "Invalid webhook timestamp" },
@@ -202,7 +203,9 @@ export async function POST(request: NextRequest) {
     let payload: DiditPayload;
 
     try {
-      payload = JSON.parse(rawBody) as DiditPayload;
+      payload = JSON.parse(
+        rawBody
+      ) as DiditPayload;
     } catch {
       return NextResponse.json(
         { error: "Invalid JSON" },
@@ -211,68 +214,93 @@ export async function POST(request: NextRequest) {
     }
 
     /*
-     * Verify Didit's V2 HMAC before trusting anything
-     * contained in the webhook.
+     * Verify the signed canonical V2 payload before
+     * trusting any fields inside it.
      */
-    if (!verifySignatureV2(payload, signature, secret)) {
-      console.error("Didit webhook signature verification failed.");
+    if (
+      !verifySignatureV2(
+        payload,
+        signature,
+        secret
+      )
+    ) {
+      console.error(
+        "Didit webhook signature verification failed."
+      );
 
       return NextResponse.json(
-        { error: "Invalid webhook signature" },
+        {
+          error:
+            "Invalid webhook signature",
+        },
         { status: 401 }
       );
     }
 
-    /*
-     * X-Timestamp and payload.timestamp should describe
-     * the same dispatch.
-     */
     if (
-      !Number.isSafeInteger(payload.timestamp) ||
+      !Number.isSafeInteger(
+        payload.timestamp
+      ) ||
       payload.timestamp !== timestamp
     ) {
       return NextResponse.json(
-        { error: "Webhook timestamp mismatch" },
+        {
+          error:
+            "Webhook timestamp mismatch",
+        },
         { status: 401 }
       );
     }
 
     /*
-     * HomeLinker currently subscribes only to KYC
-     * status.updated events.
+     * HomeLinker only processes KYC status updates.
      */
-    if (payload.webhook_type !== "status.updated") {
-      return NextResponse.json({ received: true });
+    if (
+      payload.webhook_type !==
+      "status.updated"
+    ) {
+      return NextResponse.json({
+        received: true,
+      });
     }
 
     /*
-     * Do not process sandbox events as real verification.
+     * Sandbox results must never verify a real
+     * HomeLinker account.
      */
     if (payload.environment !== "live") {
-      return NextResponse.json({ received: true });
+      return NextResponse.json({
+        received: true,
+      });
     }
 
     /*
-     * HomeLinker advertiser verification is KYC,
-     * not business/KYB verification.
+     * HomeLinker advertiser verification is
+     * individual KYC, not business/KYB.
      */
     if (
       payload.session_kind === "business" ||
       payload.business_session_id
     ) {
-      return NextResponse.json({ received: true });
+      return NextResponse.json({
+        received: true,
+      });
     }
 
     /*
-     * Only accept results belonging to our configured
-     * HomeLinker KYC workflow.
+     * Only process our configured HomeLinker workflow.
      */
-    if (payload.workflow_id !== workflowId) {
-      return NextResponse.json({ received: true });
+    if (
+      payload.workflow_id !== workflowId
+    ) {
+      return NextResponse.json({
+        received: true,
+      });
     }
 
     if (
-      typeof payload.session_id !== "string" ||
+      typeof payload.session_id !==
+        "string" ||
       payload.session_id.length === 0
     ) {
       return NextResponse.json(
@@ -286,16 +314,21 @@ export async function POST(request: NextRequest) {
       payload.status.length === 0
     ) {
       return NextResponse.json(
-        { error: "Missing verification status" },
+        {
+          error:
+            "Missing verification status",
+        },
         { status: 400 }
       );
     }
 
-    const mappedStatus = mapStatus(payload.status);
+    const mappedStatus = mapStatus(
+      payload.status
+    );
 
     /*
-     * Unknown future Didit statuses must never
-     * accidentally verify somebody.
+     * A new/unknown Didit status must never
+     * accidentally verify a user.
      */
     if (mappedStatus === null) {
       console.warn(
@@ -303,11 +336,15 @@ export async function POST(request: NextRequest) {
         payload.status
       );
 
-      return NextResponse.json({ received: true });
+      return NextResponse.json({
+        received: true,
+      });
     }
 
     if (mappedStatus === "ignore") {
-      return NextResponse.json({ received: true });
+      return NextResponse.json({
+        received: true,
+      });
     }
 
     const admin = createClient(
@@ -322,10 +359,9 @@ export async function POST(request: NextRequest) {
     );
 
     /*
-     * The session ID stored when HomeLinker created
-     * the Didit session is the authoritative user mapping.
-     *
-     * We do NOT trust vendor_data by itself.
+     * provider_session_id is the authoritative mapping
+     * between a Didit verification and a HomeLinker
+     * user.
      */
     const {
       data: verification,
@@ -336,7 +372,10 @@ export async function POST(request: NextRequest) {
         "id, user_id, status, created_at, completed_at"
       )
       .eq("provider", "didit")
-      .eq("provider_session_id", payload.session_id)
+      .eq(
+        "provider_session_id",
+        payload.session_id
+      )
       .maybeSingle();
 
     if (verificationLookupError) {
@@ -352,58 +391,67 @@ export async function POST(request: NextRequest) {
 
     if (!verification) {
       /*
-       * Returning 503 allows Didit to retry if the
-       * webhook happened to arrive before our session
-       * record was committed.
+       * A webhook can theoretically arrive before
+       * /api/verification/start has finished inserting
+       * the local session record. A retry can repair
+       * that race.
        */
       return NextResponse.json(
-        { error: "Verification session not registered" },
+        {
+          error:
+            "Verification session not registered",
+        },
         { status: 503 }
       );
     }
 
     /*
-     * vendor_data is a secondary consistency check.
-     * The actual mapping is provider_session_id above.
+     * vendor_data is only a secondary consistency
+     * check. We never use it as the primary mapping.
      */
     if (
-      typeof payload.vendor_data === "string" &&
-      payload.vendor_data !== verification.user_id
+      typeof payload.vendor_data ===
+        "string" &&
+      payload.vendor_data !==
+        verification.user_id
     ) {
       console.error(
         "Didit vendor_data does not match stored user."
       );
 
       return NextResponse.json(
-        { error: "Verification user mismatch" },
+        {
+          error:
+            "Verification user mismatch",
+        },
         { status: 400 }
       );
     }
 
     /*
-     * Idempotency:
-     * receiving the same status again must be harmless.
-     */
-    if (verification.status === mappedStatus) {
-      return NextResponse.json({ received: true });
-    }
-
-    /*
-     * Once a particular session has been approved,
-     * an older/reordered non-approved event for that
-     * same session must not revoke it.
+     * Once this particular session is approved,
+     * reordered older non-approved events must not
+     * downgrade it.
+     *
+     * Notice that an APPROVED retry is NOT returned
+     * early. We intentionally continue so the profile
+     * can be reconciled if an earlier profile update
+     * failed.
      */
     if (
-      verification.status === "approved" &&
+      verification.status ===
+        "approved" &&
       mappedStatus !== "approved"
     ) {
-      return NextResponse.json({ received: true });
+      return NextResponse.json({
+        received: true,
+      });
     }
 
     /*
-     * If the user has a newer approved session,
-     * this older session may be recorded but must not
-     * revoke the user's verified profile.
+     * Determine whether another newer approved
+     * verification exists. An older session must
+     * never revoke a newer successful verification.
      */
     const {
       data: newerApprovedSessions,
@@ -411,10 +459,16 @@ export async function POST(request: NextRequest) {
     } = await admin
       .from("identity_verifications")
       .select("id")
-      .eq("user_id", verification.user_id)
+      .eq(
+        "user_id",
+        verification.user_id
+      )
       .eq("provider", "didit")
       .eq("status", "approved")
-      .gt("created_at", verification.created_at)
+      .gt(
+        "created_at",
+        verification.created_at
+      )
       .limit(1);
 
     if (newerApprovalError) {
@@ -428,7 +482,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const now = new Date().toISOString();
+    const hasNewerApproval =
+      Boolean(
+        newerApprovedSessions &&
+          newerApprovedSessions.length > 0
+      );
+
+    const now =
+      new Date().toISOString();
 
     const terminal =
       mappedStatus === "approved" ||
@@ -436,45 +497,75 @@ export async function POST(request: NextRequest) {
       mappedStatus === "expired" ||
       mappedStatus === "cancelled";
 
-    const { error: verificationUpdateError } =
-      await admin
+    /*
+     * Only rewrite the verification row when its
+     * status actually changed.
+     *
+     * Duplicate events still continue into profile
+     * reconciliation below.
+     */
+    if (
+      verification.status !== mappedStatus
+    ) {
+      const {
+        error:
+          verificationUpdateError,
+      } = await admin
         .from("identity_verifications")
         .update({
           status: mappedStatus,
           updated_at: now,
-          completed_at: terminal ? now : null,
+          completed_at: terminal
+            ? now
+            : null,
         })
         .eq("id", verification.id);
 
-    if (verificationUpdateError) {
-      console.error(
-        "Failed updating identity verification."
-      );
+      if (verificationUpdateError) {
+        console.error(
+          "Failed updating identity verification."
+        );
 
-      return NextResponse.json(
-        { error: "Verification update failed" },
-        { status: 500 }
-      );
+        return NextResponse.json(
+          {
+            error:
+              "Verification update failed",
+          },
+          { status: 500 }
+        );
+      }
     }
 
     /*
-     * An older failed/expired session cannot undo a
-     * successful newer verification.
+     * If this is an older session and a newer approved
+     * verification exists, recording this session is
+     * enough. It must not alter the user's profile.
      */
-    if (
-      newerApprovedSessions &&
-      newerApprovedSessions.length > 0
-    ) {
-      return NextResponse.json({ received: true });
+    if (hasNewerApproval) {
+      return NextResponse.json({
+        received: true,
+      });
     }
 
     if (mappedStatus === "approved") {
-      const { error: profileUpdateError } = await admin
+      /*
+       * Reconcile the profile even when this webhook
+       * is a duplicate Approved event.
+       *
+       * This is what repairs a partial failure where
+       * identity_verifications was updated successfully
+       * but profiles failed to update.
+       */
+      const {
+        error: profileUpdateError,
+      } = await admin
         .from("profiles")
         .update({
           is_verified: true,
-          verification_status: "verified",
+          verification_status:
+            "verified",
           verified_at: now,
+          updated_at: now,
         })
         .eq("id", verification.user_id);
 
@@ -484,51 +575,104 @@ export async function POST(request: NextRequest) {
         );
 
         return NextResponse.json(
-          { error: "Profile update failed" },
+          {
+            error:
+              "Profile update failed",
+          },
           { status: 500 }
+        );
+      }
+
+      /*
+       * The verification notification is no longer
+       * actionable after approval. Mark it read rather
+       * than deleting the user's notification history.
+       */
+      const {
+        error:
+          notificationUpdateError,
+      } = await admin
+        .from("notifications")
+        .update({
+          is_read: true,
+        })
+        .eq(
+          "user_id",
+          verification.user_id
+        )
+        .eq("type", "verification")
+        .eq("action_url", "/verify");
+
+      if (notificationUpdateError) {
+        /*
+         * Notification cleanup is not security
+         * critical. Do not fail an otherwise successful
+         * verification because of it.
+         */
+        console.error(
+          "Failed marking verification notification as read."
         );
       }
     } else {
       /*
-       * Only change the profile to an unverified state
-       * if it isn't already verified by another session.
+       * Before making the profile unverified, check
+       * whether ANY Didit session for this user is
+       * already approved.
        */
       const {
-        data: anyApprovedSession,
+        data: approvedSessions,
         error: approvedSessionError,
       } = await admin
         .from("identity_verifications")
         .select("id")
-        .eq("user_id", verification.user_id)
+        .eq(
+          "user_id",
+          verification.user_id
+        )
         .eq("provider", "didit")
         .eq("status", "approved")
         .limit(1);
 
       if (approvedSessionError) {
+        console.error(
+          "Failed checking approved verification sessions."
+        );
+
         return NextResponse.json(
           { error: "Database error" },
           { status: 500 }
         );
       }
 
-      if (
-        !anyApprovedSession ||
-        anyApprovedSession.length === 0
-      ) {
+      const hasApprovedSession =
+        Boolean(
+          approvedSessions &&
+            approvedSessions.length > 0
+        );
+
+      if (!hasApprovedSession) {
         const profileStatus =
           mappedStatus === "in_progress"
             ? "pending"
             : mappedStatus;
 
-        const { error: profileUpdateError } =
-          await admin
-            .from("profiles")
-            .update({
-              is_verified: false,
-              verification_status: profileStatus,
-              verified_at: null,
-            })
-            .eq("id", verification.user_id);
+        /*
+         * Duplicate non-approved events also reconcile
+         * the profile. This means a temporary profile
+         * update failure can be repaired on retry.
+         */
+        const {
+          error: profileUpdateError,
+        } = await admin
+          .from("profiles")
+          .update({
+            is_verified: false,
+            verification_status:
+              profileStatus,
+            verified_at: null,
+            updated_at: now,
+          })
+          .eq("id", verification.user_id);
 
         if (profileUpdateError) {
           console.error(
@@ -536,7 +680,10 @@ export async function POST(request: NextRequest) {
           );
 
           return NextResponse.json(
-            { error: "Profile update failed" },
+            {
+              error:
+                "Profile update failed",
+            },
             { status: 500 }
           );
         }
@@ -545,17 +692,23 @@ export async function POST(request: NextRequest) {
 
     /*
      * We deliberately do NOT store payload.decision.
-     * It can contain ID numbers, DOB, images,
-     * addresses and other sensitive KYC information.
+     * It can contain ID numbers, dates of birth,
+     * document images, addresses and other sensitive
+     * KYC information.
      */
     return NextResponse.json({
       received: true,
     });
   } catch {
-    console.error("Unhandled Didit webhook error.");
+    console.error(
+      "Unhandled Didit webhook error."
+    );
 
     return NextResponse.json(
-      { error: "Webhook processing failed" },
+      {
+        error:
+          "Webhook processing failed",
+      },
       { status: 500 }
     );
   }
