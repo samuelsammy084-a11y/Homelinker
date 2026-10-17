@@ -10,6 +10,7 @@ import {
 
 import PropertySearchBar from "@/app/components/PropertySearchBar";
 import { getProperties } from "@/lib/getProperties";
+import type { Property } from "@/app/types/property";
 
 export const metadata: Metadata = {
   title:
@@ -46,14 +47,25 @@ type Props = {
   }>;
 };
 
-function parsePrice(value?: string): number | undefined {
+type PromotionBadge =
+  | "Priority"
+  | "Premium"
+  | "Pro"
+  | null;
+
+function parsePrice(
+  value?: string
+): number | undefined {
   if (!value?.trim()) {
     return undefined;
   }
 
   const parsed = Number(value);
 
-  if (!Number.isFinite(parsed) || parsed < 0) {
+  if (
+    !Number.isFinite(parsed) ||
+    parsed < 0
+  ) {
     return undefined;
   }
 
@@ -61,19 +73,28 @@ function parsePrice(value?: string): number | undefined {
 }
 
 function formatPrice(price: number): string {
-  return `R${Number(price || 0).toLocaleString("en-ZA")}`;
+  return `R${Number(
+    price || 0
+  ).toLocaleString("en-ZA")}`;
 }
 
 function getListingLabel(
   listingType?: string | null
 ): string {
-  const value = listingType?.toLowerCase().trim();
+  const value =
+    listingType?.toLowerCase().trim();
 
-  if (value === "sale" || value === "for sale") {
+  if (
+    value === "sale" ||
+    value === "for sale"
+  ) {
     return "For Sale";
   }
 
-  if (value === "rent" || value === "for rent") {
+  if (
+    value === "rent" ||
+    value === "for rent"
+  ) {
     return "For Rent";
   }
 
@@ -83,9 +104,110 @@ function getListingLabel(
 function isRental(
   listingType?: string | null
 ): boolean {
-  const value = listingType?.toLowerCase().trim();
+  const value =
+    listingType?.toLowerCase().trim();
 
-  return value === "rent" || value === "for rent";
+  return (
+    value === "rent" ||
+    value === "for rent"
+  );
+}
+
+/*
+ * A promotion is only considered active when:
+ *
+ * - the property itself is active
+ * - HomeLinker marked it as promoted
+ * - it came from Premium or Pro
+ * - it has a valid future expiry date
+ *
+ * This prevents stale database flags from showing
+ * paid badges after a promotion expires.
+ */
+function hasActivePaidPromotion(
+  property: Property,
+  now: number
+): boolean {
+  if (property.status !== "active") {
+    return false;
+  }
+
+  if (property.is_promoted !== true) {
+    return false;
+  }
+
+  if (
+    property.promotion_source !== "premium" &&
+    property.promotion_source !== "pro"
+  ) {
+    return false;
+  }
+
+  if (!property.promotion_expires_at) {
+    return false;
+  }
+
+  const expiresAt = new Date(
+    property.promotion_expires_at
+  ).getTime();
+
+  return (
+    Number.isFinite(expiresAt) &&
+    expiresAt > now
+  );
+}
+
+function getPromotionBadge(
+  property: Property,
+  now: number
+): PromotionBadge {
+  if (
+    !hasActivePaidPromotion(
+      property,
+      now
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    property.promotion_source === "pro" &&
+    property.is_priority === true
+  ) {
+    return "Priority";
+  }
+
+  if (
+    property.promotion_source === "premium"
+  ) {
+    return "Premium";
+  }
+
+  if (
+    property.promotion_source === "pro"
+  ) {
+    return "Pro";
+  }
+
+  return null;
+}
+
+function getPromotionBadgeClass(
+  badge: PromotionBadge
+): string {
+  switch (badge) {
+    case "Priority":
+      return "border border-[#F0D77A] bg-black text-[#E8C75A]";
+
+    case "Pro":
+      return "border border-black bg-black text-[#E8C75A]";
+
+    case "Premium":
+      return "border border-[#C9A227] bg-[#C9A227] text-white";
+
+    default:
+      return "";
+  }
 }
 
 export default async function PropertiesPage({
@@ -99,17 +221,37 @@ export default async function PropertiesPage({
       ? params.listingType
       : undefined;
 
-  const minPrice = parsePrice(params.minPrice);
-  const maxPrice = parsePrice(params.maxPrice);
+  const minPrice = parsePrice(
+    params.minPrice
+  );
 
-  const properties = await getProperties({
-    province: params.province,
-    city: params.city,
-    type: params.type,
-    listingType,
-    minPrice,
-    maxPrice,
-  });
+  const maxPrice = parsePrice(
+    params.maxPrice
+  );
+
+  const allProperties =
+    await getProperties({
+      province: params.province,
+      city: params.city,
+      type: params.type,
+      listingType,
+      minPrice,
+      maxPrice,
+    });
+
+  /*
+   * Public property search should only display
+   * currently active listings.
+   *
+   * This protects this page even before every
+   * database query is fully centralised around
+   * active-only public inventory.
+   */
+  const properties =
+    allProperties.filter(
+      (property) =>
+        property.status === "active"
+    );
 
   const hasFilters = Boolean(
     params.province ||
@@ -125,6 +267,12 @@ export default async function PropertiesPage({
       ? "Properties to Rent"
       : "Properties for Sale"
     : "Find Your Next Property";
+
+  /*
+   * Use one timestamp for the entire render so
+   * every property is evaluated consistently.
+   */
+  const now = Date.now();
 
   return (
     <main className="min-h-screen bg-[#F8F6F1] text-slate-900">
@@ -142,8 +290,9 @@ export default async function PropertiesPage({
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-              Search rooms, apartments, flats and houses
-              across South Africa. Find a place that suits
+              Search rooms, apartments,
+              flats and houses across South
+              Africa. Find a place that suits
               your needs and budget.
             </p>
           </div>
@@ -205,13 +354,15 @@ export default async function PropertiesPage({
 
             {minPrice !== undefined && (
               <span className="rounded-full border border-[#C9A227]/40 bg-white px-3 py-1">
-                From {formatPrice(minPrice)}
+                From{" "}
+                {formatPrice(minPrice)}
               </span>
             )}
 
             {maxPrice !== undefined && (
               <span className="rounded-full border border-[#C9A227]/40 bg-white px-3 py-1">
-                Up to {formatPrice(maxPrice)}
+                Up to{" "}
+                {formatPrice(maxPrice)}
               </span>
             )}
 
@@ -237,9 +388,10 @@ export default async function PropertiesPage({
             </h3>
 
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
-              Try another city or suburb, choose a
-              different property type, or adjust your
-              price range.
+              Try another city or suburb,
+              choose a different property
+              type, or adjust your price
+              range.
             </p>
 
             <Link
@@ -253,176 +405,225 @@ export default async function PropertiesPage({
           /* PROPERTY GRID */
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {properties.map((property) => {
-              const image =
-                property.image_urls?.find(
-                  (url: string | null) => Boolean(url)
-                ) || property.image_url;
+            {properties.map(
+              (property) => {
+                const image =
+                  property.image_urls?.find(
+                    (
+                      url:
+                        | string
+                        | null
+                    ) => Boolean(url)
+                  ) ||
+                  property.image_url;
 
-              const rental = isRental(
-                property.listing_type
-              );
+                const rental =
+                  isRental(
+                    property.listing_type
+                  );
 
-              const location = [
-                property.suburb,
-                property.city,
-                property.province,
-              ]
-                .filter(Boolean)
-                .filter(
-                  (value, index, values) =>
-                    values.indexOf(value) === index
-                )
-                .join(", ");
+                const location = [
+                  property.suburb,
+                  property.city,
+                  property.province,
+                ]
+                  .filter(Boolean)
+                  .filter(
+                    (
+                      value,
+                      index,
+                      values
+                    ) =>
+                      values.indexOf(
+                        value
+                      ) === index
+                  )
+                  .join(", ");
 
-              const propertyHref = property.slug
-                ? `/properties/${property.slug}`
-                : `/properties/${property.id}`;
+                const propertyHref =
+                  property.slug
+                    ? `/properties/${property.slug}`
+                    : `/properties/${property.id}`;
 
-              const verified =
-                property.verified === true ||
-                String(
-                  property.verification_status || ""
-                ).toLowerCase() === "verified";
+                const verified =
+                  property.verified ===
+                    true ||
+                  String(
+                    property.verification_status ||
+                      ""
+                  ).toLowerCase() ===
+                    "verified";
 
-              return (
-                <article
-                  key={property.id}
-                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
-                >
-                  <Link
-                    href={propertyHref}
-                    className="block"
-                    aria-label={`View ${property.title}`}
+                const promotionBadge =
+                  getPromotionBadge(
+                    property,
+                    now
+                  );
+
+                return (
+                  <article
+                    key={property.id}
+                    className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
                   >
-                    {/* IMAGE */}
+                    <Link
+                      href={propertyHref}
+                      className="block"
+                      aria-label={`View ${property.title}`}
+                    >
+                      {/* IMAGE */}
 
-                    <div className="relative h-56 overflow-hidden bg-slate-100">
-                      {image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={image}
-                          alt={property.title}
-                          loading="lazy"
-                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-400">
-                          <MapPin className="h-8 w-8" />
+                      <div className="relative h-56 overflow-hidden bg-slate-100">
+                        {image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={image}
+                            alt={
+                              property.title
+                            }
+                            loading="lazy"
+                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-400">
+                            <MapPin className="h-8 w-8" />
 
-                          <span className="text-sm">
-                            Photo unavailable
+                            <span className="text-sm">
+                              Photo unavailable
+                            </span>
+                          </div>
+                        )}
+
+                        {/* RENT / SALE */}
+
+                        <span className="absolute left-3 top-3 rounded-lg bg-black/80 px-3 py-1.5 text-xs font-bold text-white">
+                          {getListingLabel(
+                            property.listing_type
+                          )}
+                        </span>
+
+                        {/* PAID PROMOTION */}
+
+                        {promotionBadge && (
+                          <span
+                            className={`absolute right-3 top-3 rounded-lg px-3 py-1.5 text-xs font-extrabold shadow-sm ${getPromotionBadgeClass(
+                              promotionBadge
+                            )}`}
+                          >
+                            {promotionBadge}
+                          </span>
+                        )}
+
+                        {/* VERIFIED */}
+
+                        {verified && (
+                          <span className="absolute bottom-3 left-3 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
+                            Verified
+                          </span>
+                        )}
+                      </div>
+
+                      {/* DETAILS */}
+
+                      <div className="p-5">
+                        <p className="text-xl font-extrabold text-[#96700B]">
+                          {formatPrice(
+                            Number(
+                              property.price
+                            )
+                          )}
+
+                          {rental && (
+                            <span className="text-sm font-medium text-slate-500">
+                              {" "}
+                              / month
+                            </span>
+                          )}
+                        </p>
+
+                        <h3 className="mt-2 line-clamp-2 text-lg font-bold leading-6 transition group-hover:text-[#96700B]">
+                          {property.title}
+                        </h3>
+
+                        {/* LOCATION */}
+
+                        {location && (
+                          <p className="mt-2 flex items-start gap-2 text-sm text-slate-500">
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#C9A227]" />
+
+                            <span>
+                              {location}
+                            </span>
+                          </p>
+                        )}
+
+                        {/* PROPERTY TYPE */}
+
+                        {property.property_type && (
+                          <p className="mt-3 text-sm font-medium text-slate-600">
+                            {
+                              property.property_type
+                            }
+                          </p>
+                        )}
+
+                        {/* PROPERTY FEATURES */}
+
+                        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
+                          {property.bedrooms !=
+                            null && (
+                            <span className="flex items-center gap-1.5">
+                              <BedDouble className="h-4 w-4 text-[#9A7411]" />
+
+                              {
+                                property.bedrooms
+                              }{" "}
+                              beds
+                            </span>
+                          )}
+
+                          {property.bathrooms !=
+                            null && (
+                            <span className="flex items-center gap-1.5">
+                              <Bath className="h-4 w-4 text-[#9A7411]" />
+
+                              {
+                                property.bathrooms
+                              }{" "}
+                              baths
+                            </span>
+                          )}
+
+                          {property.parking !=
+                            null && (
+                            <span className="flex items-center gap-1.5">
+                              <CarFront className="h-4 w-4 text-[#9A7411]" />
+
+                              {
+                                property.parking
+                              }{" "}
+                              parking
+                            </span>
+                          )}
+                        </div>
+
+                        {/* VIEW PROPERTY */}
+
+                        <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+                          <span className="text-xs font-medium text-slate-500">
+                            Listed on
+                            HomeLinker
+                          </span>
+
+                          <span className="text-sm font-bold text-[#96700B]">
+                            View property →
                           </span>
                         </div>
-                      )}
-
-                      {/* RENT / SALE */}
-
-                      <span className="absolute left-3 top-3 rounded-lg bg-black/80 px-3 py-1.5 text-xs font-bold text-white">
-                        {getListingLabel(
-                          property.listing_type
-                        )}
-                      </span>
-
-                      {/* FEATURED */}
-
-                      {property.featured && (
-                        <span className="absolute right-3 top-3 rounded-lg bg-[#C9A227] px-3 py-1.5 text-xs font-bold text-white">
-                          Featured
-                        </span>
-                      )}
-
-                      {/* VERIFIED */}
-
-                      {verified && (
-                        <span className="absolute bottom-3 left-3 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
-                          Verified
-                        </span>
-                      )}
-                    </div>
-
-                    {/* DETAILS */}
-
-                    <div className="p-5">
-                      <p className="text-xl font-extrabold text-[#96700B]">
-                        {formatPrice(
-                          Number(property.price)
-                        )}
-
-                        {rental && (
-                          <span className="text-sm font-medium text-slate-500">
-                            {" "}
-                            / month
-                          </span>
-                        )}
-                      </p>
-
-                      <h3 className="mt-2 line-clamp-2 text-lg font-bold leading-6 transition group-hover:text-[#96700B]">
-                        {property.title}
-                      </h3>
-
-                      {/* LOCATION */}
-
-                      {location && (
-                        <p className="mt-2 flex items-start gap-2 text-sm text-slate-500">
-                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#C9A227]" />
-
-                          <span>{location}</span>
-                        </p>
-                      )}
-
-                      {/* PROPERTY TYPE */}
-
-                      {property.property_type && (
-                        <p className="mt-3 text-sm font-medium text-slate-600">
-                          {property.property_type}
-                        </p>
-                      )}
-
-                      {/* PROPERTY FEATURES */}
-
-                      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
-                        {property.bedrooms != null && (
-                          <span className="flex items-center gap-1.5">
-                            <BedDouble className="h-4 w-4 text-[#9A7411]" />
-
-                            {property.bedrooms} beds
-                          </span>
-                        )}
-
-                        {property.bathrooms != null && (
-                          <span className="flex items-center gap-1.5">
-                            <Bath className="h-4 w-4 text-[#9A7411]" />
-
-                            {property.bathrooms} baths
-                          </span>
-                        )}
-
-                        {property.parking != null && (
-                          <span className="flex items-center gap-1.5">
-                            <CarFront className="h-4 w-4 text-[#9A7411]" />
-
-                            {property.parking} parking
-                          </span>
-                        )}
                       </div>
-
-                      {/* VIEW PROPERTY */}
-
-                      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-                        <span className="text-xs font-medium text-slate-500">
-                          Listed on HomeLinker
-                        </span>
-
-                        <span className="text-sm font-bold text-[#96700B]">
-                          View property →
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                </article>
-              );
-            })}
+                    </Link>
+                  </article>
+                );
+              }
+            )}
           </div>
         )}
       </section>

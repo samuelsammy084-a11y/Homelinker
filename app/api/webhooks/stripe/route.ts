@@ -4,14 +4,40 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-const ALLOWED_PLANS = ["premium", "pro"] as const;
+const PREMIUM_PRICE = 24000;
+const PRO_PRICE = 55000;
+const PROMOTION_DAYS = 30;
 
-type AllowedPlan = (typeof ALLOWED_PLANS)[number];
+type Plan = "premium" | "pro";
+type PurchaseType = "property" | "account";
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+function getPaymentIntentId(
+  paymentIntent:
+    | string
+    | Stripe.PaymentIntent
+    | null
+) {
+  if (!paymentIntent) {
+    return null;
+  }
+
+  if (typeof paymentIntent === "string") {
+    return paymentIntent;
+  }
+
+  return paymentIntent.id;
+}
 
 export async function POST(req: Request) {
   try {
     // ==================================================
-    // ENVIRONMENT VARIABLES
+    // ENVIRONMENT
     // ==================================================
 
     const stripeSecretKey =
@@ -48,13 +74,10 @@ export async function POST(req: Request) {
     }
 
     // ==================================================
-    // READ RAW STRIPE BODY
+    // RAW STRIPE BODY
     // ==================================================
-    //
-    // Stripe signature verification requires the
-    // original raw request body.
 
-    const body = await req.text();
+    const rawBody = await req.text();
 
     const signature =
       req.headers.get("stripe-signature");
@@ -62,8 +85,7 @@ export async function POST(req: Request) {
     if (!signature) {
       return NextResponse.json(
         {
-          error:
-            "Missing Stripe signature.",
+          error: "Missing Stripe signature.",
         },
         {
           status: 400,
@@ -84,7 +106,7 @@ export async function POST(req: Request) {
     try {
       event =
         stripe.webhooks.constructEvent(
-          body,
+          rawBody,
           signature,
           webhookSecret
         );
@@ -106,7 +128,7 @@ export async function POST(req: Request) {
     }
 
     // ==================================================
-    // ONLY PROCESS CHECKOUT COMPLETION
+    // ONLY HANDLE CHECKOUT COMPLETION
     // ==================================================
 
     if (
@@ -119,43 +141,51 @@ export async function POST(req: Request) {
     }
 
     const session =
-      event.data.object as Stripe.Checkout.Session;
+      event.data
+        .object as Stripe.Checkout.Session;
 
     // ==================================================
-    // CONFIRM PAYMENT
+    // PAYMENT MUST BE PAID
     // ==================================================
-    //
-    // A completed Checkout Session is not enough.
-    // Stripe itself must report payment as paid.
 
-    if (
-      session.payment_status !== "paid"
-    ) {
+    if (session.payment_status !== "paid") {
       return NextResponse.json({
         received: true,
       });
     }
 
     // ==================================================
-    // READ TRUSTED STRIPE METADATA
+    // VALIDATE METADATA
     // ==================================================
 
-    const metadataPropertyId =
-      session.metadata?.propertyId;
+    const metadata =
+      session.metadata ?? {};
 
-    const metadataPlan =
-      session.metadata?.plan;
+    const userId =
+      metadata.userId?.trim();
 
-    const metadataUserId =
-      session.metadata?.userId;
+    const rawPlan =
+      metadata.plan
+        ?.trim()
+        .toLowerCase();
+
+    const rawPurchaseType =
+      metadata.purchaseType
+        ?.trim()
+        .toLowerCase();
+
+    const durationDays =
+      Number(metadata.durationDays);
 
     if (
-      !metadataPropertyId ||
-      !metadataPlan ||
-      !metadataUserId
+      !userId ||
+      (rawPlan !== "premium" &&
+        rawPlan !== "pro") ||
+      (rawPurchaseType !== "property" &&
+        rawPurchaseType !== "account")
     ) {
       console.error(
-        "Stripe Checkout Session is missing required HomeLinker metadata.",
+        "Stripe payment metadata is invalid.",
         {
           sessionId: session.id,
         }
@@ -164,65 +194,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Payment metadata is incomplete.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    // ==================================================
-    // VALIDATE PROPERTY ID
-    // ==================================================
-
-    const propertyId = Number(
-      metadataPropertyId
-    );
-
-    if (
-      !Number.isInteger(propertyId) ||
-      propertyId <= 0
-    ) {
-      console.error(
-        "Stripe webhook received an invalid property ID.",
-        {
-          sessionId: session.id,
-        }
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "Invalid property ID.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    // ==================================================
-    // VALIDATE PLAN
-    // ==================================================
-
-    if (
-      !ALLOWED_PLANS.includes(
-        metadataPlan as AllowedPlan
-      )
-    ) {
-      console.error(
-        "Stripe webhook received an invalid plan.",
-        {
-          sessionId: session.id,
-          plan: metadataPlan,
-        }
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "Invalid payment plan.",
+            "Payment metadata is incomplete or invalid.",
         },
         {
           status: 400,
@@ -231,22 +203,56 @@ export async function POST(req: Request) {
     }
 
     const plan =
-      metadataPlan as AllowedPlan;
+      rawPlan as Plan;
+
+    const purchaseType =
+      rawPurchaseType as PurchaseType;
+
+    // Premium = property purchase.
+    // Pro = account purchase.
+
+    if (
+      (plan === "premium" &&
+        purchaseType !== "property") ||
+      (plan === "pro" &&
+        purchaseType !== "account")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Payment plan and purchase type do not match.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !Number.isInteger(durationDays) ||
+      durationDays !== PROMOTION_DAYS
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid promotion duration.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     // ==================================================
-    // VERIFY STRIPE USER INFORMATION
+    // VERIFY USER ASSOCIATION
     // ==================================================
-    //
-    // Checkout creation stores the authenticated
-    // HomeLinker user in both metadata and
-    // client_reference_id.
 
     if (
       session.client_reference_id !==
-      metadataUserId
+      userId
     ) {
       console.error(
-        "Stripe Checkout Session user information does not match.",
+        "Stripe client_reference_id does not match userId.",
         {
           sessionId: session.id,
         }
@@ -264,7 +270,62 @@ export async function POST(req: Request) {
     }
 
     // ==================================================
-    // SERVER-ONLY SUPABASE CLIENT
+    // VERIFY AMOUNT + CURRENCY
+    // ==================================================
+
+    const expectedAmount =
+      plan === "premium"
+        ? PREMIUM_PRICE
+        : PRO_PRICE;
+
+    if (
+      session.amount_total !==
+      expectedAmount
+    ) {
+      console.error(
+        "Stripe payment amount does not match HomeLinker plan.",
+        {
+          sessionId: session.id,
+          plan,
+          expectedAmount,
+          receivedAmount:
+            session.amount_total,
+        }
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Payment amount does not match the selected plan.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      session.currency?.toLowerCase() !==
+      "zar"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid payment currency.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const paymentIntentId =
+      getPaymentIntentId(
+        session.payment_intent
+      );
+
+    // ==================================================
+    // ADMIN DATABASE CLIENT
     // ==================================================
 
     const supabaseAdmin = createClient(
@@ -279,35 +340,33 @@ export async function POST(req: Request) {
     );
 
     // ==================================================
-    // VERIFY PROPERTY + OWNERSHIP
+    // PAYMENT LEDGER / IDEMPOTENCY
     // ==================================================
 
     const {
-      data: property,
-      error: propertyError,
+      data: existingPayment,
+      error: existingPaymentError,
     } = await supabaseAdmin
-      .from("properties")
+      .from("payments")
       .select(
-        "id, user_id, status, plan, payment_status, stripe_session_id"
+        "id, user_id, property_id, plan, purchase_type, status"
       )
-      .eq("id", propertyId)
-      .eq("user_id", metadataUserId)
+      .eq(
+        "stripe_session_id",
+        session.id
+      )
       .maybeSingle();
 
-    if (propertyError) {
+    if (existingPaymentError) {
       console.error(
-        "Stripe webhook property lookup error:",
-        propertyError
+        "Stripe payment idempotency lookup failed:",
+        existingPaymentError
       );
 
-      /*
-       * Return 500 so Stripe can retry the
-       * webhook later.
-       */
       return NextResponse.json(
         {
           error:
-            "Unable to verify property.",
+            "Unable to verify payment state.",
         },
         {
           status: 500,
@@ -315,19 +374,377 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!property) {
-      console.error(
-        "Stripe webhook could not match the payment to an owned property.",
-        {
-          sessionId: session.id,
-          propertyId,
+    if (existingPayment) {
+      if (
+        existingPayment.user_id !==
+          userId ||
+        existingPayment.plan !== plan ||
+        existingPayment.purchase_type !==
+          purchaseType
+      ) {
+        console.error(
+          "Existing payment does not match incoming Stripe metadata.",
+          {
+            sessionId: session.id,
+          }
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Existing payment information does not match.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      return NextResponse.json({
+        received: true,
+        success: true,
+        alreadyProcessed: true,
+        plan,
+      });
+    }
+
+    // ==================================================
+    // PREMIUM
+    // ==================================================
+
+    if (plan === "premium") {
+      const propertyId =
+        Number(metadata.propertyId);
+
+      if (
+        !Number.isInteger(propertyId) ||
+        propertyId <= 0
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Premium payment contains an invalid property.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      // ----------------------------------------------
+      // VERIFY PROPERTY OWNERSHIP
+      // ----------------------------------------------
+
+      const {
+        data: property,
+        error: propertyError,
+      } = await supabaseAdmin
+        .from("properties")
+        .select(
+          "id, user_id, stripe_session_id, promotion_source, promotion_starts_at, promotion_expires_at"
+        )
+        .eq("id", propertyId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (propertyError) {
+        console.error(
+          "Premium property lookup failed:",
+          propertyError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Unable to verify property.",
+          },
+          {
+            status: 500,
+          }
+        );
+      }
+
+      if (!property) {
+        return NextResponse.json(
+          {
+            error:
+              "Premium property could not be verified.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      // ----------------------------------------------
+      // PREMIUM DATES
+      // ----------------------------------------------
+      //
+      // If the browser reconciliation endpoint
+      // already activated THIS EXACT Stripe session,
+      // preserve those dates.
+      //
+      // Otherwise create a fresh 30-day period.
+      //
+      // This prevents an older Premium/Pro promotion
+      // from donating its dates to this purchase.
+
+      const samePremiumSession =
+        property.stripe_session_id ===
+          session.id &&
+        property.promotion_source ===
+          "premium" &&
+        Boolean(
+          property.promotion_starts_at
+        ) &&
+        Boolean(
+          property.promotion_expires_at
+        );
+
+      let startsIso: string;
+      let expiresIso: string;
+
+      if (samePremiumSession) {
+        startsIso =
+          property.promotion_starts_at as string;
+
+        expiresIso =
+          property.promotion_expires_at as string;
+      } else {
+        const startsAt =
+          new Date();
+
+        const expiresAt =
+          addDays(
+            startsAt,
+            PROMOTION_DAYS
+          );
+
+        startsIso =
+          startsAt.toISOString();
+
+        expiresIso =
+          expiresAt.toISOString();
+      }
+
+      // ----------------------------------------------
+      // ACTIVATE PREMIUM
+      // ----------------------------------------------
+
+      const {
+        data: updatedProperty,
+        error: propertyUpdateError,
+      } = await supabaseAdmin
+        .from("properties")
+        .update({
+          status: "active",
+
+          plan: "premium",
+
+          payment_status: "paid",
+
+          stripe_session_id:
+            session.id,
+
+          featured: true,
+
+          is_promoted: true,
+
+          is_priority: false,
+
+          promotion_source:
+            "premium",
+
+          promotion_starts_at:
+            startsIso,
+
+          promotion_expires_at:
+            expiresIso,
+
+          featured_until:
+            expiresIso,
+        })
+        .eq("id", propertyId)
+        .eq("user_id", userId)
+        .select("id")
+        .maybeSingle();
+
+      if (
+        propertyUpdateError ||
+        !updatedProperty
+      ) {
+        console.error(
+          "Premium property activation failed:",
+          propertyUpdateError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Unable to activate Premium listing.",
+          },
+          {
+            status: 500,
+          }
+        );
+      }
+
+      // ----------------------------------------------
+      // RECORD PREMIUM PAYMENT
+      // ----------------------------------------------
+
+      const {
+        error: paymentInsertError,
+      } = await supabaseAdmin
+        .from("payments")
+        .insert({
+          user_id: userId,
+
+          property_id: propertyId,
+
+          plan: "premium",
+
+          purchase_type:
+            "property",
+
+          amount: PREMIUM_PRICE,
+
+          currency: "zar",
+
+          status: "paid",
+
+          stripe_session_id:
+            session.id,
+
+          stripe_payment_intent_id:
+            paymentIntentId,
+        });
+
+      if (paymentInsertError) {
+        /*
+         * The browser reconciliation endpoint may
+         * have inserted the payment while the
+         * webhook was running.
+         *
+         * Re-query instead of incorrectly failing
+         * a successful Stripe payment.
+         */
+
+        const {
+          data: recoveredPayment,
+          error: recoveryError,
+        } = await supabaseAdmin
+          .from("payments")
+          .select(
+            "id, user_id, property_id, plan, purchase_type"
+          )
+          .eq(
+            "stripe_session_id",
+            session.id
+          )
+          .maybeSingle();
+
+        if (
+          recoveryError ||
+          !recoveredPayment ||
+          recoveredPayment.user_id !==
+            userId ||
+          recoveredPayment.plan !==
+            "premium" ||
+          recoveredPayment.purchase_type !==
+            "property" ||
+          Number(
+            recoveredPayment.property_id
+          ) !== propertyId
+        ) {
+          console.error(
+            "Premium payment ledger insert failed:",
+            paymentInsertError
+          );
+
+          return NextResponse.json(
+            {
+              error:
+                "Premium was activated, but the payment record could not be confirmed.",
+            },
+            {
+              status: 500,
+            }
+          );
         }
+      }
+
+      return NextResponse.json({
+        received: true,
+        success: true,
+        plan: "premium",
+        propertyId,
+        expiresAt: expiresIso,
+      });
+    }
+
+    // ==================================================
+    // PRO
+    // ==================================================
+
+    const initialPropertyId =
+      Number(
+        metadata.initialPropertyId
+      );
+
+    if (
+      !Number.isInteger(
+        initialPropertyId
+      ) ||
+      initialPropertyId <= 0
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Pro payment contains an invalid initial property.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    // ----------------------------------------------
+    // VERIFY INITIAL PROPERTY
+    // ----------------------------------------------
+
+    const {
+      data: initialProperty,
+      error: initialPropertyError,
+    } = await supabaseAdmin
+      .from("properties")
+      .select("id, user_id")
+      .eq("id", initialPropertyId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (initialPropertyError) {
+      console.error(
+        "Pro initial property lookup failed:",
+        initialPropertyError
       );
 
       return NextResponse.json(
         {
           error:
-            "Property could not be verified.",
+            "Unable to verify initial Pro property.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (!initialProperty) {
+      return NextResponse.json(
+        {
+          error:
+            "Initial Pro property could not be verified.",
         },
         {
           status: 400,
@@ -336,51 +753,51 @@ export async function POST(req: Request) {
     }
 
     // ==================================================
-    // IDEMPOTENCY
-    // ==================================================
-    //
-    // Stripe can deliver the same webhook more
-    // than once. Reprocessing the exact same
-    // completed payment must be harmless.
-
-    if (
-      property.payment_status === "paid" &&
-      property.stripe_session_id ===
-        session.id &&
-      property.plan === plan
-    ) {
-      return NextResponse.json({
-        received: true,
-        success: true,
-        alreadyProcessed: true,
-      });
-    }
-
-    // ==================================================
-    // PROTECT EXISTING COMPLETED PAYMENT
+    // FIND EXISTING PRO SUBSCRIPTION FOR THIS SESSION
     // ==================================================
 
-    if (
-      property.payment_status === "paid" &&
-      property.stripe_session_id &&
-      property.stripe_session_id !==
+    let {
+      data: proSubscription,
+      error: proSubscriptionLookupError,
+    } = await supabaseAdmin
+      .from(
+        "advertiser_subscriptions"
+      )
+      .select(
+        "id, user_id, starts_at, expires_at, stripe_session_id"
+      )
+      .eq(
+        "stripe_session_id",
         session.id
-    ) {
+      )
+      .maybeSingle();
+
+    if (proSubscriptionLookupError) {
       console.error(
-        "Property already has a different completed Stripe payment.",
-        {
-          propertyId,
-          existingSessionId:
-            property.stripe_session_id,
-          incomingSessionId:
-            session.id,
-        }
+        "Pro subscription lookup failed:",
+        proSubscriptionLookupError
       );
 
       return NextResponse.json(
         {
           error:
-            "Property already has another completed payment.",
+            "Unable to verify Pro activation.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (
+      proSubscription &&
+      proSubscription.user_id !==
+        userId
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This Pro payment belongs to another account.",
         },
         {
           status: 409,
@@ -389,56 +806,190 @@ export async function POST(req: Request) {
     }
 
     // ==================================================
-    // ACTIVATE PAID LISTING
+    // CREATE PRO SUBSCRIPTION IF NEEDED
+    // ==================================================
+
+    if (!proSubscription) {
+      const startsAt =
+        new Date();
+
+      const expiresAt =
+        addDays(
+          startsAt,
+          PROMOTION_DAYS
+        );
+
+      const startsIso =
+        startsAt.toISOString();
+
+      const expiresIso =
+        expiresAt.toISOString();
+
+      const {
+        data: createdSubscription,
+        error: createSubscriptionError,
+      } = await supabaseAdmin
+        .from(
+          "advertiser_subscriptions"
+        )
+        .insert({
+          user_id: userId,
+
+          plan: "pro",
+
+          status: "active",
+
+          listing_limit: 10,
+
+          priority_listing_limit: 3,
+
+          starts_at:
+            startsIso,
+
+          expires_at:
+            expiresIso,
+
+          stripe_session_id:
+            session.id,
+
+          stripe_payment_intent_id:
+            paymentIntentId,
+
+          amount_paid:
+            PRO_PRICE,
+
+          currency: "zar",
+        })
+        .select(
+          "id, user_id, starts_at, expires_at, stripe_session_id"
+        )
+        .single();
+
+      if (createSubscriptionError) {
+        /*
+         * Browser reconciliation may have created
+         * the same subscription at the same time.
+         */
+
+        const {
+          data: recoveredSubscription,
+          error: recoveryError,
+        } = await supabaseAdmin
+          .from(
+            "advertiser_subscriptions"
+          )
+          .select(
+            "id, user_id, starts_at, expires_at, stripe_session_id"
+          )
+          .eq(
+            "stripe_session_id",
+            session.id
+          )
+          .maybeSingle();
+
+        if (
+          recoveryError ||
+          !recoveredSubscription ||
+          recoveredSubscription.user_id !==
+            userId
+        ) {
+          console.error(
+            "Pro subscription creation failed:",
+            createSubscriptionError
+          );
+
+          return NextResponse.json(
+            {
+              error:
+                "Unable to activate Pro plan.",
+            },
+            {
+              status: 500,
+            }
+          );
+        }
+
+        proSubscription =
+          recoveredSubscription;
+      } else {
+        proSubscription =
+          createdSubscription;
+      }
+    }
+
+    // ==================================================
+    // USE AUTHORITATIVE SUBSCRIPTION DATES
     // ==================================================
     //
-    // This must stay consistent with:
+    // This is important:
     //
-    // /api/activate-paid-listing
+    // whichever request created the subscription
+    // first owns the 30-day dates.
     //
-    // Both Premium and Pro are paid promotional
-    // plans, so both receive featured/promoted
-    // placement.
+    // Both the webhook and browser reconciliation
+    // then use the same dates.
+
+    const startsIso =
+      proSubscription.starts_at;
+
+    const expiresIso =
+      proSubscription.expires_at;
+
+    // ==================================================
+    // PROMOTE FIRST PRO PROPERTY
+    // ==================================================
 
     const {
-      data: updatedProperty,
-      error: updateError,
+      data: updatedProProperty,
+      error: proPropertyError,
     } = await supabaseAdmin
       .from("properties")
       .update({
         status: "active",
 
-        plan,
+        plan: "pro",
 
         payment_status: "paid",
-
-        stripe_session_id:
-          session.id,
 
         featured: true,
 
         is_promoted: true,
+
+        is_priority: false,
+
+        promotion_source:
+          "pro",
+
+        promotion_starts_at:
+          startsIso,
+
+        promotion_expires_at:
+          expiresIso,
+
+        featured_until:
+          expiresIso,
       })
-      .eq("id", propertyId)
-      .eq("user_id", metadataUserId)
-      .select(
-        "id, status, plan, payment_status, featured, is_promoted"
+      .eq(
+        "id",
+        initialPropertyId
       )
+      .eq("user_id", userId)
+      .select("id")
       .maybeSingle();
 
-    if (updateError) {
+    if (
+      proPropertyError ||
+      !updatedProProperty
+    ) {
       console.error(
-        "Stripe webhook property update error:",
-        updateError
+        "Initial Pro property activation failed:",
+        proPropertyError
       );
 
-      /*
-       * Return 500 so Stripe retries this webhook.
-       */
       return NextResponse.json(
         {
           error:
-            "Database update failed.",
+            "Pro was activated, but the initial property could not be promoted.",
         },
         {
           status: 500,
@@ -446,24 +997,83 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!updatedProperty) {
-      console.error(
-        "Stripe webhook property update matched no property.",
-        {
-          sessionId: session.id,
-          propertyId,
-        }
-      );
+    // ==================================================
+    // RECORD PRO PAYMENT
+    // ==================================================
 
-      return NextResponse.json(
-        {
-          error:
-            "Property could not be updated.",
-        },
-        {
-          status: 500,
-        }
-      );
+    const {
+      error: proPaymentError,
+    } = await supabaseAdmin
+      .from("payments")
+      .insert({
+        user_id: userId,
+
+        // Pro is account-level.
+        property_id: null,
+
+        plan: "pro",
+
+        purchase_type:
+          "account",
+
+        amount: PRO_PRICE,
+
+        currency: "zar",
+
+        status: "paid",
+
+        stripe_session_id:
+          session.id,
+
+        stripe_payment_intent_id:
+          paymentIntentId,
+      });
+
+    if (proPaymentError) {
+      /*
+       * Browser reconciliation may have inserted
+       * the same payment first.
+       */
+
+      const {
+        data: recoveredPayment,
+        error: recoveryError,
+      } = await supabaseAdmin
+        .from("payments")
+        .select(
+          "id, user_id, plan, purchase_type"
+        )
+        .eq(
+          "stripe_session_id",
+          session.id
+        )
+        .maybeSingle();
+
+      if (
+        recoveryError ||
+        !recoveredPayment ||
+        recoveredPayment.user_id !==
+          userId ||
+        recoveredPayment.plan !==
+          "pro" ||
+        recoveredPayment.purchase_type !==
+          "account"
+      ) {
+        console.error(
+          "Pro payment ledger insert failed:",
+          proPaymentError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Pro was activated, but the payment record could not be confirmed.",
+          },
+          {
+            status: 500,
+          }
+        );
+      }
     }
 
     // ==================================================
@@ -472,34 +1082,19 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       received: true,
-
       success: true,
 
-      propertyId:
-        updatedProperty.id,
+      plan: "pro",
 
-      plan:
-        updatedProperty.plan,
+      subscriptionId:
+        proSubscription.id,
 
-      status:
-        updatedProperty.status,
+      initialPropertyId,
 
-      paymentStatus:
-        updatedProperty.payment_status,
-
-      featured:
-        updatedProperty.featured,
-
-      isPromoted:
-        updatedProperty.is_promoted,
+      expiresAt:
+        expiresIso,
     });
   } catch (error) {
-    /*
-     * Returning 500 is important here.
-     *
-     * Stripe can retry the webhook if something
-     * unexpected temporarily fails.
-     */
     console.error(
       "Unexpected Stripe webhook error:",
       error

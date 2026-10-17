@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
@@ -21,6 +21,9 @@ import {
   UserCircle,
   CheckCircle2,
   RotateCcw,
+  Crown,
+  Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -31,56 +34,263 @@ type Role =
   | "property_owner"
   | "estate_agent";
 
+type ProAction =
+  | "promote"
+  | "unpromote"
+  | "make_priority"
+  | "remove_priority";
+
+type ProStatus = {
+  active: boolean;
+
+  subscription?: {
+    id?: string | number;
+    startsAt?: string | null;
+    expiresAt?: string | null;
+    starts_at?: string | null;
+    expires_at?: string | null;
+  } | null;
+
+  limits?: {
+    promoted?: number;
+    priority?: number;
+  };
+
+  promotedCount?: number;
+  priorityCount?: number;
+
+  remainingPromotedSlots?: number;
+  remainingPrioritySlots?: number;
+
+  promotedPropertyIds?: number[];
+  priorityPropertyIds?: number[];
+
+  error?: string;
+};
+
+function normalizeListingType(
+  value: string | null | undefined
+) {
+  return (value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isSaleListingType(
+  value: string | null | undefined
+) {
+  const normalized =
+    normalizeListingType(value);
+
+  return (
+    normalized === "sale" ||
+    normalized === "for sale"
+  );
+}
+
+function hasFutureExpiry(
+  value: string | null | undefined
+) {
+  if (!value) return false;
+
+  const expiry = new Date(value);
+
+  if (
+    Number.isNaN(
+      expiry.getTime()
+    )
+  ) {
+    return false;
+  }
+
+  return expiry.getTime() > Date.now();
+}
+
+function isActivePremium(
+  property: Property
+) {
+  return (
+    property.status === "active" &&
+    property.is_promoted === true &&
+    property.promotion_source ===
+      "premium" &&
+    hasFutureExpiry(
+      property.promotion_expires_at
+    )
+  );
+}
+
+function isActiveProPromotion(
+  property: Property
+) {
+  return (
+    property.status === "active" &&
+    property.is_promoted === true &&
+    property.promotion_source === "pro" &&
+    hasFutureExpiry(
+      property.promotion_expires_at
+    )
+  );
+}
+
+function formatDate(
+  value: string | null | undefined
+) {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleDateString(
+    "en-ZA",
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }
+  );
+}
+
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<Role>("home_seeker");
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<number | null>(
+  const [user, setUser] =
+    useState<User | null>(null);
+
+  const [role, setRole] =
+    useState<Role>("home_seeker");
+
+  const [properties, setProperties] =
+    useState<Property[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [
+    deletingId,
+    setDeletingId,
+  ] = useState<number | null>(null);
+
+  const [
+    updatingStatusId,
+    setUpdatingStatusId,
+  ] = useState<number | null>(null);
+
+  const [
+    proStatus,
+    setProStatus,
+  ] = useState<ProStatus | null>(null);
+
+  const [
+    proLoading,
+    setProLoading,
+  ] = useState(false);
+
+  const [
+    proActionId,
+    setProActionId,
+  ] = useState<number | null>(null);
+
+  const [
+    proActionType,
+    setProActionType,
+  ] = useState<ProAction | null>(
     null
   );
-  const [updatingStatusId, setUpdatingStatusId] = useState<
-    number | null
-  >(null);
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
+  // ==================================================
+  // GET ACCESS TOKEN
+  // ==================================================
+
+  const getAccessToken =
+    useCallback(async () => {
+      const {
+        data: { session },
+        error,
+      } =
+        await supabase.auth.getSession();
+
+      if (
+        error ||
+        !session?.access_token
+      ) {
+        return null;
+      }
+
+      return session.access_token;
+    }, []);
+
+  // ==================================================
+  // LOAD PRO STATUS
+  // ==================================================
+
+  const loadProStatus =
+    useCallback(async () => {
+      const accessToken =
+        await getAccessToken();
+
+      if (!accessToken) {
+        setProStatus(null);
+        return;
+      }
+
+      setProLoading(true);
 
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+        const response = await fetch(
+          "/api/pro/status",
+          {
+            method: "GET",
+            headers: {
+              Authorization:
+                `Bearer ${accessToken}`,
+            },
+            cache: "no-store",
+          }
+        );
 
-        if (userError || !user) {
-          setLoading(false);
+        const result =
+          (await response
+            .json()
+            .catch(() => null)) as
+            | ProStatus
+            | null;
+
+        if (!response.ok) {
+          console.error(
+            "HomeLinker Pro status error:",
+            result
+          );
+
+          setProStatus(null);
           return;
         }
 
-        setUser(user);
+        setProStatus(result);
+      } catch (error) {
+        console.error(
+          "HomeLinker Pro status error:",
+          error
+        );
 
-        const { data: profile, error: profileError } =
-          await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .maybeSingle();
+        setProStatus(null);
+      } finally {
+        setProLoading(false);
+      }
+    }, [getAccessToken]);
 
-        if (profileError) {
-          console.error(
-            "HomeLinker profile error:",
-            profileError
-          );
-        }
+  // ==================================================
+  // LOAD USER PROPERTIES
+  // ==================================================
 
-        const userRole =
-          (profile?.role as Role | null) ??
-          "home_seeker";
-
-        setRole(userRole);
-
-        const { data, error } = await supabase
+  const loadProperties =
+    useCallback(
+      async (userId: string) => {
+        const {
+          data,
+          error,
+        } = await supabase
           .from("properties")
           .select(`
             id,
@@ -121,9 +331,14 @@ export default function DashboardPage() {
             furnished,
             pet_friendly,
             is_promoted,
+            is_priority,
+            promotion_source,
+            promotion_starts_at,
+            promotion_expires_at,
+            legacy_popular,
             show_contact_phone
           `)
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .order("created_at", {
             ascending: false,
           });
@@ -139,9 +354,70 @@ export default function DashboardPage() {
           );
 
           setProperties([]);
-        } else {
-          setProperties((data ?? []) as Property[]);
+          return;
         }
+
+        setProperties(
+          (data ?? []) as Property[]
+        );
+      },
+      []
+    );
+
+  // ==================================================
+  // INITIAL DASHBOARD LOAD
+  // ==================================================
+
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } =
+          await supabase.auth.getUser();
+
+        if (
+          userError ||
+          !user
+        ) {
+          setLoading(false);
+          return;
+        }
+
+        setUser(user);
+
+        const {
+          data: profile,
+          error: profileError,
+        } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error(
+            "HomeLinker profile error:",
+            profileError
+          );
+        }
+
+        const userRole =
+          (profile?.role as
+            | Role
+            | null) ??
+          "home_seeker";
+
+        setRole(userRole);
+
+        await loadProperties(
+          user.id
+        );
+
+        await loadProStatus();
       } catch (error) {
         console.error(
           "HomeLinker dashboard error:",
@@ -157,7 +433,142 @@ export default function DashboardPage() {
     }
 
     void loadData();
-  }, []);
+  }, [
+    loadProperties,
+    loadProStatus,
+  ]);
+
+  // ==================================================
+  // REFRESH PAID PLAN DATA
+  // ==================================================
+
+  async function refreshPlanData() {
+    if (!user) return;
+
+    await Promise.all([
+      loadProperties(user.id),
+      loadProStatus(),
+    ]);
+  }
+
+  // ==================================================
+  // PRO LISTING ACTION
+  // ==================================================
+
+  async function handleProAction(
+    propertyId: number,
+    action: ProAction
+  ) {
+    if (!user) {
+      toast.error(
+        "You must be logged in."
+      );
+      return;
+    }
+
+    const accessToken =
+      await getAccessToken();
+
+    if (!accessToken) {
+      toast.error(
+        "Your session has expired. Please sign in again."
+      );
+      return;
+    }
+
+    setProActionId(propertyId);
+    setProActionType(action);
+
+    try {
+      const response = await fetch(
+        "/api/pro/manage-listing",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            propertyId,
+            action,
+          }),
+        }
+      );
+
+      const result =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | {
+              success?: boolean;
+              error?: string;
+            }
+          | null;
+
+      if (
+        !response.ok ||
+        !result?.success
+      ) {
+        throw new Error(
+          result?.error ||
+            "Unable to update this Pro listing."
+        );
+      }
+
+      if (action === "promote") {
+        toast.success(
+          "Property added to your Pro promotion."
+        );
+      }
+
+      if (
+        action === "unpromote"
+      ) {
+        toast.success(
+          "Property removed from Pro promotion."
+        );
+      }
+
+      if (
+        action === "make_priority"
+      ) {
+        toast.success(
+          "Property is now a Priority listing."
+        );
+      }
+
+      if (
+        action ===
+        "remove_priority"
+      ) {
+        toast.success(
+          "Priority removed from this property."
+        );
+      }
+
+      await refreshPlanData();
+    } catch (error) {
+      console.error(
+        "HomeLinker Pro action error:",
+        error
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to update Pro promotion."
+      );
+    } finally {
+      setProActionId(null);
+      setProActionType(null);
+    }
+  }
+
+  // ==================================================
+  // LISTING STATUS
+  // ==================================================
 
   async function handleToggleStatus(
     propertyId: number,
@@ -165,7 +576,9 @@ export default function DashboardPage() {
     listingType: string | null
   ) {
     if (!user) {
-      toast.error("You must be logged in.");
+      toast.error(
+        "You must be logged in."
+      );
       return;
     }
 
@@ -173,24 +586,24 @@ export default function DashboardPage() {
       currentStatus === "sold" ||
       currentStatus === "rented";
 
-    const newStatus = isUnavailable
-      ? "active"
-      : listingType === "sale"
-        ? "sold"
-        : "rented";
+    const newStatus =
+      isUnavailable
+        ? "active"
+        : isSaleListingType(
+              listingType
+            )
+          ? "sold"
+          : "rented";
 
-    setUpdatingStatusId(propertyId);
+    setUpdatingStatusId(
+      propertyId
+    );
 
     try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      const accessToken =
+        await getAccessToken();
 
-      if (
-        sessionError ||
-        !session?.access_token
-      ) {
+      if (!accessToken) {
         toast.error(
           "Your session has expired. Please sign in again."
         );
@@ -202,8 +615,10 @@ export default function DashboardPage() {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             propertyId,
@@ -212,38 +627,44 @@ export default function DashboardPage() {
         }
       );
 
-      const result = (await response.json()) as {
-        success?: boolean;
-        status?: string;
-        error?: string;
-      };
+      const result =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | {
+              success?: boolean;
+              status?: string;
+              error?: string;
+            }
+          | null;
 
-      if (!response.ok || !result.success) {
+      if (
+        !response.ok ||
+        !result?.success
+      ) {
         throw new Error(
-          result.error ||
+          result?.error ||
             "Unable to update the listing status."
         );
       }
 
       const confirmedStatus =
-        result.status || newStatus;
-
-      setProperties((current) =>
-        current.map((property) =>
-          property.id === propertyId
-            ? {
-                ...property,
-                status: confirmedStatus,
-              }
-            : property
-        )
-      );
+        result.status ||
+        newStatus;
 
       toast.success(
-        confirmedStatus === "active"
+        confirmedStatus ===
+          "active"
           ? "Property listed as active again!"
           : `Property marked as ${confirmedStatus}!`
       );
+
+      /*
+       * Refresh instead of only changing the
+       * local status because the API may also
+       * release Pro promotion / Priority slots.
+       */
+      await refreshPlanData();
     } catch (error) {
       console.error(
         "HomeLinker listing status error:",
@@ -256,36 +677,40 @@ export default function DashboardPage() {
           : "Failed to update status."
       );
     } finally {
-      setUpdatingStatusId(null);
+      setUpdatingStatusId(
+        null
+      );
     }
   }
+
+  // ==================================================
+  // DELETE PROPERTY
+  // ==================================================
 
   async function handleDeleteProperty(
     propertyId: number
   ) {
     if (!user) {
-      toast.error("You must be logged in.");
+      toast.error(
+        "You must be logged in."
+      );
       return;
     }
 
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this property?\n\nThis action cannot be undone."
-    );
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this property?\n\nThis action cannot be undone."
+      );
 
     if (!confirmed) return;
 
     setDeletingId(propertyId);
 
     try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      const accessToken =
+        await getAccessToken();
 
-      if (
-        sessionError ||
-        !session?.access_token
-      ) {
+      if (!accessToken) {
         toast.error(
           "Your session has expired. Please sign in again."
         );
@@ -297,8 +722,10 @@ export default function DashboardPage() {
         {
           method: "DELETE",
           headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             propertyId,
@@ -306,33 +733,32 @@ export default function DashboardPage() {
         }
       );
 
-      const result = (await response
-        .json()
-        .catch(() => null)) as
-        | {
-            success?: boolean;
-            propertyId?: number;
-            error?: string;
-          }
-        | null;
+      const result =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | {
+              success?: boolean;
+              propertyId?: number;
+              error?: string;
+            }
+          | null;
 
-      if (!response.ok || !result?.success) {
+      if (
+        !response.ok ||
+        !result?.success
+      ) {
         throw new Error(
           result?.error ||
             "Unable to delete this property."
         );
       }
 
-      setProperties((current) =>
-        current.filter(
-          (property) =>
-            property.id !== propertyId
-        )
-      );
-
       toast.success(
         "Property deleted successfully!"
       );
+
+      await refreshPlanData();
     } catch (error) {
       console.error(
         "HomeLinker delete property error:",
@@ -349,6 +775,10 @@ export default function DashboardPage() {
     }
   }
 
+  // ==================================================
+  // LOADING
+  // ==================================================
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#F8F6F1] px-6 py-24">
@@ -357,7 +787,8 @@ export default function DashboardPage() {
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#C9A227]/20 border-t-[#C9A227]" />
 
             <h1 className="mt-6 text-2xl font-bold text-[#1B1B1B]">
-              Loading your HomeLinker dashboard...
+              Loading your HomeLinker
+              dashboard...
             </h1>
 
             <p className="mt-2 text-slate-600">
@@ -369,13 +800,19 @@ export default function DashboardPage() {
     );
   }
 
+  // ==================================================
+  // NOT LOGGED IN
+  // ==================================================
+
   if (!user) {
     return (
       <main className="min-h-screen bg-[#F8F6F1] px-6 py-24">
         <div className="mx-auto max-w-2xl">
           <div className="rounded-[32px] border border-[#F0E7CF] bg-white p-10 text-center shadow-lg">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#C9A227]/10 text-[#C9A227]">
-              <Building2 size={28} />
+              <Building2
+                size={28}
+              />
             </div>
 
             <h1 className="mt-6 text-3xl font-black text-[#1B1B1B]">
@@ -383,7 +820,8 @@ export default function DashboardPage() {
             </h1>
 
             <p className="mt-3 text-slate-600">
-              Sign in to access your HomeLinker account.
+              Sign in to access your
+              HomeLinker account.
             </p>
 
             <Link
@@ -398,9 +836,10 @@ export default function DashboardPage() {
     );
   }
 
-  /*
-   * HOME SEEKER DASHBOARD
-   */
+  // ==================================================
+  // HOME SEEKER DASHBOARD
+  // ==================================================
+
   if (
     role === "home_seeker" &&
     properties.length === 0
@@ -408,13 +847,14 @@ export default function DashboardPage() {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
         <div className="mx-auto max-w-7xl">
-          {/* TOP NAVIGATION */}
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <Link
               href="/"
               className="inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-[#C9A227]"
             >
-              <ArrowLeft size={16} />
+              <ArrowLeft
+                size={16}
+              />
               HomeLinker
             </Link>
 
@@ -431,14 +871,22 @@ export default function DashboardPage() {
           </div>
 
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{
+              opacity: 0,
+              y: 15,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
             className="overflow-hidden rounded-[32px] bg-[#111111] p-6 shadow-xl sm:p-10"
           >
             <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-[#C9A227]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#C9A227]">
-                  <House size={14} />
+                  <House
+                    size={14}
+                  />
                   Home Seeker
                 </div>
 
@@ -447,10 +895,13 @@ export default function DashboardPage() {
                 </h1>
 
                 <p className="mt-3 max-w-xl text-slate-300">
-                  Find a place you&apos;ll love to call
-                  home. Browse properties, save your
-                  favourites, and chat directly with
-                  owners and agents.
+                  Find a place
+                  you&apos;ll love to
+                  call home. Browse
+                  properties, save your
+                  favourites, and chat
+                  directly with owners
+                  and agents.
                 </p>
               </div>
 
@@ -458,17 +909,22 @@ export default function DashboardPage() {
                 href="/properties"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-3 font-bold text-white transition hover:bg-[#A67C00]"
               >
-                <Search size={18} />
+                <Search
+                  size={18}
+                />
                 Find a Home
               </Link>
             </div>
           </motion.div>
 
-          {/* QUICK ACTIONS */}
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
             <DashboardAction
               href="/properties"
-              icon={<Search size={22} />}
+              icon={
+                <Search
+                  size={22}
+                />
+              }
               title="Find a Home"
               description="Browse properties"
               primary
@@ -476,42 +932,65 @@ export default function DashboardPage() {
 
             <DashboardAction
               href="/favorites"
-              icon={<Heart size={22} />}
+              icon={
+                <Heart
+                  size={22}
+                />
+              }
               title="My Favorites"
               description="Saved properties"
             />
 
             <DashboardAction
               href="/notifications"
-              icon={<Bell size={22} />}
+              icon={
+                <Bell
+                  size={22}
+                />
+              }
               title="Notifications"
               description="See your updates"
             />
 
             <DashboardAction
               href="/profile"
-              icon={<UserCircle size={22} />}
+              icon={
+                <UserCircle
+                  size={22}
+                />
+              }
               title="My Profile"
               description="Edit your account"
             />
           </div>
 
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
+            initial={{
+              opacity: 0,
+              y: 15,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            transition={{
+              delay: 0.1,
+            }}
             className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.2)] sm:p-8"
           >
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-2xl font-black text-[#1B1B1B]">
-                  Looking for your next home?
+                  Looking for your next
+                  home?
                 </h2>
 
                 <p className="mt-2 text-slate-600">
-                  Start browsing properties across South
-                  Africa and contact the people listing
-                  them.
+                  Start browsing
+                  properties across
+                  South Africa and
+                  contact the people
+                  listing them.
                 </p>
               </div>
 
@@ -532,21 +1011,67 @@ export default function DashboardPage() {
     );
   }
 
-  /*
-   * PROPERTY OWNER / ESTATE AGENT DASHBOARD
-   */
-  const isAgent = role === "estate_agent";
+  // ==================================================
+  // OWNER / AGENT DASHBOARD
+  // ==================================================
+
+  const isAgent =
+    role === "estate_agent";
+
+  const promotedLimit =
+    proStatus?.limits
+      ?.promoted ?? 10;
+
+  const priorityLimit =
+    proStatus?.limits
+      ?.priority ?? 3;
+
+  const promotedCount =
+    proStatus?.promotedCount ??
+    0;
+
+  const priorityCount =
+    proStatus?.priorityCount ??
+    0;
+
+  const remainingPromoted =
+    proStatus
+      ?.remainingPromotedSlots ??
+    Math.max(
+      0,
+      promotedLimit -
+        promotedCount
+    );
+
+  const remainingPriority =
+    proStatus
+      ?.remainingPrioritySlots ??
+    Math.max(
+      0,
+      priorityLimit -
+        priorityCount
+    );
+
+  const proExpiry =
+    proStatus?.subscription
+      ?.expiresAt ??
+    proStatus?.subscription
+      ?.expires_at ??
+    null;
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#FCFAF5_0%,#F8F6F1_100%)] px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-7xl">
         {/* TOP NAVIGATION */}
+
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/"
             className="inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-[#C9A227]"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft
+              size={16}
+            />
             HomeLinker
           </Link>
 
@@ -563,17 +1088,28 @@ export default function DashboardPage() {
         </div>
 
         {/* HEADER */}
+
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{
+            opacity: 0,
+            y: 15,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
           className="mb-8 flex flex-col gap-6 rounded-[32px] border border-[#F0E7CF] bg-white/80 p-6 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)] backdrop-blur sm:mb-10 sm:p-8 md:flex-row md:items-end md:justify-between"
         >
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#C9A227]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#A67C00]">
               {isAgent ? (
-                <Building2 size={14} />
+                <Building2
+                  size={14}
+                />
               ) : (
-                <House size={14} />
+                <House
+                  size={14}
+                />
               )}
 
               {isAgent
@@ -592,22 +1128,27 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/post-listing"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-3 font-semibold text-white transition hover:bg-[#A67C00]"
-            >
-              <Plus size={16} />
-              Post New Property
-            </Link>
-          </div>
+          <Link
+            href="/post-listing"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-3 font-semibold text-white transition hover:bg-[#A67C00]"
+          >
+            <Plus
+              size={16}
+            />
+            Post New Property
+          </Link>
         </motion.div>
 
         {/* QUICK ACTIONS */}
-        <div className="mb-8 grid grid-cols-2 gap-3 sm:mb-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:mb-10 sm:gap-5 lg:grid-cols-3">
           <DashboardAction
             href="/post-listing"
-            icon={<Plus size={22} />}
+            icon={
+              <Plus
+                size={22}
+              />
+            }
             title="Add Property"
             description="Create a new listing"
             primary
@@ -615,20 +1156,153 @@ export default function DashboardPage() {
 
           <DashboardAction
             href="/notifications"
-            icon={<Bell size={22} />}
+            icon={
+              <Bell
+                size={22}
+              />
+            }
             title="Notifications"
             description="See new enquiries"
           />
 
           <DashboardAction
             href="/profile"
-            icon={<UserCircle size={22} />}
+            icon={
+              <UserCircle
+                size={22}
+              />
+            }
             title="My Profile"
             description="Edit your account"
           />
         </div>
 
+        {/* PRO ACCOUNT PANEL */}
+
+        {proLoading ? (
+          <div className="mb-8 rounded-[30px] border border-[#E8D9A8] bg-white p-6 shadow-sm">
+            <p className="font-semibold text-slate-600">
+              Checking your Pro
+              account...
+            </p>
+          </div>
+        ) : proStatus?.active ? (
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 10,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="mb-8 overflow-hidden rounded-[30px] bg-[#111111] p-6 text-white shadow-xl sm:p-8"
+          >
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-[#C9A227]/15 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-[#D8B74C]">
+                  <Crown
+                    size={15}
+                  />
+                  HomeLinker Pro
+                </div>
+
+                <h2 className="mt-4 text-2xl font-black sm:text-3xl">
+                  Your Pro account is
+                  active
+                </h2>
+
+                <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">
+                  Choose which active
+                  properties receive Pro
+                  promotion and which
+                  three receive the
+                  strongest Priority
+                  placement.
+                </p>
+
+                {formatDate(
+                  proExpiry
+                ) && (
+                  <p className="mt-3 text-sm font-semibold text-[#D8B74C]">
+                    Active until{" "}
+                    {formatDate(
+                      proExpiry
+                    )}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+                  <p className="text-2xl font-black text-[#D8B74C]">
+                    {promotedCount}/
+                    {promotedLimit}
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-300">
+                    Pro listings
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+                  <p className="text-2xl font-black text-[#D8B74C]">
+                    {priorityCount}/
+                    {priorityLimit}
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-300">
+                    Priority listings
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
+              <span className="rounded-full bg-white/5 px-3 py-2">
+                {remainingPromoted} Pro
+                slots available
+              </span>
+
+              <span className="rounded-full bg-white/5 px-3 py-2">
+                {remainingPriority}{" "}
+                Priority slots available
+              </span>
+            </div>
+          </motion.div>
+        ) : (
+          <div className="mb-8 rounded-[30px] border border-[#E8D9A8] bg-[#FFF9E8] p-6 sm:p-8">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2 font-black text-[#1B1B1B]">
+                  <Crown
+                    size={20}
+                    className="text-[#C9A227]"
+                  />
+                  HomeLinker Pro
+                </div>
+
+                <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                  Promote up to 10
+                  active properties and
+                  choose up to 3 as
+                  Priority listings with
+                  a 30-day Pro package.
+                </p>
+              </div>
+
+              <Link
+                href="/pricing"
+                className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#111111] px-6 py-3 font-bold text-white transition hover:bg-[#292929]"
+              >
+                View Plans
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* LISTINGS HEADER */}
+
         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-2xl font-black text-[#1B1B1B] sm:text-3xl">
@@ -637,7 +1311,9 @@ export default function DashboardPage() {
 
             <p className="mt-1 text-slate-600">
               You have{" "}
-              <strong>{properties.length}</strong>{" "}
+              <strong>
+                {properties.length}
+              </strong>{" "}
               {properties.length === 1
                 ? "property"
                 : "properties"}{" "}
@@ -645,29 +1321,44 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {properties.length > 0 && (
+          {properties.length >
+            0 && (
             <Link
               href="/post-listing"
               className="inline-flex items-center gap-2 font-semibold text-[#A67C00] hover:underline"
             >
-              <Plus size={16} />
+              <Plus
+                size={16}
+              />
               Add another
             </Link>
           )}
         </div>
 
         {/* NO LISTINGS */}
-        {properties.length === 0 ? (
+
+        {properties.length ===
+        0 ? (
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{
+              opacity: 0,
+              y: 12,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
             className="rounded-[32px] border border-[#F0E7CF] bg-white p-8 text-center shadow-[0_20px_70px_-30px_rgba(0,0,0,0.2)] sm:p-16"
           >
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#C9A227]/10 text-[#C9A227]">
               {isAgent ? (
-                <Building2 size={28} />
+                <Building2
+                  size={28}
+                />
               ) : (
-                <House size={28} />
+                <House
+                  size={28}
+                />
               )}
             </div>
 
@@ -685,202 +1376,559 @@ export default function DashboardPage() {
               href="/post-listing"
               className="mt-8 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-8 py-3 font-semibold text-white transition hover:bg-[#A67C00]"
             >
-              <Plus size={18} />
+              <Plus
+                size={18}
+              />
               Post Property
             </Link>
           </motion.div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-2 lg:gap-8">
-            {properties.map((property) => {
-              const image =
-                property.image_urls?.length
-                  ? property.image_urls[0]
-                  : property.image_url ||
-                    "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d";
+            {properties.map(
+              (property) => {
+                const image =
+                  property
+                    .image_urls
+                    ?.length
+                    ? property
+                        .image_urls[0]
+                    : property
+                        .image_url ||
+                      "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d";
 
-              const isDeleting =
-                deletingId === property.id;
+                const isDeleting =
+                  deletingId ===
+                  property.id;
 
-              const isUpdatingStatus =
-                updatingStatusId === property.id;
+                const isUpdatingStatus =
+                  updatingStatusId ===
+                  property.id;
 
-              return (
-                <motion.div
-                  key={property.id}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_15px_50px_-30px_rgba(0,0,0,0.22)] sm:rounded-[30px]"
-                >
-                  {/* IMAGE */}
-                  <div className="relative aspect-[4/3] w-full sm:aspect-video sm:h-64">
-                    <Image
-                      src={image}
-                      alt={property.title}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
+                const isProAction =
+                  proActionId ===
+                  property.id;
 
-                    <div className="absolute left-2 top-2 flex max-w-[80%] flex-wrap gap-1 sm:left-4 sm:top-4 sm:gap-2">
-                      {(property.status === "sold" ||
-                        property.status ===
-                          "rented") && (
-                        <span className="rounded-full bg-black px-2 py-1 text-[7px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.2em]">
-                          {property.status === "sold"
-                            ? "Sold"
-                            : "Rented"}
-                        </span>
-                      )}
+                const premiumActive =
+                  isActivePremium(
+                    property
+                  );
 
-                      {property.featured && (
-                        <span className="rounded-full bg-[#C9A227] px-2 py-1 text-[7px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.2em]">
-                          Featured
-                        </span>
-                      )}
+                const proActive =
+                  isActiveProPromotion(
+                    property
+                  );
 
-                      {property.verified && (
-                        <span className="rounded-full bg-emerald-600 px-2 py-1 text-[7px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.2em]">
-                          Verified
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                const priorityActive =
+                  proActive &&
+                  property.is_priority ===
+                    true;
 
-                  {/* CONTENT */}
-                  <div className="p-3 sm:p-7">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h2 className="line-clamp-2 text-sm font-bold leading-5 text-[#1B1B1B] sm:text-2xl sm:leading-7">
-                          {property.title}
-                        </h2>
+                const unavailable =
+                  property.status ===
+                    "sold" ||
+                  property.status ===
+                    "rented";
 
-                        <p className="mt-1 line-clamp-1 text-[9px] text-slate-600 sm:mt-2 sm:text-sm">
-                          📍 {property.city},{" "}
-                          {property.province}
-                        </p>
+                const canPromote =
+                  Boolean(
+                    proStatus?.active
+                  ) &&
+                  property.status ===
+                    "active" &&
+                  !premiumActive &&
+                  !proActive &&
+                  remainingPromoted >
+                    0;
+
+                const canMakePriority =
+                  Boolean(
+                    proStatus?.active
+                  ) &&
+                  proActive &&
+                  !priorityActive &&
+                  remainingPriority >
+                    0;
+
+                return (
+                  <motion.div
+                    key={
+                      property.id
+                    }
+                    initial={{
+                      opacity: 0,
+                      y: 16,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    transition={{
+                      duration: 0.25,
+                    }}
+                    className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_15px_50px_-30px_rgba(0,0,0,0.22)] sm:rounded-[30px]"
+                  >
+                    {/* IMAGE */}
+
+                    <div className="relative aspect-[4/3] w-full sm:aspect-video sm:h-64">
+                      <Image
+                        src={image}
+                        alt={
+                          property.title
+                        }
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+
+                      <div className="absolute left-2 top-2 flex max-w-[90%] flex-wrap gap-1 sm:left-4 sm:top-4 sm:gap-2">
+                        {unavailable && (
+                          <span className="rounded-full bg-black px-2 py-1 text-[7px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.2em]">
+                            {property.status ===
+                            "sold"
+                              ? "Sold"
+                              : "Rented"}
+                          </span>
+                        )}
+
+                        {!unavailable &&
+                          priorityActive && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#111111] px-2 py-1 text-[7px] font-black uppercase tracking-wide text-[#E4C45B] shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.15em]">
+                              <Crown
+                                size={
+                                  11
+                                }
+                              />
+                              Priority
+                            </span>
+                          )}
+
+                        {!unavailable &&
+                          premiumActive && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#C9A227] px-2 py-1 text-[7px] font-black uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.15em]">
+                              <Sparkles
+                                size={
+                                  11
+                                }
+                              />
+                              Premium
+                            </span>
+                          )}
+
+                        {!unavailable &&
+                          proActive &&
+                          !priorityActive && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#111111] px-2 py-1 text-[7px] font-black uppercase tracking-wide text-[#E4C45B] shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.15em]">
+                              <Crown
+                                size={
+                                  11
+                                }
+                              />
+                              Pro
+                            </span>
+                          )}
+
+                        {property.verified && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-1 text-[7px] font-bold uppercase tracking-wide text-white shadow sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.15em]">
+                            <ShieldCheck
+                              size={
+                                11
+                              }
+                            />
+                            Verified
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    <p className="mt-3 text-xl font-black text-[#C9A227] sm:mt-6 sm:text-4xl">
-                      R
-                      {Number(
-                        property.price
-                      ).toLocaleString("en-ZA")}
-                    </p>
+                    {/* CONTENT */}
 
-                    <div className="mt-3 grid grid-cols-3 gap-1.5 sm:mt-6 sm:gap-3">
-                      <PropertyStat
-                        icon={<BedDouble size={14} />}
-                        value={property.bedrooms ?? 0}
-                        label="Beds"
-                      />
+                    <div className="p-3 sm:p-7">
+                      <h2 className="line-clamp-2 text-sm font-bold leading-5 text-[#1B1B1B] sm:text-2xl sm:leading-7">
+                        {
+                          property.title
+                        }
+                      </h2>
 
-                      <PropertyStat
-                        icon={<Bath size={14} />}
-                        value={property.bathrooms ?? 0}
-                        label="Baths"
-                      />
+                      <p className="mt-1 line-clamp-1 text-[9px] text-slate-600 sm:mt-2 sm:text-sm">
+                        📍{" "}
+                        {
+                          property.city
+                        }
+                        ,{" "}
+                        {
+                          property.province
+                        }
+                      </p>
 
-                      <PropertyStat
-                        icon={<CarFront size={14} />}
-                        value={property.parking ?? 0}
-                        label="Parking"
-                      />
-                    </div>
+                      <p className="mt-3 text-xl font-black text-[#C9A227] sm:mt-6 sm:text-4xl">
+                        R
+                        {Number(
+                          property.price
+                        ).toLocaleString(
+                          "en-ZA"
+                        )}
+                      </p>
 
-                    {/* ACTIONS */}
-                    <div className="mt-3 flex flex-col gap-2 sm:mt-8">
-                      <div className="flex gap-2 sm:gap-3">
-                        <Link
-                          href={`/edit-listing/${property.id}`}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2 py-2.5 text-[9px] font-semibold text-white transition hover:bg-slate-700 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
-                        >
-                          <Pencil size={13} />
-                          Edit
-                        </Link>
+                      <div className="mt-3 grid grid-cols-3 gap-1.5 sm:mt-6 sm:gap-3">
+                        <PropertyStat
+                          icon={
+                            <BedDouble
+                              size={
+                                14
+                              }
+                            />
+                          }
+                          value={
+                            property.bedrooms ??
+                            0
+                          }
+                          label="Beds"
+                        />
+
+                        <PropertyStat
+                          icon={
+                            <Bath
+                              size={
+                                14
+                              }
+                            />
+                          }
+                          value={
+                            property.bathrooms ??
+                            0
+                          }
+                          label="Baths"
+                        />
+
+                        <PropertyStat
+                          icon={
+                            <CarFront
+                              size={
+                                14
+                              }
+                            />
+                          }
+                          value={
+                            property.parking ??
+                            0
+                          }
+                          label="Parking"
+                        />
+                      </div>
+
+                      {/* PAID PLAN INFO */}
+
+                      {premiumActive && (
+                        <div className="mt-3 rounded-xl border border-[#E8D9A8] bg-[#FFF9E8] p-3 sm:mt-5 sm:rounded-2xl sm:p-4">
+                          <div className="flex items-center gap-2 text-[9px] font-black text-[#8A6900] sm:text-sm">
+                            <Sparkles
+                              size={
+                                15
+                              }
+                            />
+                            Premium promotion
+                            active
+                          </div>
+
+                          {formatDate(
+                            property.promotion_expires_at
+                          ) && (
+                            <p className="mt-1 text-[8px] text-slate-600 sm:text-xs">
+                              Promoted
+                              until{" "}
+                              {formatDate(
+                                property.promotion_expires_at
+                              )}
+                            </p>
+                          )}
+
+                          <p className="mt-2 text-[8px] text-slate-500 sm:text-xs">
+                            This listing
+                            keeps its
+                            Premium
+                            promotion
+                            separately
+                            from your Pro
+                            slots.
+                          </p>
+                        </div>
+                      )}
+
+                      {proActive && (
+                        <div className="mt-3 rounded-xl bg-[#111111] p-3 text-white sm:mt-5 sm:rounded-2xl sm:p-4">
+                          <div className="flex items-center gap-2 text-[9px] font-black text-[#E4C45B] sm:text-sm">
+                            <Crown
+                              size={
+                                15
+                              }
+                            />
+
+                            {priorityActive
+                              ? "Pro Priority listing"
+                              : "Pro promotion active"}
+                          </div>
+
+                          {formatDate(
+                            property.promotion_expires_at
+                          ) && (
+                            <p className="mt-1 text-[8px] text-slate-300 sm:text-xs">
+                              Pro access
+                              until{" "}
+                              {formatDate(
+                                property.promotion_expires_at
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* PRO CONTROLS */}
+
+                      {proStatus?.active &&
+                        !unavailable &&
+                        !premiumActive && (
+                          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-2.5 sm:mt-5 sm:rounded-2xl sm:p-4">
+                            <p className="mb-2 text-[8px] font-black uppercase tracking-wide text-slate-500 sm:text-xs">
+                              Pro controls
+                            </p>
+
+                            {!proActive ? (
+                              <button
+                                type="button"
+                                disabled={
+                                  isProAction ||
+                                  !canPromote
+                                }
+                                onClick={() =>
+                                  handleProAction(
+                                    property.id,
+                                    "promote"
+                                  )
+                                }
+                                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#111111] px-3 py-2.5 text-[8px] font-bold text-white transition hover:bg-[#292929] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                              >
+                                <Crown
+                                  size={
+                                    14
+                                  }
+                                />
+
+                                {isProAction &&
+                                proActionType ===
+                                  "promote"
+                                  ? "Adding..."
+                                  : remainingPromoted <=
+                                      0
+                                    ? "10 Pro slots in use"
+                                    : "Promote with Pro"}
+                              </button>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                {priorityActive ? (
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      isProAction
+                                    }
+                                    onClick={() =>
+                                      handleProAction(
+                                        property.id,
+                                        "remove_priority"
+                                      )
+                                    }
+                                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#C9A227] bg-white px-3 py-2.5 text-[8px] font-bold text-[#8A6900] transition hover:bg-[#FFF9E8] disabled:opacity-50 sm:text-sm"
+                                  >
+                                    <Crown
+                                      size={
+                                        14
+                                      }
+                                    />
+
+                                    {isProAction &&
+                                    proActionType ===
+                                      "remove_priority"
+                                      ? "Updating..."
+                                      : "Remove Priority"}
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      isProAction ||
+                                      !canMakePriority
+                                    }
+                                    onClick={() =>
+                                      handleProAction(
+                                        property.id,
+                                        "make_priority"
+                                      )
+                                    }
+                                    className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#C9A227] px-3 py-2.5 text-[8px] font-bold text-white transition hover:bg-[#A67C00] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                                  >
+                                    <Crown
+                                      size={
+                                        14
+                                      }
+                                    />
+
+                                    {isProAction &&
+                                    proActionType ===
+                                      "make_priority"
+                                      ? "Updating..."
+                                      : remainingPriority <=
+                                          0
+                                        ? "3 Priority slots in use"
+                                        : "Make Priority"}
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  disabled={
+                                    isProAction
+                                  }
+                                  onClick={() =>
+                                    handleProAction(
+                                      property.id,
+                                      "unpromote"
+                                    )
+                                  }
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-[8px] font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 sm:text-sm"
+                                >
+                                  {isProAction &&
+                                  proActionType ===
+                                    "unpromote"
+                                    ? "Removing..."
+                                    : "Remove from Pro"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                      {/* STANDARD ACTIONS */}
+
+                      <div className="mt-3 flex flex-col gap-2 sm:mt-8">
+                        <div className="flex gap-2 sm:gap-3">
+                          <Link
+                            href={`/edit-listing/${property.id}`}
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2 py-2.5 text-[9px] font-semibold text-white transition hover:bg-slate-700 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                          >
+                            <Pencil
+                              size={
+                                13
+                              }
+                            />
+                            Edit
+                          </Link>
+
+                          <button
+                            type="button"
+                            disabled={
+                              isDeleting
+                            }
+                            onClick={() =>
+                              handleDeleteProperty(
+                                property.id
+                              )
+                            }
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2 py-2.5 text-[9px] font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                          >
+                            <Trash2
+                              size={
+                                13
+                              }
+                            />
+
+                            {isDeleting
+                              ? "Deleting..."
+                              : "Delete"}
+                          </button>
+                        </div>
 
                         <button
                           type="button"
-                          disabled={isDeleting}
+                          disabled={
+                            isUpdatingStatus ||
+                            isProAction
+                          }
                           onClick={() =>
-                            handleDeleteProperty(
-                              property.id
+                            handleToggleStatus(
+                              property.id,
+                              property.status ||
+                                null,
+                              property.listing_type ||
+                                null
                             )
                           }
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2 py-2.5 text-[9px] font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                          className={`flex w-full items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[9px] font-bold transition disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm ${
+                            unavailable
+                              ? "border-2 border-[#C9A227] bg-white text-[#C9A227] hover:bg-[#C9A227] hover:text-white"
+                              : "bg-[#C9A227] text-white hover:bg-[#A67C00]"
+                          }`}
                         >
-                          <Trash2 size={13} />
-
-                          {isDeleting
-                            ? "Deleting..."
-                            : "Delete"}
+                          {isUpdatingStatus ? (
+                            <>
+                              Updating...
+                            </>
+                          ) : unavailable ? (
+                            <>
+                              <RotateCcw
+                                size={
+                                  14
+                                }
+                              />
+                              Mark as
+                              Available
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2
+                                size={
+                                  14
+                                }
+                              />
+                              Mark as{" "}
+                              {isSaleListingType(
+                                property.listing_type
+                              )
+                                ? "Sold"
+                                : "Rented"}
+                            </>
+                          )}
                         </button>
                       </div>
-
-                      <button
-                        type="button"
-                        disabled={isUpdatingStatus}
-                        onClick={() =>
-                          handleToggleStatus(
-                            property.id,
-                            property.status || null,
-                            property.listing_type ||
-                              null
-                          )
-                        }
-                        className={`flex w-full items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[9px] font-bold transition disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm ${
-                          property.status === "sold" ||
-                          property.status === "rented"
-                            ? "border-2 border-[#C9A227] bg-white text-[#C9A227] hover:bg-[#C9A227] hover:text-white"
-                            : "bg-[#C9A227] text-white hover:bg-[#A67C00]"
-                        }`}
-                      >
-                        {isUpdatingStatus ? (
-                          <>Updating...</>
-                        ) : property.status === "sold" ||
-                          property.status ===
-                            "rented" ? (
-                          <>
-                            <RotateCcw size={14} />
-                            Mark as Available
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 size={14} />
-                            Mark as{" "}
-                            {property.listing_type ===
-                            "sale"
-                              ? "Sold"
-                              : "Rented"}
-                          </>
-                        )}
-                      </button>
                     </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+                  </motion.div>
+                );
+              }
+            )}
           </div>
         )}
 
         {/* PROFILE REMINDER */}
+
         <div className="mt-8 rounded-[32px] border border-[#E8D9A8] bg-[#FFF9E8] p-6 sm:p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#C9A227]/15 text-[#C9A227]">
-                <UserCircle size={25} />
+                <UserCircle
+                  size={25}
+                />
               </div>
 
               <div>
                 <h2 className="text-xl font-black text-[#1B1B1B]">
-                  Keep your profile up to date
+                  Keep your profile up
+                  to date
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-600">
-                  Add your name, phone number and profile
-                  picture so people know who they are
-                  dealing with.
+                  Add your name, phone
+                  number and profile
+                  picture so people know
+                  who they are dealing
+                  with.
                 </p>
               </div>
             </div>
@@ -889,7 +1937,9 @@ export default function DashboardPage() {
               href="/profile"
               className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-3 font-bold text-white transition hover:bg-[#A67C00]"
             >
-              <UserCircle size={18} />
+              <UserCircle
+                size={18}
+              />
               Edit Profile
             </Link>
           </div>
@@ -899,9 +1949,10 @@ export default function DashboardPage() {
   );
 }
 
-/*
- * DASHBOARD ACTION
- */
+// ==================================================
+// DASHBOARD ACTION
+// ==================================================
+
 function DashboardAction({
   href,
   icon,
@@ -951,9 +2002,10 @@ function DashboardAction({
   );
 }
 
-/*
- * PROPERTY STAT
- */
+// ==================================================
+// PROPERTY STAT
+// ==================================================
+
 function PropertyStat({
   icon,
   value,
