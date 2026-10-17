@@ -12,19 +12,23 @@ export type PropertyFilters = {
   maxPrice?: number;
 };
 
-/**
- * A paid promotion only counts while:
- *
- * - the listing is active
- * - is_promoted is true
- * - the promotion came from Premium or Pro
- * - the promotion has not expired
- */
+function normalizeText(
+  value: string | null | undefined
+) {
+  return (value || "").trim().toLowerCase();
+}
+
+function isPubliclyActive(
+  status: string | null | undefined
+) {
+  return normalizeText(status) === "active";
+}
+
 function hasActivePaidPromotion(
   property: Property,
   now: number
 ): boolean {
-  if (property.status !== "active") {
+  if (!isPubliclyActive(property.status)) {
     return false;
   }
 
@@ -53,29 +57,22 @@ function hasActivePaidPromotion(
   );
 }
 
-/**
- * HomeLinker search ranking:
- *
- * 3 = Pro Priority
- * 2 = Premium / Pro promoted
- * 1 = Normal listing
- */
 function getRankingScore(
   property: Property,
   now: number
 ): number {
-  const activePromotion =
+  const paid =
     hasActivePaidPromotion(property, now);
 
   if (
-    activePromotion &&
+    paid &&
     property.promotion_source === "pro" &&
     property.is_priority === true
   ) {
     return 3;
   }
 
-  if (activePromotion) {
+  if (paid) {
     return 2;
   }
 
@@ -89,12 +86,12 @@ function getCreatedTime(
     return 0;
   }
 
-  const time = new Date(
+  const value = new Date(
     property.created_at
   ).getTime();
 
-  return Number.isFinite(time)
-    ? time
+  return Number.isFinite(value)
+    ? value
     : 0;
 }
 
@@ -105,36 +102,30 @@ function getPromotionStartTime(
     return 0;
   }
 
-  const time = new Date(
+  const value = new Date(
     property.promotion_starts_at
   ).getTime();
 
-  return Number.isFinite(time)
-    ? time
+  return Number.isFinite(value)
+    ? value
     : 0;
 }
 
 export async function getProperties(
   filters?: PropertyFilters
-) {
+): Promise<Property[]> {
   unstable_noStore();
 
   /*
-   * ============================================
-   * PUBLIC PROPERTY QUERY
-   * ============================================
+   * IMPORTANT:
    *
-   * Never use select("*") here.
+   * We deliberately fetch the public listing data
+   * first and filter active listings in application
+   * code.
    *
-   * Sensitive fields deliberately excluded:
-   * - contact_phone
-   * - contact_number
-   * - payment_reference
-   * - stripe_session_id
-   *
-   * Promotion fields are intentionally public
-   * because HomeLinker uses them for ranking,
-   * placement and badges.
+   * This restores compatibility with HomeLinker's
+   * existing listings while still preventing
+   * pending/sold/rented listings from being returned.
    */
 
   let query = supabase
@@ -163,18 +154,11 @@ export async function getProperties(
       suburb,
       status,
       plan,
-      payment_status,
-      expires_at,
-      featured_until,
-      published_at,
       listing_type,
       deposit,
       available_from,
       floor_size,
       land_size,
-      condition,
-      rates,
-      levies,
       furnished,
       pet_friendly,
       is_promoted,
@@ -182,24 +166,8 @@ export async function getProperties(
       promotion_source,
       promotion_starts_at,
       promotion_expires_at,
-      legacy_popular,
-      show_contact_phone
+      legacy_popular
     `);
-
-  /*
-   * ============================================
-   * PUBLIC INVENTORY
-   * ============================================
-   *
-   * Only active listings are allowed into public
-   * search results.
-   *
-   * Pending, sold, rented and other inactive
-   * listings remain in the database/dashboard
-   * but do not appear in public property search.
-   */
-
-  query = query.eq("status", "active");
 
   // ============================================
   // PROVINCE
@@ -243,9 +211,14 @@ export async function getProperties(
   // ============================================
 
   if (filters?.listingType) {
-    query = query.ilike(
+    const listingType =
+      filters.listingType === "sale"
+        ? ["sale", "for sale"]
+        : ["rent", "for rent"];
+
+    query = query.in(
       "listing_type",
-      filters.listingType
+      listingType
     );
   }
 
@@ -279,17 +252,6 @@ export async function getProperties(
     );
   }
 
-  /*
-   * ============================================
-   * DATABASE ORDER
-   * ============================================
-   *
-   * Fetch newest first.
-   *
-   * Final paid ranking happens below after
-   * promotion expiry is validated.
-   */
-
   const { data, error } =
     await query.order("created_at", {
       ascending: false,
@@ -305,58 +267,45 @@ export async function getProperties(
   }
 
   // ============================================
-  // NORMALISE PROPERTY DATA
+  // NORMALISE + ACTIVE ONLY
   // ============================================
 
   const properties: Property[] = (
     data || []
-  ).map((property) => {
-    const typedProperty =
-      property as Property;
+  )
+    .map((row) => {
+      const property =
+        row as Property;
 
-    return {
-      ...typedProperty,
+      return {
+        ...property,
 
-      slug: createPropertySlug(
-        typedProperty.title,
-        typedProperty.city ?? "",
-        typedProperty.id
-      ),
+        slug: createPropertySlug(
+          property.title,
+          property.city ?? "",
+          property.id
+        ),
 
-      image_urls:
-        typedProperty.image_urls?.length
-          ? typedProperty.image_urls
-          : typedProperty.image_url
-            ? [typedProperty.image_url]
-            : [],
+        image_urls:
+          property.image_urls?.length
+            ? property.image_urls
+            : property.image_url
+              ? [property.image_url]
+              : [],
 
-      owner_name: "HomeLinker User",
+        owner_name: "HomeLinker User",
 
-      owner_verified:
-        typedProperty.verified === true,
-    };
-  });
+        owner_verified:
+          property.verified === true,
+      };
+    })
+    .filter((property) =>
+      isPubliclyActive(property.status)
+    );
 
-  /*
-   * ============================================
-   * HOMELINKER SEARCH RANKING
-   * ============================================
-   *
-   * Ranking happens AFTER the user's filters.
-   *
-   * Paying for promotion improves placement only
-   * among properties that genuinely match the
-   * user's search.
-   *
-   * ORDER:
-   *
-   * 1. Active Pro Priority
-   * 2. Active Premium / Pro promoted
-   * 3. Normal listings
-   *
-   * Expired promotions automatically return to
-   * normal ranking.
-   */
+  // ============================================
+  // PAID SEARCH RANKING
+  // ============================================
 
   const now = Date.now();
 
@@ -367,37 +316,29 @@ export async function getProperties(
     const bScore =
       getRankingScore(b, now);
 
-    // Higher paid ranking first.
+    // Priority > paid > normal
     if (aScore !== bScore) {
       return bScore - aScore;
     }
 
-    /*
-     * Within paid tiers, newer promotions are
-     * placed ahead of older promotions.
-     */
+    // Newer paid promotion first
     if (aScore > 1) {
-      const aPromotionStart =
+      const aPromotion =
         getPromotionStartTime(a);
 
-      const bPromotionStart =
+      const bPromotion =
         getPromotionStartTime(b);
 
       if (
-        aPromotionStart !==
-        bPromotionStart
+        aPromotion !== bPromotion
       ) {
         return (
-          bPromotionStart -
-          aPromotionStart
+          bPromotion - aPromotion
         );
       }
     }
 
-    /*
-     * Within the same ranking level,
-     * newer listings come first.
-     */
+    // Newer property first
     return (
       getCreatedTime(b) -
       getCreatedTime(a)
