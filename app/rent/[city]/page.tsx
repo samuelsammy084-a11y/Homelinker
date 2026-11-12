@@ -117,7 +117,7 @@ export default async function CityRentPage({
   const { city } = await params;
   const cityName = slugToCityName(city);
 
-  const allProperties = await getProperties();
+  const allProperties = await getProperties({ listingType: "rent" });
 
   const properties = allProperties.filter(
     (property: Property) => {
@@ -125,8 +125,7 @@ export default async function CityRentPage({
 
       return (
         cityToSlug(property.city) ===
-          city.toLowerCase() &&
-        property.listing_type === "rent"
+          city.toLowerCase()
       );
     }
   );
