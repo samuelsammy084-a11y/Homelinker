@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -41,6 +41,7 @@ export default function VerifyPage() {
 
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const startInProgress = useRef(false);
   const [checking, setChecking] = useState(false);
 
   const loadVerification = useCallback(
@@ -200,8 +201,9 @@ export default function VerifyPage() {
   }, [loadVerification]);
 
   async function startVerification() {
-    if (starting) return;
+    if (startInProgress.current) return;
 
+    startInProgress.current = true;
     setStarting(true);
 
     try {
@@ -233,15 +235,21 @@ export default function VerifyPage() {
         }
       );
 
-      const data = (await response.json()) as {
+      if (response.status === 401) {
+        toast.error("Please sign in again before starting verification.");
+        router.push("/login?next=%2Fverify");
+        return;
+      }
+
+      const data = (await response.json().catch(() => null)) as {
         success?: boolean;
         verificationUrl?: string;
         error?: string;
         code?: string;
-      };
+      } | null;
 
       if (!response.ok) {
-        if (data.code === "ALREADY_VERIFIED") {
+        if (data?.code === "ALREADY_VERIFIED") {
           await loadVerification();
 
           toast.success(
@@ -252,12 +260,12 @@ export default function VerifyPage() {
         }
 
         throw new Error(
-          data.error ||
+          data?.error ||
             "Could not start identity verification."
         );
       }
 
-      if (!data.verificationUrl) {
+      if (!data?.verificationUrl) {
         throw new Error(
           "The verification provider did not return a verification link."
         );
@@ -300,6 +308,7 @@ export default function VerifyPage() {
           : "Could not start verification."
       );
     } finally {
+      startInProgress.current = false;
       setStarting(false);
     }
   }
