@@ -21,7 +21,24 @@ type Profile = {
   avatar_url: string;
 };
 
+const inboxFilters = [
+  { id: "all", label: "All messages" },
+  { id: "incoming", label: "Incoming enquiries" },
+  { id: "sent", label: "Sent enquiries" },
+] as const;
+
+type InboxFilter = (typeof inboxFilters)[number]["id"];
+
+function filterConversations(conversations: Conversation[], userId: string | null, filter: InboxFilter) {
+  return conversations.filter((conversation) => {
+    if (filter === "incoming") return conversation.owner_id === userId;
+    if (filter === "sent") return conversation.buyer_id === userId;
+    return true;
+  });
+}
+
 export default function MessagesPage() {
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
   const [userId, setUserId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
@@ -315,6 +332,8 @@ export default function MessagesPage() {
   // Inbox
   // --------------------------------------------------
 
+  const visibleConversations = filterConversations(conversations, userId, inboxFilter);
+
   return (
     <main className="min-h-screen bg-[#F8F6F1] px-4 py-10">
       <div className="mx-auto max-w-5xl">
@@ -343,8 +362,28 @@ export default function MessagesPage() {
           </Link>
         </div>
 
+        {conversations.length > 0 && (
+          <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filter conversations">
+            {inboxFilters.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={inboxFilter === id}
+                onClick={() => setInboxFilter(id)}
+                className="rounded-xl border border-[#C9A227] bg-white px-4 py-2 text-sm font-semibold text-black aria-pressed:bg-[#C9A227]"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Empty state */}
-        {conversations.length === 0 ? (
+        {visibleConversations.length === 0 && inboxFilter !== "all" ? (
+          <p className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-slate-600">
+            {inboxFilter === "incoming" ? "No incoming enquiries yet." : "No sent enquiries yet."}
+          </p>
+        ) : visibleConversations.length === 0 ? (
           <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#C9A227]/10 text-3xl">
               💬
@@ -375,8 +414,8 @@ export default function MessagesPage() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                {conversations.length} conversation
-                {conversations.length === 1
+                {visibleConversations.length} conversation
+                {visibleConversations.length === 1
                   ? ""
                   : "s"}
               </p>
@@ -385,7 +424,7 @@ export default function MessagesPage() {
             {/* Conversation list */}
             <div className="divide-y divide-slate-200">
 
-              {conversations.map(
+              {visibleConversations.map(
                 (conversation) => {
                   const isBuyer =
                     conversation.buyer_id ===
