@@ -371,14 +371,32 @@ export async function POST(
     const property =
       propertyData as PropertyPromotion;
 
-    // ============================================
-    // ACTIVE STATUS REQUIRED
-    // ============================================
+    if (action === "promote" || action === "make_priority") {
+      const { data: profile, error: profileError } = await admin
+        .from("profiles")
+        .select("is_verified, verification_status")
+        .eq("id", user.id)
+        .maybeSingle();
 
-    if (
-      action === "promote" ||
-      action === "make_priority"
-    ) {
+      if (profileError) {
+        console.error("Pro promotion profile lookup error:", profileError);
+        return NextResponse.json(
+          { error: "Unable to verify your HomeLinker account." },
+          { status: 500 }
+        );
+      }
+
+      if (profile?.is_verified !== true || profile.verification_status !== "verified") {
+        return NextResponse.json(
+          {
+            error: "Identity verification is required before applying Pro promotion.",
+            code: "IDENTITY_VERIFICATION_REQUIRED",
+            verificationUrl: "/verify",
+          },
+          { status: 403 }
+        );
+      }
+
       if (property.status !== "active") {
         return NextResponse.json(
           {
