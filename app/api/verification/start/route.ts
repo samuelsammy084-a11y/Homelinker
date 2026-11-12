@@ -236,11 +236,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const diditData: DiditSessionResponse =
+    const diditData: DiditSessionResponse | null =
       await diditResponse.json().catch(() => ({}));
 
-    const sessionId = diditData.session_id;
-    const sessionUrl = diditData.url;
+    const sessionId = diditData?.session_id;
+    const sessionUrl = diditData?.url;
 
     if (
       typeof sessionId !== "string" ||

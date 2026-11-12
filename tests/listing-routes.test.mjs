@@ -4,20 +4,22 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import ts from "typescript";
 
-function route(name, { user = "owner", profile, property } = {}) {
+function route(name, { user = "owner", profile, property, fetch } = {}) {
   const calls = [];
   const env = {
     NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
     NEXT_PUBLIC_SUPABASE_ANON_KEY: "test",
     SUPABASE_SERVICE_ROLE_KEY: "test",
     STRIPE_SECRET_KEY: "test",
+    DIDIT_API_KEY: "test",
+    DIDIT_WORKFLOW_ID: "test",
   };
   const exports = {};
   const client = {
     auth: { getUser: async () => ({ data: { user: { id: user } } }) },
     from(table) {
       const query = {};
-      for (const method of ["select", "eq", "gt", "order", "limit", "update", "insert"]) {
+      for (const method of ["select", "eq", "in", "gt", "order", "limit", "update", "insert"]) {
         query[method] = (...args) => {
           calls.push([table, method, ...args]);
           return query;
@@ -37,7 +39,7 @@ function route(name, { user = "owner", profile, property } = {}) {
   runInNewContext(ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText, {
-    exports, process: { env }, console,
+    exports, process: { env }, console, fetch, AbortSignal,
     require: (id) => ({
       "next/server": { NextResponse: Response },
       "@supabase/supabase-js": { createClient: () => client },
@@ -118,3 +120,12 @@ for (const action of ["promote", "make_priority"]) {
     assert.ok(api.calls.every(([, method]) => method !== "update"));
   });
 }
+
+test("verification handles an empty provider result without saving a session", async () => {
+  const api = route("verification/start", {
+    profile: { is_verified: false },
+    fetch: async () => Response.json(null),
+  });
+  assert.equal((await api.post({})).status, 502);
+  assert.ok(api.calls.every(([, method]) => method !== "insert"));
+});
