@@ -17,6 +17,7 @@ import {
   Heart,
   Search,
   Bell,
+  MessageSquare,
   Building2,
   UserCircle,
   CheckCircle2,
@@ -1152,6 +1153,13 @@ export default function DashboardPage() {
             title="Add Property"
             description="Create a new listing"
             primary
+          />
+
+          <DashboardAction
+            href="/messages"
+            icon={<MessageSquare size={22} />}
+            title="Property Enquiries"
+            description="Open your message inbox"
           />
 
           <DashboardAction
