@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { authReturnPath } from "@/lib/auth-return-path";
 
 type Role =
   | "home_seeker"
@@ -47,16 +48,10 @@ export default function LoginContent() {
 
     const role = profile?.role as Role | null;
 
-    // Only allow safe internal paths
-    const safeNext =
-      requestedNext &&
-      requestedNext.startsWith("/") &&
-      !requestedNext.startsWith("//")
-        ? requestedNext
-        : null;
+    const safeNext = authReturnPath(requestedNext);
 
     // If another page requested a specific destination
-    if (safeNext && safeNext !== "/dashboard") {
+    if (safeNext !== "/dashboard") {
       router.replace(safeNext);
       return;
     }
