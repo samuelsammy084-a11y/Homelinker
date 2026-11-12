@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
@@ -18,6 +18,7 @@ export default function PostListingPage() {
 
   const [step, setStep] = useState(1);
   const [publishing, setPublishing] = useState(false);
+  const publishInProgress = useRef(false);
 
   const [popup, setPopup] = useState<{
     show: boolean;
@@ -85,20 +86,7 @@ export default function PostListingPage() {
   }
 
   async function publishListing() {
-    if (publishing) {
-      return;
-    }
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      showError(
-        "Login Required",
-        "Please login before posting a property."
-      );
+    if (publishInProgress.current) {
       return;
     }
 
@@ -424,9 +412,33 @@ export default function PostListingPage() {
       }
     }
 
+    publishInProgress.current = true;
     setPublishing(true);
+    const uploadedPaths: string[] = [];
+    let creationRequested = false;
 
     try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      const accessToken = session?.access_token;
+      if (sessionError || !accessToken) {
+        showError("Login Required", "Please sign in before posting your property.");
+        return;
+      }
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser(accessToken);
+
+      if (authError || !user) {
+        showError("Session Expired", "Please sign in again before posting your property.");
+        return;
+      }
+
       // --------------------------------------------------
       // DUPLICATE PRE-CHECK
       // --------------------------------------------------
@@ -470,7 +482,6 @@ export default function PostListingPage() {
 
       let imageUrl = "";
       const imageUrls: string[] = [];
-      const uploadedPaths: string[] = [];
 
       const compressionOptions = {
         maxSizeMB: 1,
@@ -514,12 +525,6 @@ export default function PostListingPage() {
             uploadError
           );
 
-          if (uploadedPaths.length > 0) {
-            await supabase.storage
-              .from("property-images")
-              .remove(uploadedPaths);
-          }
-
           showError(
             "Upload Failed",
             "One of your property photos could not be uploaded. Please try again."
@@ -538,33 +543,8 @@ export default function PostListingPage() {
 
       imageUrl = imageUrls[0];
 
-      // --------------------------------------------------
-      // GET AUTHENTICATED SESSION
-      // --------------------------------------------------
-
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError || !session?.access_token) {
-        console.error(
-          "Listing session error:",
-          sessionError
-        );
-
-        if (uploadedPaths.length > 0) {
-          await supabase.storage
-            .from("property-images")
-            .remove(uploadedPaths);
-        }
-
-        showError(
-          "Session Expired",
-          "Please sign in again before posting your property."
-        );
-        return;
-      }
+      // The request may reach the server even if the browser loses the response.
+      creationRequested = true;
 
       // --------------------------------------------------
       // CREATE PENDING PROPERTY
@@ -582,7 +562,7 @@ export default function PostListingPage() {
           headers: {
             "Content-Type": "application/json",
             Authorization:
-              `Bearer ${session.access_token}`,
+              `Bearer ${accessToken}`,
           },
 
           body: JSON.stringify({
@@ -656,12 +636,8 @@ export default function PostListingPage() {
           createData
         );
 
-        // The listing was not created, so remove the
-        // newly uploaded unused photos.
-        if (uploadedPaths.length > 0) {
-          await supabase.storage
-            .from("property-images")
-            .remove(uploadedPaths);
+        if ([400, 401, 409].includes(createResponse.status)) {
+          creationRequested = false;
         }
 
         if (
@@ -716,6 +692,17 @@ export default function PostListingPage() {
         "Something unexpected happened while creating your listing. Please try again."
       );
     } finally {
+      if (!creationRequested && uploadedPaths.length > 0) {
+        try {
+          const { error } = await supabase.storage
+            .from("property-images")
+            .remove(uploadedPaths);
+          if (error) console.warn("Could not clean up listing photos:", error);
+        } catch (error) {
+          console.warn("Could not clean up listing photos:", error);
+        }
+      }
+      publishInProgress.current = false;
       setPublishing(false);
     }
   }
