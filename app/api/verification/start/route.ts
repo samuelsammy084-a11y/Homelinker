@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: "Your account is already verified.",
+          code: "ALREADY_VERIFIED",
         },
         { status: 409 }
       );
