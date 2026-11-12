@@ -110,7 +110,7 @@ export default async function CitySalePage({
   const { city } = await params;
   const cityName = slugToCityName(city);
 
-  const allProperties = await getProperties();
+  const allProperties = await getProperties({ listingType: "sale" });
 
   const properties = allProperties.filter(
     (property: Property) => {
@@ -118,8 +118,7 @@ export default async function CitySalePage({
 
       return (
         cityToSlug(property.city) ===
-          city.toLowerCase() &&
-        property.listing_type === "sale"
+          city.toLowerCase()
       );
     }
   );

@@ -36,16 +36,22 @@ export const metadata: Metadata = {
   },
 };
 
+type SearchParam = string | string[] | undefined;
+
 type Props = {
   searchParams: Promise<{
-    province?: string;
-    city?: string;
-    type?: string;
-    listingType?: string;
-    minPrice?: string;
-    maxPrice?: string;
+    province?: SearchParam;
+    city?: SearchParam;
+    type?: SearchParam;
+    listingType?: SearchParam;
+    minPrice?: SearchParam;
+    maxPrice?: SearchParam;
   }>;
 };
+
+function firstSearchValue(value: SearchParam): string | undefined {
+  return (Array.isArray(value) ? value[0] : value)?.trim() || undefined;
+}
 
 type PromotionBadge =
   | "Priority"
@@ -213,7 +219,15 @@ function getPromotionBadgeClass(
 export default async function PropertiesPage({
   searchParams,
 }: Props) {
-  const params = await searchParams;
+  const rawParams = await searchParams;
+  const params = {
+    province: firstSearchValue(rawParams.province),
+    city: firstSearchValue(rawParams.city),
+    type: firstSearchValue(rawParams.type),
+    listingType: firstSearchValue(rawParams.listingType),
+    minPrice: firstSearchValue(rawParams.minPrice),
+    maxPrice: firstSearchValue(rawParams.maxPrice),
+  };
 
   const listingType =
     params.listingType === "rent" ||
