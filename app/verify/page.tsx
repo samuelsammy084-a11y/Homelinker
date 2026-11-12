@@ -52,7 +52,7 @@ export default function VerifyPage() {
         } = await supabase.auth.getUser();
 
         if (userError || !user) {
-          router.replace("/login");
+          router.replace("/login?next=%2Fverify");
           return;
         }
 
@@ -218,7 +218,7 @@ export default function VerifyPage() {
           "Please sign in again before starting verification."
         );
 
-        router.push("/login");
+        router.push("/login?next=%2Fverify");
         return;
       }
 
