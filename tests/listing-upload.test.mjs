@@ -9,7 +9,7 @@ const page = file.statements.find(node => node.name?.text === "PostListingPage")
 const publish = page.body.statements.find(node => node.name?.text === "publishListing");
 const code = ts.transpileModule(publish.getText(file), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 
-function fixture({ missingSession, failUpload, response = 200 } = {}) {
+function fixture({ missingSession, failUpload, blockedStorage, response = 200 } = {}) {
   const calls = [];
   const image = { type: "image/jpeg", size: 100, name: "test.jpg" };
   const publishInProgress = { current: false };
@@ -38,7 +38,7 @@ function fixture({ missingSession, failUpload, response = 200 } = {}) {
     imageCompression: async image => image,
     setPublishing: () => {}, showError: title => calls.push(title),
     console: { error() {}, warn() {} },
-    sessionStorage: { setItem() {} },
+    sessionStorage: { setItem() { if (blockedStorage) throw new Error("Storage unavailable"); } },
     router: { push: path => calls.push(path) },
     fetch: async () => {
       calls.push("create");
@@ -80,4 +80,11 @@ test("ambiguous server error retains photos in case the listing exists", async (
   const { run, calls } = fixture({ response: 500 });
   await run();
   assert.deepEqual(calls, ["upload", "upload", "create", "Something Went Wrong"]);
+});
+
+
+test("a saved draft reaches plan selection even when browser storage is blocked", async () => {
+  const { run, calls } = fixture({ blockedStorage: true });
+  await run();
+  assert.deepEqual(calls, ["upload", "upload", "create", "/pricing?propertyId=1"]);
 });

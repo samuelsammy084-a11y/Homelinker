@@ -666,10 +666,11 @@ export default function PostListingPage() {
       // SAVE PROPERTY ID
       // --------------------------------------------------
 
-      sessionStorage.setItem(
-        "propertyId",
-        String(propertyId)
-      );
+      try {
+        sessionStorage.setItem("propertyId", String(propertyId));
+      } catch {
+        // The pricing URL carries the draft ID even if browser storage is blocked.
+      }
 
       // --------------------------------------------------
       // CHOOSE LISTING PLAN
