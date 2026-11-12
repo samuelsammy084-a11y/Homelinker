@@ -294,9 +294,7 @@ export default function EditListingPage() {
           : null;
       };
 
-      const {
-        error,
-      } = await supabase
+      const { data: updatedProperty, error } = await supabase
         .from("properties")
         .update({
           title: cleanTitle,
@@ -341,7 +339,9 @@ export default function EditListingPage() {
             showContactPhone,
         })
         .eq("id", id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .select("id")
+        .maybeSingle();
 
       if (error) {
         console.error(
@@ -350,6 +350,11 @@ export default function EditListingPage() {
         );
 
         alert(error.message);
+        return;
+      }
+
+      if (!updatedProperty) {
+        alert("This listing could not be saved. It may have been removed or you may no longer have access.");
         return;
       }
 
