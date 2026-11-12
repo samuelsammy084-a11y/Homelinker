@@ -991,6 +991,14 @@ export default function ProfilePage() {
 
                 </div>
 
+                <Link
+                  href="/verify"
+                  className="mx-auto mt-6 flex max-w-xl items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-black transition hover:bg-[#b89520]"
+                >
+                  <ShieldCheck size={20} aria-hidden="true" />
+                  Start guided identity verification
+                </Link>
+
                 <label
                   htmlFor="verification-document"
                   className="mx-auto mt-6 flex max-w-xl cursor-pointer items-center justify-center gap-3 rounded-2xl border border-[#C9A227] bg-white px-6 py-5 font-bold text-[#A67C00] transition hover:bg-[#FFF9E8]"
