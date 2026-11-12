@@ -1,9 +1,10 @@
-const { readFileSync } = require("node:fs");
-const { runInNewContext } = require("node:vm");
-const assert = require("node:assert/strict");
-const { test } = require("node:test");
-const ts = require(process.cwd() + "/node_modules/typescript");
-const file = ts.createSourceFile("page.tsx", readFileSync("app/post-listing/page.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import ts from "typescript";
+
+const file = ts.createSourceFile("page.tsx", readFileSync(new URL("../app/post-listing/page.tsx", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const page = file.statements.find(node => node.name?.text === "PostListingPage");
 const publish = page.body.statements.find(node => node.name?.text === "publishListing");
 const code = ts.transpileModule(publish.getText(file), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
