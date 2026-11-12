@@ -19,11 +19,16 @@ import { supabase } from "@/lib/supabase";
 function PricingContent() {
   const searchParams = useSearchParams();
 
-  const propertyId =
-    searchParams.get("propertyId") ||
-    (typeof window !== "undefined"
-      ? sessionStorage.getItem("propertyId")
-      : null);
+  const propertyIdFromUrl = searchParams.get("propertyId");
+
+  function getPropertyId() {
+    if (propertyIdFromUrl) return propertyIdFromUrl;
+    try {
+      return sessionStorage.getItem("propertyId");
+    } catch {
+      return null;
+    }
+  }
 
   const [loadingPlan, setLoadingPlan] =
     useState<
@@ -35,11 +40,17 @@ function PricingContent() {
   // ==================================================
 
   async function startFreePlan() {
+    const propertyId = getPropertyId();
     if (!propertyId) {
       alert(
         "No property was found. Please go back and post your property again."
       );
       return;
+    }
+
+    const returnUrl = `/pricing?propertyId=${encodeURIComponent(propertyId)}`;
+    function signInToResume() {
+      window.location.href = `/login?next=${encodeURIComponent(returnUrl)}`;
     }
 
     setLoadingPlan("free");
@@ -56,28 +67,12 @@ function PricingContent() {
           sessionError
         );
 
-        alert(
-          "Unable to verify your login. Please sign in again."
-        );
-
+        signInToResume();
         return;
       }
 
       if (!session?.access_token) {
-        alert(
-          "Please sign in before publishing your listing."
-        );
-
-        const returnUrl =
-          `/pricing?propertyId=${encodeURIComponent(
-            String(propertyId)
-          )}`;
-
-        window.location.href =
-          `/login?redirect=${encodeURIComponent(
-            returnUrl
-          )}`;
-
+        signInToResume();
         return;
       }
 
@@ -99,6 +94,11 @@ function PricingContent() {
           }),
         }
       );
+
+      if (response.status === 401) {
+        signInToResume();
+        return;
+      }
 
       let data: {
         success?: boolean;
@@ -128,9 +128,11 @@ function PricingContent() {
         return;
       }
 
-      sessionStorage.removeItem(
-        "propertyId"
-      );
+      try {
+        sessionStorage.removeItem("propertyId");
+      } catch {
+        // The listing is already published even if browser storage is unavailable.
+      }
 
       window.location.href =
         "/dashboard";
@@ -141,7 +143,7 @@ function PricingContent() {
       );
 
       alert(
-        "Something went wrong activating your listing."
+        "HomeLinker could not confirm publication. Open your dashboard to check the listing and retry if it is still pending."
       );
     } finally {
       setLoadingPlan(null);
@@ -155,6 +157,7 @@ function PricingContent() {
   async function checkout(
     plan: "premium" | "pro"
   ) {
+    const propertyId = getPropertyId();
     if (!propertyId) {
       alert(
         "No property was found. Please go back and post your property again."
@@ -194,7 +197,7 @@ function PricingContent() {
           )}`;
 
         window.location.href =
-          `/login?redirect=${encodeURIComponent(
+          `/login?next=${encodeURIComponent(
             returnUrl
           )}`;
 

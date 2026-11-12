@@ -1809,6 +1809,15 @@ export default function DashboardPage() {
                       {/* STANDARD ACTIONS */}
 
                       <div className="mt-3 flex flex-col gap-2 sm:mt-8">
+                        {property.status === "pending" && (
+                          <Link
+                            href={`/pricing?propertyId=${property.id}`}
+                            className="flex w-full items-center justify-center rounded-xl bg-[#C9A227] px-2 py-2.5 text-[9px] font-bold text-white transition hover:bg-[#A67C00] sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                          >
+                            Finish publishing
+                          </Link>
+                        )}
+
                         <div className="flex gap-2 sm:gap-3">
                           <Link
                             href={`/edit-listing/${property.id}`}
