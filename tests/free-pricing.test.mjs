@@ -48,3 +48,34 @@ test("successful Free publishing opens the dashboard even if storage is unavaila
   assert.equal(location.href, "/dashboard");
   assert.deepEqual(alerts, []);
 });
+
+test("password sign-in passes the draft return path to navigation", async () => {
+  const loginFile = ts.createSourceFile(
+    "LoginContent.tsx",
+    readFileSync(new URL("../app/login/LoginContent.tsx", import.meta.url), "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const login = loginFile.statements.find((node) => node.name?.text === "LoginContent");
+  const handler = login.body.statements.find((node) => node.name?.text === "handleLogin");
+  const code = ts.transpileModule(handler.getText(loginFile), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const destinations = [];
+  const submit = runInNewContext(code + "\nhandleLogin;", {
+    loading: false,
+    email: "test@example.test",
+    password: "test-password",
+    setLoading() {},
+    alert: assert.fail,
+    searchParams: new URLSearchParams({ next: "/pricing?propertyId=17" }),
+    authReturnPath: (value) => value,
+    supabase: {
+      auth: { signInWithPassword: async () => ({ data: { user: { id: "owner" } } }) },
+    },
+    redirectByRole: (user, path) => destinations.push([user, path]),
+  });
+  await submit({ preventDefault() {} });
+  assert.deepEqual(destinations, [["owner", "/pricing?propertyId=17"]]);
+});

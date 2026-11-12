@@ -28,6 +28,14 @@ export default function LoginContent() {
     userId: string,
     requestedNext?: string
   ) {
+    const safeNext = authReturnPath(requestedNext);
+
+    // If another page requested a specific destination
+    if (safeNext !== "/dashboard") {
+      router.replace(safeNext);
+      return;
+    }
+
     const { data: profile, error } = await supabase
       .from("profiles")
       .select("role")
@@ -47,14 +55,6 @@ export default function LoginContent() {
     }
 
     const role = profile?.role as Role | null;
-
-    const safeNext = authReturnPath(requestedNext);
-
-    // If another page requested a specific destination
-    if (safeNext !== "/dashboard") {
-      router.replace(safeNext);
-      return;
-    }
 
     // Otherwise redirect according to role
     switch (role) {
@@ -160,7 +160,7 @@ export default function LoginContent() {
     setLoading(true);
 
     try {
-      const next = "/dashboard";
+      const next = authReturnPath(searchParams.get("next"));
 
       const redirectTo =
         process.env.NODE_ENV === "development"
@@ -257,7 +257,7 @@ export default function LoginContent() {
 
       await redirectByRole(
         data.user.id,
-        "/dashboard"
+        authReturnPath(searchParams.get("next"))
       );
     } catch (error) {
       console.error(
