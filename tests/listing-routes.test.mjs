@@ -42,7 +42,7 @@ function route(name, { user = "owner", profile, property, fetch, verificationIns
   runInNewContext(ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText, {
-    exports, process: { env }, console, fetch, AbortSignal,
+    exports, process: { env }, console, fetch, AbortSignal, URL,
     require: (id) => ({
       "next/server": { NextResponse: Response },
       "@supabase/supabase-js": { createClient: () => client },
