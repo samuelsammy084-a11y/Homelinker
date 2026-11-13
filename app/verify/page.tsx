@@ -198,7 +198,7 @@ export default function VerifyPage() {
     void initialise();
   }, [loadVerification]);
 
-  async function startVerification() {
+  async function startVerification(resume = false) {
     if (startInProgress.current) return;
 
     startInProgress.current = true;
@@ -223,7 +223,7 @@ export default function VerifyPage() {
       }
 
       const response = await fetch(
-        "/api/verification/start",
+        resume ? "/api/verification/start?resume=1" : "/api/verification/start",
         {
           method: "POST",
           headers: {
@@ -471,6 +471,15 @@ export default function VerifyPage() {
 
             <button
               type="button"
+              onClick={() => void startVerification(true)}
+              disabled={starting}
+              className="mr-3 mt-7 inline-flex rounded-2xl bg-[#C9A227] px-7 py-3.5 font-bold text-black hover:bg-[#D8B43C] disabled:opacity-60"
+            >
+              {starting ? "Opening verification..." : "Resume verification"}
+            </button>
+
+            <button
+              type="button"
               onClick={refreshStatus}
               disabled={checking}
               className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#C9A227] px-7 py-3.5 font-bold text-[#9A791D] transition hover:bg-[#FFF9E8] disabled:cursor-not-allowed disabled:opacity-60"
@@ -509,7 +518,7 @@ export default function VerifyPage() {
 
             <button
               type="button"
-              onClick={startVerification}
+              onClick={() => void startVerification()}
               disabled={starting}
               className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-8 py-4 font-bold text-black transition hover:bg-[#D8B43C] disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -585,7 +594,7 @@ export default function VerifyPage() {
 
               <button
                 type="button"
-                onClick={startVerification}
+                onClick={() => void startVerification()}
                 disabled={starting}
                 className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-black transition hover:bg-[#D8B43C] disabled:cursor-not-allowed disabled:opacity-60"
               >
