@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import ts from "typescript";
 
-function route(name, { user = "owner", profile, property, fetch } = {}) {
+function route(name, { user = "owner", profile, property, fetch, verificationInsertError } = {}) {
   const calls = [];
   const env = {
     NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
@@ -22,6 +22,9 @@ function route(name, { user = "owner", profile, property, fetch } = {}) {
       for (const method of ["select", "eq", "in", "gt", "order", "limit", "update", "insert"]) {
         query[method] = (...args) => {
           calls.push([table, method, ...args]);
+          if (table === "identity_verifications" && method === "insert") {
+            return Promise.resolve({ error: verificationInsertError });
+          }
           return query;
         };
       }
@@ -39,7 +42,7 @@ function route(name, { user = "owner", profile, property, fetch } = {}) {
   runInNewContext(ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText, {
-    exports, process: { env }, console, fetch, AbortSignal,
+    exports, process: { env }, console, fetch, AbortSignal, URL,
     require: (id) => ({
       "next/server": { NextResponse: Response },
       "@supabase/supabase-js": { createClient: () => client },
@@ -129,3 +132,22 @@ test("verification handles an empty provider result without saving a session", a
   assert.equal((await api.post({})).status, 502);
   assert.ok(api.calls.every(([, method]) => method !== "insert"));
 });
+
+for (const saveFails of [false, true]) {
+  test(`verification session ${saveFails ? "withholds the link if saving fails" : "links the saved session to the signed-in user"}`, async () => {
+    const verificationUrl = "https://verify.didit.me/session/mock";
+    const api = route("verification/start", {
+      profile: { is_verified: false },
+      fetch: async () => Response.json({ session_id: "mock-session", url: verificationUrl }),
+      verificationInsertError: saveFails ? { message: "Mock database unavailable" } : null,
+    });
+    const response = await api.post({});
+    assert.equal(response.status, saveFails ? 500 : 200);
+    assert.equal((await response.json()).verificationUrl, saveFails ? undefined : verificationUrl);
+    const [, , record] = api.calls.find(([table, method]) =>
+      table === "identity_verifications" && method === "insert");
+    assert.equal(record.user_id, "owner");
+    assert.equal(record.provider_session_id, "mock-session");
+    assert.equal(record.status, "pending");
+  });
+}
