@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import ts from "typescript";
 
-function route(name, { user = "owner", profile, property, fetch, verificationInsertError } = {}) {
+function route(name, { user = "owner", profile, property, fetch, verificationInsertError, storedSession } = {}) {
   const calls = [];
   const env = {
     NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
@@ -19,9 +19,11 @@ function route(name, { user = "owner", profile, property, fetch, verificationIns
     auth: { getUser: async () => ({ data: { user: { id: user } } }) },
     from(table) {
       const query = {};
+      let sessionLookup = false;
       for (const method of ["select", "eq", "in", "gt", "order", "limit", "update", "insert"]) {
         query[method] = (...args) => {
           calls.push([table, method, ...args]);
+          if (method === "eq" && args[0] === "provider_session_id") sessionLookup = true;
           if (table === "identity_verifications" && method === "insert") {
             return Promise.resolve({ error: verificationInsertError });
           }
@@ -30,6 +32,7 @@ function route(name, { user = "owner", profile, property, fetch, verificationIns
       }
       query.maybeSingle = query.single = async () => ({
         data: {
+          identity_verifications: sessionLookup ? storedSession : undefined,
           profiles: profile,
           advertiser_subscriptions: { id: 1, user_id: user },
           properties: property,
@@ -151,3 +154,19 @@ for (const saveFails of [false, true]) {
     assert.equal(record.status, "pending");
   });
 }
+
+test("Didit can return a recorded session without rewriting its ownership or status", async () => {
+  const api = route("verification/start", {
+    profile: { is_verified: false },
+    storedSession: { user_id: "owner", status: "in_progress" },
+    fetch: async () => Response.json({
+      session_id: "mock-session",
+      url: "https://verify.didit.me/session/mock",
+    }),
+  });
+  const response = await api.post({});
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal((await response.json()).verificationUrl, "https://verify.didit.me/session/mock");
+  assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
+});
