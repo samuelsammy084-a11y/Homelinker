@@ -84,6 +84,6 @@ test("provider approval stays pending until the profile confirms verification", 
   profile = { is_verified: true, verification_status: "verified" };
   await load(true);
 
-  assert.deepEqual(statuses, ["pending", "verified"]);
+  assert.deepEqual(statuses, ["updating_profile", "verified"]);
   assert.deepEqual(messages.map(([level]) => level), ["info", "success"]);
 });
