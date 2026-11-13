@@ -22,6 +22,7 @@ type VerificationStatus =
   | "pending"
   | "in_progress"
   | "approved"
+  | "updating_profile"
   | "verified"
   | "declined"
   | "expired"
@@ -124,7 +125,7 @@ export default function VerifyPage() {
             verification.status as VerificationStatus;
 
           const displayStatus =
-            latestStatus === "approved" ? "pending" : latestStatus;
+            latestStatus === "approved" ? "updating_profile" : latestStatus;
           setStatus(displayStatus);
 
           if (showMessage) {
@@ -344,7 +345,8 @@ export default function VerifyPage() {
 
   const isPending =
     status === "pending" ||
-    status === "in_progress";
+    status === "in_progress" ||
+    status === "updating_profile";
 
   const needsRetry =
     status === "declined" ||
@@ -453,7 +455,7 @@ export default function VerifyPage() {
             </div>
 
             <h2 className="mt-6 text-3xl font-black text-[#1B1B1B]">
-              Verification in progress
+              {status === "updating_profile" ? "Updating your profile" : "Verification in progress"}
             </h2>
 
             <p className="mx-auto mt-3 max-w-xl leading-7 text-slate-600">
@@ -469,14 +471,16 @@ export default function VerifyPage() {
               Premium and Pro require approval.
             </p>
 
-            <button
-              type="button"
-              onClick={() => void startVerification(true)}
-              disabled={starting}
-              className="mr-3 mt-7 inline-flex rounded-2xl bg-[#C9A227] px-7 py-3.5 font-bold text-black hover:bg-[#D8B43C] disabled:opacity-60"
-            >
-              {starting ? "Opening verification..." : "Resume verification"}
-            </button>
+            {status !== "updating_profile" && (
+              <button
+                type="button"
+                onClick={() => void startVerification(true)}
+                disabled={starting}
+                className="mr-3 mt-7 inline-flex rounded-2xl bg-[#C9A227] px-7 py-3.5 font-bold text-black hover:bg-[#D8B43C] disabled:opacity-60"
+              >
+                {starting ? "Opening verification..." : "Resume verification"}
+              </button>
+            )}
 
             <button
               type="button"
