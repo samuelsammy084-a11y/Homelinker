@@ -215,3 +215,15 @@ test("resume retrieves the owned Didit session without creating or writing a ses
   assert.equal((await response.json()).verificationUrl, "https://verify.didit.me/session/mock");
   assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
 });
+
+test("resume reports an invalid Didit response without returning a link", async () => {
+  const api = route("verification/start", {
+    profile: { is_verified: false },
+    activeSession: { provider_session_id: "mock-session" },
+    fetch: async () => new Response("Service temporarily unavailable"),
+  });
+  const response = await api.post({}, true, "/?resume=1");
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "Unable to retrieve verification." });
+  assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
+});
