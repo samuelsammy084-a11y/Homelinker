@@ -195,7 +195,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Unable to retrieve verification." }, { status: 502 });
       }
 
-      const session = await response.json();
+      const session = await response.json().catch(() => null);
+      if (!session || typeof session !== "object" || Array.isArray(session)) {
+        return NextResponse.json({ error: "Unable to retrieve verification." }, { status: 502 });
+      }
+
       if (
         session?.session_id !== sessionId ||
         session?.session_kind !== "user" ||
