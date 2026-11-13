@@ -381,10 +381,9 @@ export default function VerifyPage() {
               </h1>
 
               <p className="mt-4 max-w-2xl leading-7 text-slate-300">
-                Property owners and estate agents
-                must verify their identity before
-                posting new properties on
-                HomeLinker.
+                You can publish Free listings without
+                identity verification. Premium and Pro
+                listings require verification.
               </p>
             </div>
           </div>
@@ -401,9 +400,8 @@ export default function VerifyPage() {
                   Already have listings?
                 </strong>{" "}
                 Your existing property listings
-                remain active. Verification is
-                required before you can publish new
-                properties.
+                remain active while your identity
+                verification is in progress.
               </p>
             </div>
           </div>
@@ -424,8 +422,8 @@ export default function VerifyPage() {
 
             <p className="mx-auto mt-3 max-w-xl leading-7 text-slate-600">
               Your HomeLinker identity verification
-              is complete. You can now post new
-              property listings.
+              is complete. You can now choose
+              Premium or Pro when publishing a listing.
             </p>
 
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
@@ -469,10 +467,8 @@ export default function VerifyPage() {
             </p>
 
             <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-500">
-              You won&apos;t be able to publish a
-              new property until verification is
-              approved. Your existing listings
-              remain active.
+              You can publish Free listings while you wait.
+              Premium and Pro require approval.
             </p>
 
             <button
