@@ -170,3 +170,24 @@ test("Didit can return a recorded session without rewriting its ownership or sta
   assert.equal((await response.json()).verificationUrl, "https://verify.didit.me/session/mock");
   assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
 });
+
+for (const storedSession of [
+  { user_id: "different-account", status: "pending", reason: "different owner" },
+  { user_id: "owner", status: "approved", reason: "completed session" },
+]) {
+  test(`Didit withholds a resume link for a ${storedSession.reason}`, async () => {
+    const api = route("verification/start", {
+      profile: { is_verified: false },
+      storedSession,
+      fetch: async () => Response.json({
+        session_id: "mock-session",
+        url: "https://verify.didit.me/session/mock",
+      }),
+    });
+
+    const response = await api.post({});
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).verificationUrl, undefined);
+    assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
+  });
+}
