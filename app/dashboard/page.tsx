@@ -165,6 +165,8 @@ export default function DashboardPage() {
   const [properties, setProperties] =
     useState<Property[]>([]);
 
+  const [propertiesFailed, setPropertiesFailed] = useState(false);
+
   const [loading, setLoading] =
     useState(true);
 
@@ -248,6 +250,7 @@ export default function DashboardPage() {
                 `Bearer ${accessToken}`,
             },
             cache: "no-store",
+            signal: AbortSignal.timeout(15000),
           }
         );
 
@@ -288,79 +291,26 @@ export default function DashboardPage() {
   const loadProperties =
     useCallback(
       async (userId: string) => {
-        const {
-          data,
-          error,
-        } = await supabase
-          .from("properties")
-          .select(`
-            id,
-            title,
-            description,
-            price,
-            province,
-            city,
-            location,
-            property_type,
-            bedrooms,
-            bathrooms,
-            parking,
-            image_url,
-            featured,
-            verified,
-            created_at,
-            user_id,
-            image_urls,
-            latitude,
-            longitude,
-            street_address,
-            suburb,
-            status,
-            plan,
-            payment_status,
-            expires_at,
-            featured_until,
-            published_at,
-            listing_type,
-            deposit,
-            available_from,
-            floor_size,
-            land_size,
-            condition,
-            rates,
-            levies,
-            furnished,
-            pet_friendly,
-            is_promoted,
-            is_priority,
-            promotion_source,
-            promotion_starts_at,
-            promotion_expires_at,
-            legacy_popular,
-            show_contact_phone
-          `)
-          .eq("user_id", userId)
-          .order("created_at", {
-            ascending: false,
-          });
+        try {
+          const { data, error } = await supabase
+            .from("properties")
+            .select(`
+              id, title, price, province, city, bedrooms, bathrooms, parking,
+              image_url, image_urls, verified, status, listing_type, is_promoted,
+              is_priority, promotion_source, promotion_expires_at
+            `)
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .abortSignal(AbortSignal.timeout(15000));
 
-        if (error) {
-          console.error(
-            "HomeLinker properties error:",
-            error
-          );
+          if (error) throw error;
 
-          toast.error(
-            "Unable to load your properties."
-          );
-
-          setProperties([]);
-          return;
+          setProperties((data ?? []) as Property[]);
+          setPropertiesFailed(false);
+        } catch (error) {
+          console.error("HomeLinker properties error:", error);
+          setPropertiesFailed(true);
         }
-
-        setProperties(
-          (data ?? []) as Property[]
-        );
       },
       []
     );
@@ -418,7 +368,7 @@ export default function DashboardPage() {
           user.id
         );
 
-        await loadProStatus();
+        void loadProStatus();
       } catch (error) {
         console.error(
           "HomeLinker dashboard error:",
@@ -843,6 +793,7 @@ export default function DashboardPage() {
 
   if (
     role === "home_seeker" &&
+    !propertiesFailed &&
     properties.length === 0
   ) {
     return (
@@ -1345,8 +1296,18 @@ export default function DashboardPage() {
 
         {/* NO LISTINGS */}
 
-        {properties.length ===
-        0 ? (
+        {propertiesFailed ? (
+          <div role="alert" className="rounded-[32px] border border-[#F0E7CF] bg-white p-8 text-center shadow-lg">
+            <p className="font-semibold text-[#1B1B1B]">Unable to load your properties.</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 rounded-2xl bg-[#C9A227] px-5 py-3 font-bold text-black hover:bg-[#D8B43C]"
+            >
+              Try again
+            </button>
+          </div>
+        ) : properties.length === 0 ? (
           <motion.div
             initial={{
               opacity: 0,
