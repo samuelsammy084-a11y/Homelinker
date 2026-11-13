@@ -123,20 +123,18 @@ export default function VerifyPage() {
           const latestStatus =
             verification.status as VerificationStatus;
 
-          if (latestStatus === "approved") {
-            setStatus("verified");
-          } else {
-            setStatus(latestStatus);
-          }
+          const displayStatus =
+            latestStatus === "approved" ? "pending" : latestStatus;
+          setStatus(displayStatus);
 
           if (showMessage) {
             if (latestStatus === "approved") {
-              toast.success(
-                "Your identity is verified."
+              toast.info(
+                "Your identity check is approved. HomeLinker is still updating your profile."
               );
             } else if (
-              latestStatus === "pending" ||
-              latestStatus === "in_progress"
+              displayStatus === "pending" ||
+              displayStatus === "in_progress"
             ) {
               toast.info(
                 "Your verification is still in progress."
