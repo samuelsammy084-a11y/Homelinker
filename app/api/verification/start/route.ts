@@ -154,7 +154,8 @@ export async function POST(request: NextRequest) {
       error: existingError,
     } = await admin
       .from("identity_verifications")
-      .select("id, status, created_at")
+      .select("id, status, created_at, provider_session_id")
+      .eq("provider", "didit")
       .eq("user_id", user.id)
       .in("status", ["pending", "in_progress"])
       .order("created_at", { ascending: false })
@@ -173,6 +174,47 @@ export async function POST(request: NextRequest) {
             "Unable to check existing verification sessions.",
         },
         { status: 500 }
+      );
+    }
+
+    if (new URL(request.url).searchParams.get("resume") === "1") {
+      const sessionId = existingVerification?.provider_session_id;
+      if (!sessionId) {
+        return NextResponse.json({ error: "No resumable verification session." }, { status: 409 });
+      }
+
+      const response = await fetch(
+        DIDIT_API_URL + encodeURIComponent(sessionId) + "/decision/",
+        {
+          headers: { "x-api-key": diditApiKey },
+          cache: "no-store",
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+      if (!response.ok) {
+        return NextResponse.json({ error: "Unable to retrieve verification." }, { status: 502 });
+      }
+
+      const session = await response.json();
+      if (
+        session?.session_id !== sessionId ||
+        session?.session_kind !== "user" ||
+        session?.vendor_data !== user.id ||
+        session?.workflow_id !== diditWorkflowId ||
+        !["Not Started", "In Progress"].includes(session?.status) ||
+        !(Date.parse(session?.expires_at) > Date.now())
+      ) {
+        return NextResponse.json({ error: "This session cannot be resumed. Check your verification status." }, { status: 409 });
+      }
+
+      const url = URL.canParse(session.session_url) ? new URL(session.session_url) : null;
+      if (url?.origin !== "https://verify.didit.me" || url.username || url.password) {
+        return NextResponse.json({ error: "Invalid verification link." }, { status: 502 });
+      }
+
+      return NextResponse.json(
+        { success: true, verificationUrl: url.toString() },
+        { headers: { "Cache-Control": "no-store" } }
       );
     }
 
