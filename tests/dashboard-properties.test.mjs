@@ -19,9 +19,11 @@ test("dashboard keeps existing listings on failure and recovers on retry", async
   let properties = [{ id: 1 }];
   const failures = [];
   let result = { error: new Error("Temporary database failure") };
+  const projections = [];
   const query = {
     select: (columns) => {
       assert.doesNotMatch(columns, /show_contact_phone|legacy_popular/);
+      projections.push(columns);
       return query;
     },
     eq: (column, value) => {
@@ -30,7 +32,12 @@ test("dashboard keeps existing listings on failure and recovers on retry", async
       return query;
     },
     order: () => query,
-    abortSignal: async () => result,
+    abortSignal: async () => {
+      if (result.error?.code === "42703" && !projections.at(-1).includes("promotion_source")) {
+        return { data: [{ id: 3 }] };
+      }
+      return result;
+    },
   };
   const load = runInNewContext(outputText, {
     AbortSignal,
@@ -45,5 +52,8 @@ test("dashboard keeps existing listings on failure and recovers on retry", async
   result = { data: [{ id: 2 }] };
   await load("owner");
   assert.deepEqual(properties, [{ id: 2 }]);
-  assert.deepEqual(failures, [true, false]);
+  result = { error: { code: "42703" } };
+  await load("owner");
+  assert.deepEqual(properties, [{ id: 3 }]);
+  assert.deepEqual(failures, [true, false, false]);
 });

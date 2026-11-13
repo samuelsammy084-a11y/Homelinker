@@ -292,20 +292,25 @@ export default function DashboardPage() {
     useCallback(
       async (userId: string) => {
         try {
-          const { data, error } = await supabase
+          const listingFields = "id, title, price, province, city, bedrooms, bathrooms, parking, image_url, image_urls, verified, status, listing_type";
+          const fetchOwnedListings = (fields: string) => supabase
             .from("properties")
-            .select(`
-              id, title, price, province, city, bedrooms, bathrooms, parking,
-              image_url, image_urls, verified, status, listing_type, is_promoted,
-              is_priority, promotion_source, promotion_expires_at
-            `)
+            .select(fields)
             .eq("user_id", userId)
             .order("created_at", { ascending: false })
             .abortSignal(AbortSignal.timeout(15000));
 
+          let { data, error } = await fetchOwnedListings(
+            listingFields + ", is_promoted, is_priority, promotion_source, promotion_expires_at"
+          );
+
+          if (error?.code === "42703") {
+            ({ data, error } = await fetchOwnedListings(listingFields));
+          }
+
           if (error) throw error;
 
-          setProperties((data ?? []) as Property[]);
+          setProperties((data ?? []) as unknown as Property[]);
           setPropertiesFailed(false);
         } catch (error) {
           console.error("HomeLinker properties error:", error);
