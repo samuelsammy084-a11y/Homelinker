@@ -1792,6 +1792,12 @@ export default function DashboardPage() {
                           </Link>
                         )}
 
+                        <Link
+                          href={`/dashboard/performance/${property.id}`}
+                          className="rounded-xl border border-[#C9A227] px-3 py-2 text-center text-xs font-semibold text-[#795D00] sm:text-sm"
+                        >
+                          Listing performance
+                        </Link>
                         <div className="flex gap-2 sm:gap-3">
                           <Link
                             href={`/edit-listing/${property.id}`}
