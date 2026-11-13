@@ -15,17 +15,20 @@ const source = ts.transpileModule(handler.getText(file), {
 
 function fixture(response) {
   const events = [];
+  const requests = [];
   const start = runInNewContext(source + "\nstartVerification;", {
     startInProgress: { current: false },
     setStarting() {},
     supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "mock" } } }) } },
-    fetch: async () => { events.push("request"); return response; },
+    fetch: async (path) => { requests.push(path); events.push("request"); return response; },
+    URL,
+    window: { location: { assign: (url) => events.push(url) } },
     router: { push: (path) => events.push(path) },
     toast: { error: (message) => events.push(message), success: (message) => events.push(message) },
     loadVerification: async () => events.push("refresh"),
     console: { error() {} },
   });
-  return { start, events };
+  return { start, events, requests };
 }
 
 test("an expired verification session returns through login to verification", async () => {
@@ -86,4 +89,12 @@ test("provider approval stays pending until the profile confirms verification", 
 
   assert.deepEqual(statuses, ["updating_profile", "verified"]);
   assert.deepEqual(messages.map(([level]) => level), ["info", "success"]);
+});
+
+test("resuming verification opens the hosted link through the resume request", async () => {
+  const url = "https://verify.didit.me/session/mock";
+  const { start, events, requests } = fixture(Response.json({ verificationUrl: url }));
+  await start(true);
+  assert.deepEqual(requests, ["/api/verification/start?resume=1"]);
+  assert.deepEqual(events, ["request", url]);
 });
