@@ -298,41 +298,67 @@ export async function POST(request: NextRequest) {
     // 7. Record session in HomeLinker
     // ---------------------------------------
 
-    const {
-      error: insertError,
-    } = await admin
+    const { data: storedSession, error: sessionLookupError } = await admin
       .from("identity_verifications")
-      .insert({
-        user_id: user.id,
-        provider: "didit",
-        provider_session_id: sessionId,
-        status: "pending",
-      });
+      .select("user_id, status")
+      .eq("provider", "didit")
+      .eq("provider_session_id", sessionId)
+      .maybeSingle();
 
-    if (insertError) {
-      console.error(
-        "Failed to save verification session:",
-        insertError.message
-      );
-
-      // Never return an untracked verification link.
+    if (sessionLookupError) {
       return NextResponse.json(
-        {
-          error:
-            "Verification could not be recorded. Please try again later.",
-        },
+        { error: "Unable to check the verification session." },
         { status: 500 }
       );
+    }
+
+    if (storedSession) {
+      if (
+        storedSession.user_id !== user.id ||
+        !["pending", "in_progress"].includes(storedSession.status)
+      ) {
+        return NextResponse.json(
+          { error: "This verification session is unavailable." },
+          { status: 409 }
+        );
+      }
+    } else {
+      const {
+        error: insertError,
+      } = await admin
+        .from("identity_verifications")
+        .insert({
+          user_id: user.id,
+          provider: "didit",
+          provider_session_id: sessionId,
+          status: "pending",
+        });
+
+      if (insertError) {
+        console.error(
+          "Failed to save verification session:",
+          insertError.message
+        );
+
+        // Never return an untracked verification link.
+        return NextResponse.json(
+          {
+            error:
+              "Verification could not be recorded. Please try again later.",
+          },
+          { status: 500 }
+        );
+      }
     }
 
     // ---------------------------------------
     // 8. Return hosted verification URL
     // ---------------------------------------
 
-    return NextResponse.json({
-      success: true,
-      verificationUrl: verificationUrl.toString(),
-    });
+    return NextResponse.json(
+      { success: true, verificationUrl: verificationUrl.toString() },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error(
       "Verification start failed:",
