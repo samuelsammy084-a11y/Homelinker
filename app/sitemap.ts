@@ -152,14 +152,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ?.trim()
       .toLowerCase();
 
+    const isRent = listingType === "rent" || listingType === "for rent";
+    const isSale = listingType === "sale" || listingType === "for sale";
     const existing = cityMap.get(slug);
 
     if (!existing) {
       cityMap.set(slug, {
         city,
         lastModified: createdAt,
-        hasRent: listingType === "rent",
-        hasSale: listingType === "sale",
+        hasRent: isRent,
+        hasSale: isSale,
       });
 
       continue;
@@ -169,11 +171,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       existing.lastModified = createdAt;
     }
 
-    if (listingType === "rent") {
+    if (isRent) {
       existing.hasRent = true;
     }
 
-    if (listingType === "sale") {
+    if (isSale) {
       existing.hasSale = true;
     }
   }
