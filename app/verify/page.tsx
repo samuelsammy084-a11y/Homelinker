@@ -23,6 +23,7 @@ type VerificationStatus =
   | "in_progress"
   | "approved"
   | "updating_profile"
+  | "profile_pending"
   | "verified"
   | "declined"
   | "expired"
@@ -154,7 +155,7 @@ export default function VerifyPage() {
           profile?.verification_status;
 
         if (profileStatus === "pending") {
-          setStatus("pending");
+          setStatus("profile_pending");
         } else if (
           profileStatus === "declined" ||
           profileStatus === "rejected"
@@ -346,7 +347,7 @@ export default function VerifyPage() {
   const isPending =
     status === "pending" ||
     status === "in_progress" ||
-    status === "updating_profile";
+    status === "updating_profile" || status === "profile_pending";
 
   const needsRetry =
     status === "declined" ||
@@ -471,7 +472,7 @@ export default function VerifyPage() {
               Premium and Pro require approval.
             </p>
 
-            {status !== "updating_profile" && (
+            {(status === "pending" || status === "in_progress") && (
               <button
                 type="button"
                 onClick={() => void startVerification(true)}
