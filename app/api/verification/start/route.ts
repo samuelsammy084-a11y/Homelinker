@@ -206,7 +206,8 @@ export async function POST(request: NextRequest) {
         session?.vendor_data !== user.id ||
         session?.workflow_id !== diditWorkflowId ||
         !["Not Started", "In Progress"].includes(session?.status) ||
-        !(Date.parse(session?.expires_at) > Date.now())
+        (session.expires_at !== null &&
+          !(typeof session.expires_at === "string" && Date.parse(session.expires_at) > Date.now()))
       ) {
         return NextResponse.json({ error: "This session cannot be resumed. Check your verification status." }, { status: 409 });
       }
