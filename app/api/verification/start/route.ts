@@ -154,7 +154,8 @@ export async function POST(request: NextRequest) {
       error: existingError,
     } = await admin
       .from("identity_verifications")
-      .select("id, status, created_at")
+      .select("id, status, created_at, provider_session_id")
+      .eq("provider", "didit")
       .eq("user_id", user.id)
       .in("status", ["pending", "in_progress"])
       .order("created_at", { ascending: false })
@@ -173,6 +174,52 @@ export async function POST(request: NextRequest) {
             "Unable to check existing verification sessions.",
         },
         { status: 500 }
+      );
+    }
+
+    if (new URL(request.url).searchParams.get("resume") === "1") {
+      const sessionId = existingVerification?.provider_session_id;
+      if (!sessionId) {
+        return NextResponse.json({ error: "No resumable verification session." }, { status: 409 });
+      }
+
+      const response = await fetch(
+        DIDIT_API_URL + encodeURIComponent(sessionId) + "/decision/",
+        {
+          headers: { "x-api-key": diditApiKey },
+          cache: "no-store",
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+      if (!response.ok) {
+        return NextResponse.json({ error: "Unable to retrieve verification." }, { status: 502 });
+      }
+
+      const session = await response.json().catch(() => null);
+      if (!session || typeof session !== "object" || Array.isArray(session)) {
+        return NextResponse.json({ error: "Unable to retrieve verification." }, { status: 502 });
+      }
+
+      if (
+        session?.session_id !== sessionId ||
+        session?.session_kind !== "user" ||
+        session?.vendor_data !== user.id ||
+        session?.workflow_id !== diditWorkflowId ||
+        !["Not Started", "In Progress"].includes(session?.status) ||
+        (session.expires_at !== null &&
+          !(typeof session.expires_at === "string" && Date.parse(session.expires_at) > Date.now()))
+      ) {
+        return NextResponse.json({ error: "This session cannot be resumed. Check your verification status." }, { status: 409 });
+      }
+
+      const url = URL.canParse(session.session_url) ? new URL(session.session_url) : null;
+      if (url?.origin !== "https://verify.didit.me" || url.username || url.password) {
+        return NextResponse.json({ error: "Invalid verification link." }, { status: 502 });
+      }
+
+      return NextResponse.json(
+        { success: true, verificationUrl: url.toString() },
+        { headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -298,41 +345,67 @@ export async function POST(request: NextRequest) {
     // 7. Record session in HomeLinker
     // ---------------------------------------
 
-    const {
-      error: insertError,
-    } = await admin
+    const { data: storedSession, error: sessionLookupError } = await admin
       .from("identity_verifications")
-      .insert({
-        user_id: user.id,
-        provider: "didit",
-        provider_session_id: sessionId,
-        status: "pending",
-      });
+      .select("user_id, status")
+      .eq("provider", "didit")
+      .eq("provider_session_id", sessionId)
+      .maybeSingle();
 
-    if (insertError) {
-      console.error(
-        "Failed to save verification session:",
-        insertError.message
-      );
-
-      // Never return an untracked verification link.
+    if (sessionLookupError) {
       return NextResponse.json(
-        {
-          error:
-            "Verification could not be recorded. Please try again later.",
-        },
+        { error: "Unable to check the verification session." },
         { status: 500 }
       );
+    }
+
+    if (storedSession) {
+      if (
+        storedSession.user_id !== user.id ||
+        !["pending", "in_progress"].includes(storedSession.status)
+      ) {
+        return NextResponse.json(
+          { error: "This verification session is unavailable." },
+          { status: 409 }
+        );
+      }
+    } else {
+      const {
+        error: insertError,
+      } = await admin
+        .from("identity_verifications")
+        .insert({
+          user_id: user.id,
+          provider: "didit",
+          provider_session_id: sessionId,
+          status: "pending",
+        });
+
+      if (insertError) {
+        console.error(
+          "Failed to save verification session:",
+          insertError.message
+        );
+
+        // Never return an untracked verification link.
+        return NextResponse.json(
+          {
+            error:
+              "Verification could not be recorded. Please try again later.",
+          },
+          { status: 500 }
+        );
+      }
     }
 
     // ---------------------------------------
     // 8. Return hosted verification URL
     // ---------------------------------------
 
-    return NextResponse.json({
-      success: true,
-      verificationUrl: verificationUrl.toString(),
-    });
+    return NextResponse.json(
+      { success: true, verificationUrl: verificationUrl.toString() },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error(
       "Verification start failed:",

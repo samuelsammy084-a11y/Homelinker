@@ -22,6 +22,8 @@ type VerificationStatus =
   | "pending"
   | "in_progress"
   | "approved"
+  | "updating_profile"
+  | "profile_pending"
   | "verified"
   | "declined"
   | "expired"
@@ -124,7 +126,7 @@ export default function VerifyPage() {
             verification.status as VerificationStatus;
 
           const displayStatus =
-            latestStatus === "approved" ? "pending" : latestStatus;
+            latestStatus === "approved" ? "updating_profile" : latestStatus;
           setStatus(displayStatus);
 
           if (showMessage) {
@@ -153,7 +155,7 @@ export default function VerifyPage() {
           profile?.verification_status;
 
         if (profileStatus === "pending") {
-          setStatus("pending");
+          setStatus("profile_pending");
         } else if (
           profileStatus === "declined" ||
           profileStatus === "rejected"
@@ -198,7 +200,7 @@ export default function VerifyPage() {
     void initialise();
   }, [loadVerification]);
 
-  async function startVerification() {
+  async function startVerification(resume = false) {
     if (startInProgress.current) return;
 
     startInProgress.current = true;
@@ -223,7 +225,7 @@ export default function VerifyPage() {
       }
 
       const response = await fetch(
-        "/api/verification/start",
+        resume ? "/api/verification/start?resume=1" : "/api/verification/start",
         {
           method: "POST",
           headers: {
@@ -344,7 +346,8 @@ export default function VerifyPage() {
 
   const isPending =
     status === "pending" ||
-    status === "in_progress";
+    status === "in_progress" ||
+    status === "updating_profile" || status === "profile_pending";
 
   const needsRetry =
     status === "declined" ||
@@ -453,7 +456,7 @@ export default function VerifyPage() {
             </div>
 
             <h2 className="mt-6 text-3xl font-black text-[#1B1B1B]">
-              Verification in progress
+              {status === "updating_profile" ? "Updating your profile" : "Verification in progress"}
             </h2>
 
             <p className="mx-auto mt-3 max-w-xl leading-7 text-slate-600">
@@ -468,6 +471,17 @@ export default function VerifyPage() {
               You can publish Free listings while you wait.
               Premium and Pro require approval.
             </p>
+
+            {(status === "pending" || status === "in_progress") && (
+              <button
+                type="button"
+                onClick={() => void startVerification(true)}
+                disabled={starting}
+                className="mr-3 mt-7 inline-flex rounded-2xl bg-[#C9A227] px-7 py-3.5 font-bold text-black hover:bg-[#D8B43C] disabled:opacity-60"
+              >
+                {starting ? "Opening verification..." : "Resume verification"}
+              </button>
+            )}
 
             <button
               type="button"
@@ -509,7 +523,7 @@ export default function VerifyPage() {
 
             <button
               type="button"
-              onClick={startVerification}
+              onClick={() => void startVerification()}
               disabled={starting}
               className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-8 py-4 font-bold text-black transition hover:bg-[#D8B43C] disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -585,7 +599,7 @@ export default function VerifyPage() {
 
               <button
                 type="button"
-                onClick={startVerification}
+                onClick={() => void startVerification()}
                 disabled={starting}
                 className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-black transition hover:bg-[#D8B43C] disabled:cursor-not-allowed disabled:opacity-60"
               >
