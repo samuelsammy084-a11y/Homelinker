@@ -1,32 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  Loader2,
-  MapPin,
-  Search,
-  CheckCircle2,
-} from "lucide-react";
-
-type SearchResult = {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  address?: {
-    road?: string;
-    house_number?: string;
-    suburb?: string;
-    neighbourhood?: string;
-    city?: string;
-    town?: string;
-    village?: string;
-    municipality?: string;
-    state?: string;
-    province?: string;
-    postcode?: string;
-  };
-};
+import { useState } from "react";
+import { MapPin, Search } from "lucide-react";
 
 type Props = {
   province: string;
@@ -79,179 +54,15 @@ export default function LocationStep({
   onBack,
   onNext,
 }: Props) {
-  const [searching, setSearching] = useState(false);
-  const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
-  const [selectedLocation, setSelectedLocation] =
-    useState<SearchResult | null>(null);
-  const [searchMessage, setSearchMessage] = useState("");
+  const [addressMessage, setAddressMessage] = useState("");
 
   const input =
     "w-full rounded-2xl border border-[#E8D9A8] bg-white p-4 text-black outline-none transition focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/10";
 
-  /*
-   * AUTOMATIC ADDRESS SEARCH
-   *
-   * This runs while the user types.
-   * Finding an address is OPTIONAL.
-   */
-  useEffect(() => {
-    const query = address.trim();
-
-    const controller = new AbortController();
-
-    const timer = window.setTimeout(async () => {
-      setSuggestions([]);
-      setSearchMessage("");
-      setSearching(query.length >= 4);
-
-      if (query.length < 4) return;
-
-      try {
-        const fullQuery = [
-          query,
-          suburb.trim(),
-          city.trim(),
-          province.trim(),
-          "South Africa",
-        ]
-          .filter(Boolean)
-          .join(", ");
-
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=za&q=${encodeURIComponent(
-            fullQuery
-          )}`,
-          {
-            signal: controller.signal,
-            headers: {
-              Accept: "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Address search failed: ${response.status}`
-          );
-        }
-
-        const results =
-          (await response.json()) as SearchResult[];
-
-        if (controller.signal.aborted) return;
-        setSuggestions(results);
-
-        if (results.length === 0) {
-          setSearchMessage(
-            "We couldn't find an exact match. That's okay — you can still use the address you entered."
-          );
-        }
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        console.error(
-          "HomeLinker address search error:",
-          error
-        );
-
-        setSuggestions([]);
-
-        setSearchMessage(
-          "We couldn't search the map right now. You can still continue with your address."
-        );
-      } finally {
-        if (!controller.signal.aborted) setSearching(false);
-      }
-    }, query.length < 4 ? 0 : 500);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [address, suburb, city, province]);
-
-  function chooseSuggestion(result: SearchResult) {
-    const details = result.address ?? {};
-
-    const road = details.road ?? "";
-    const houseNumber = details.house_number ?? "";
-
-    const formattedAddress =
-      [houseNumber, road]
-        .filter(Boolean)
-        .join(" ")
-        .trim() ||
-      result.display_name.split(",")[0];
-
-    const detectedSuburb =
-      details.suburb ||
-      details.neighbourhood ||
-      "";
-
-    const detectedCity =
-      details.city ||
-      details.town ||
-      details.village ||
-      details.municipality ||
-      "";
-
-    const detectedProvince =
-      details.state ||
-      details.province ||
-      "";
-
-    setAddress(formattedAddress);
-
-    if (detectedSuburb) {
-      setSuburb(detectedSuburb);
-    }
-
-    if (detectedCity) {
-      setCity(detectedCity);
-    }
-
-    if (detectedProvince) {
-      const matchingProvince = provinces.find(
-        (item) =>
-          item.toLowerCase() ===
-          detectedProvince.toLowerCase()
-      );
-
-      setProvince(
-        matchingProvince || detectedProvince
-      );
-    }
-
-    setLatitude(Number(result.lat));
-    setLongitude(Number(result.lon));
-
-    setSelectedLocation(result);
-    setSuggestions([]);
-    setSearchMessage("");
-  }
-
-  /*
-   * MANUAL ADDRESS
-   *
-   * This intentionally does NOT require a map result.
-   */
   function saveManualAddress() {
-    if (!address.trim()) {
-      setSearchMessage(
-        "Please enter the street address first."
-      );
-      return;
-    }
-
-    setSearchMessage(
-      "Address saved. You can continue even though an exact map location was not found."
-    );
+    setAddressMessage("Address entered. You can continue to the next step.");
   }
 
-  /*
-   * Province + City + Address are enough.
-   *
-   * Latitude and longitude are OPTIONAL.
-   */
   const canContinue =
     province.trim() !== "" &&
     city.trim() !== "" &&
@@ -267,8 +78,7 @@ export default function LocationStep({
         </h2>
 
         <p className="mt-3 text-[#555555]">
-          Enter the property address. You don&apos;t need to find
-          the exact location on the map.
+          Enter the property address to continue.
         </p>
       </div>
 
@@ -285,7 +95,7 @@ export default function LocationStep({
             value={province}
             onChange={(e) => {
               setProvince(e.target.value);
-              setSelectedLocation(null);
+              setAddressMessage("");
               setLatitude(null);
               setLongitude(null);
             }}
@@ -316,7 +126,7 @@ export default function LocationStep({
               value={city}
               onChange={(e) => {
                 setCity(e.target.value);
-                setSelectedLocation(null);
+                setAddressMessage("");
                 setLatitude(null);
                 setLongitude(null);
               }}
@@ -334,7 +144,7 @@ export default function LocationStep({
               value={suburb}
               onChange={(e) => {
                 setSuburb(e.target.value);
-                setSelectedLocation(null);
+                setAddressMessage("");
                 setLatitude(null);
                 setLongitude(null);
               }}
@@ -358,62 +168,21 @@ export default function LocationStep({
             />
 
             <input
-              className={`${input} pl-12 pr-12`}
+              className={`${input} pl-12`}
               placeholder="Type or paste the full address..."
               value={address}
               onChange={(e) => {
                 setAddress(e.target.value);
-                setSelectedLocation(null);
+                setAddressMessage("");
                 setLatitude(null);
                 setLongitude(null);
               }}
               autoComplete="street-address"
             />
 
-            {searching && (
-              <Loader2
-                size={19}
-                className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-[#C9A227]"
-              />
-            )}
-
           </div>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Start typing and we&apos;ll automatically suggest
-            matching addresses.
-          </p>
-
-          {/* ADDRESS SUGGESTIONS */}
-          {suggestions.length > 0 && (
-            <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-[#E8D9A8] bg-white shadow-2xl">
-
-              {suggestions.map((result) => (
-                <button
-                  key={result.place_id}
-                  type="button"
-                  onClick={() =>
-                    chooseSuggestion(result)
-                  }
-                  className="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-4 text-left transition last:border-0 hover:bg-[#FFF9E8]"
-                >
-                  <MapPin
-                    size={19}
-                    className="mt-0.5 shrink-0 text-[#C9A227]"
-                  />
-
-                  <span className="text-sm leading-6 text-[#111111]">
-                    {result.display_name}
-                  </span>
-                </button>
-              ))}
-
-            </div>
-          )}
-
         </div>
 
-        {/* OPTIONAL SEARCH BUTTON */}
         <button
           type="button"
           onClick={saveManualAddress}
@@ -424,35 +193,11 @@ export default function LocationStep({
           Use This Address
         </button>
 
-        {/* MAP FOUND */}
-        {selectedLocation && (
-          <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-
-            <CheckCircle2
-              size={22}
-              className="mt-0.5 shrink-0 text-emerald-600"
-            />
-
-            <div>
-              <p className="font-bold text-emerald-800">
-                Location found
-              </p>
-
-              <p className="mt-1 text-sm text-emerald-700">
-                We found this address on the map.
-                Your property will use this location.
-              </p>
-            </div>
-
-          </div>
-        )}
-
-        {/* MAP NOT FOUND */}
-        {searchMessage && (
+        {addressMessage && (
           <div className="rounded-2xl border border-[#E8D9A8] bg-[#FFF9E8] p-4">
 
             <p className="text-sm leading-6 text-[#555555]">
-              {searchMessage}
+              {addressMessage}
             </p>
 
           </div>
