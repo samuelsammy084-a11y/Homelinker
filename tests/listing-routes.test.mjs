@@ -192,29 +192,36 @@ for (const storedSession of [
   });
 }
 
-test("resume retrieves the owned Didit session without creating or writing a session", async () => {
-  const api = route("verification/start", {
-    profile: { is_verified: false },
-    activeSession: { provider_session_id: "mock-session" },
-    fetch: async (url, options) => {
-      assert.match(url, /\/mock-session\/decision\/$/);
-      assert.equal(options.method ?? "GET", "GET");
-      return Response.json({
-        session_id: "mock-session",
-        session_kind: "user",
-        vendor_data: "owner",
-        workflow_id: "test",
-        status: "In Progress",
-        expires_at: new Date(Date.now() + 60000).toISOString(),
-        session_url: "https://verify.didit.me/session/mock",
-      });
-    },
+for (const [label, expires_at, expectedStatus] of [
+  ["future", new Date(Date.now() + 60000).toISOString(), 200],
+  ["no configured expiration", null, 200],
+  ["expired", "2000-01-01T00:00:00Z", 409],
+  ["missing", undefined, 409],
+]) {
+  test(`resume checks Didit expiration (${label}) without writing a session`, async () => {
+    const api = route("verification/start", {
+      profile: { is_verified: false },
+      activeSession: { provider_session_id: "mock-session" },
+      fetch: async (url, options) => {
+        assert.match(url, /\/mock-session\/decision\/$/);
+        assert.equal(options.method ?? "GET", "GET");
+        return Response.json({
+          session_id: "mock-session",
+          session_kind: "user",
+          vendor_data: "owner",
+          workflow_id: "test",
+          status: "In Progress",
+          expires_at,
+          session_url: "https://verify.didit.me/session/mock",
+        });
+      },
+    });
+    const response = await api.post({}, true, "/?resume=1");
+    assert.equal(response.status, expectedStatus);
+    assert.equal((await response.json()).verificationUrl, expectedStatus === 200 ? "https://verify.didit.me/session/mock" : undefined);
+    assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
   });
-  const response = await api.post({}, true, "/?resume=1");
-  assert.equal(response.status, 200);
-  assert.equal((await response.json()).verificationUrl, "https://verify.didit.me/session/mock");
-  assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
-});
+}
 
 test("resume reports an invalid Didit response without returning a link", async () => {
   const api = route("verification/start", {
