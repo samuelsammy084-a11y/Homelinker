@@ -97,15 +97,14 @@ export default function LocationStep({
   useEffect(() => {
     const query = address.trim();
 
-    if (query.length < 4) {
-      setSuggestions([]);
-      setSearchMessage("");
-      return;
-    }
+    const controller = new AbortController();
 
     const timer = window.setTimeout(async () => {
-      setSearching(true);
+      setSuggestions([]);
       setSearchMessage("");
+      setSearching(query.length >= 4);
+
+      if (query.length < 4) return;
 
       try {
         const fullQuery = [
@@ -123,6 +122,7 @@ export default function LocationStep({
             fullQuery
           )}`,
           {
+            signal: controller.signal,
             headers: {
               Accept: "application/json",
             },
@@ -138,6 +138,7 @@ export default function LocationStep({
         const results =
           (await response.json()) as SearchResult[];
 
+        if (controller.signal.aborted) return;
         setSuggestions(results);
 
         if (results.length === 0) {
@@ -146,6 +147,7 @@ export default function LocationStep({
           );
         }
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error(
           "HomeLinker address search error:",
           error
@@ -157,12 +159,13 @@ export default function LocationStep({
           "We couldn't search the map right now. You can still continue with your address."
         );
       } finally {
-        setSearching(false);
+        if (!controller.signal.aborted) setSearching(false);
       }
-    }, 500);
+    }, query.length < 4 ? 0 : 500);
 
     return () => {
       window.clearTimeout(timer);
+      controller.abort();
     };
   }, [address, suburb, city, province]);
 
@@ -264,7 +267,7 @@ export default function LocationStep({
         </h2>
 
         <p className="mt-3 text-[#555555]">
-          Enter the property address. You don't need to find
+          Enter the property address. You don&apos;t need to find
           the exact location on the map.
         </p>
       </div>
@@ -377,7 +380,7 @@ export default function LocationStep({
           </div>
 
           <p className="mt-2 text-sm text-slate-500">
-            Start typing and we'll automatically suggest
+            Start typing and we&apos;ll automatically suggest
             matching addresses.
           </p>
 
