@@ -1,7 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { MapPin, Search } from "lucide-react";
+
+const LocationPickerMap = dynamic(() => import("./LocationPickerMap"), {
+  ssr: false,
+});
 
 type Props = {
   province: string;
@@ -54,6 +59,7 @@ export default function LocationStep({
   onBack,
   onNext,
 }: Props) {
+  const [showMap, setShowMap] = useState(false);
   const [addressMessage, setAddressMessage] = useState("");
 
   const input =
@@ -202,6 +208,33 @@ export default function LocationStep({
 
           </div>
         )}
+
+        <div>
+          <button
+            type="button"
+            aria-expanded={showMap}
+            aria-controls="listing-location-map"
+            onClick={() => setShowMap((visible) => !visible)}
+            className="rounded-2xl border border-[#C9A227] px-6 py-3 font-semibold text-[#A67C00]"
+          >
+            {showMap ? "Hide map" : "Set a map pin (optional)"}
+          </button>
+          <div id="listing-location-map" hidden={!showMap}>
+            {showMap && (
+              <>
+                <p className="my-3 text-sm text-slate-600">
+                  Select the location you want shown on your public listing.
+                </p>
+                <LocationPickerMap
+                  latitude={latitude}
+                  longitude={longitude}
+                  setLatitude={setLatitude}
+                  setLongitude={setLongitude}
+                />
+              </>
+            )}
+          </div>
+        </div>
 
         {/* OPTIONAL LOCATION DETAILS */}
         {(latitude !== null || longitude !== null) && (
