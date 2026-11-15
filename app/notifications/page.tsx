@@ -70,6 +70,16 @@ export default function NotificationsPage() {
 
     if (!user) return;
 
+    const { data, error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select("id")
+      .maybeSingle();
+
+    if (error || !data) return;
+
     setNotifications((current) =>
       current.map((notification) =>
         notification.id === id
@@ -77,12 +87,6 @@ export default function NotificationsPage() {
           : notification
       )
     );
-
-    await supabase
-      .from("notifications")
-      .update({ is_read: true })
-      .eq("id", id)
-      .eq("user_id", user.id);
   }
 
   async function markAllAsRead() {
