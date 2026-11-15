@@ -49,13 +49,14 @@ test("a non-JSON verification outage shows an actionable message", async () => {
   assert.deepEqual(events, ["request", "Could not start identity verification."]);
 });
 
-test("provider approval stays pending until the profile confirms verification", async () => {
+test("status checks recover from lookup failures and wait for profile confirmation", async () => {
   const callback = page.body.statements
     .flatMap((node) => node.declarationList?.declarations ?? [])
     .find((node) => node.name.getText(file) === "loadVerification")
     .initializer.arguments[0];
   const statuses = [];
   const messages = [];
+  let failingTable;
   let profile = { is_verified: false, verification_status: "pending" };
   const { outputText } = ts.transpileModule("(" + callback.getText(file) + ")", {
     compilerOptions: { target: ts.ScriptTarget.ES2022 },
@@ -70,12 +71,14 @@ test("provider approval stays pending until the profile confirms verification", 
           order: () => query,
           limit: () => query,
           maybeSingle: async () => ({
+            error: table === failingTable ? new Error("Unavailable") : null,
             data: table === "profiles" ? profile : { status: "approved" },
           }),
         };
         return query;
       },
     },
+    console: { error() {} },
     setStatus: (status) => statuses.push(status),
     toast: {
       info: (message) => messages.push(["info", message]),
@@ -83,11 +86,16 @@ test("provider approval stays pending until the profile confirms verification", 
     },
   });
 
+  for (const table of ["profiles", "identity_verifications"]) {
+    failingTable = table;
+    await load();
+  }
+  failingTable = undefined;
   await load(true);
   profile = { is_verified: true, verification_status: "verified" };
   await load(true);
 
-  assert.deepEqual(statuses, ["updating_profile", "verified"]);
+  assert.deepEqual(statuses, ["unavailable", "unavailable", "updating_profile", "verified"]);
   assert.deepEqual(messages.map(([level]) => level), ["info", "success"]);
 });
 
