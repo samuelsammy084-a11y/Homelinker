@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 type VerificationStatus =
+  | "unavailable"
   | "unverified"
   | "pending"
   | "in_progress"
@@ -68,20 +69,7 @@ export default function VerifyPage() {
             .eq("id", user.id)
             .maybeSingle();
 
-        if (profileError) {
-          console.error(
-            "Profile verification error:",
-            profileError
-          );
-
-          if (showMessage) {
-            toast.error(
-              "Could not refresh your verification status."
-            );
-          }
-
-          return;
-        }
+        if (profileError) throw profileError;
 
         if (
           profile?.is_verified === true &&
@@ -114,12 +102,7 @@ export default function VerifyPage() {
           .limit(1)
           .maybeSingle<IdentityVerification>();
 
-        if (verificationError) {
-          console.error(
-            "Identity verification error:",
-            verificationError
-          );
-        }
+        if (verificationError) throw verificationError;
 
         if (verification?.status) {
           const latestStatus =
@@ -179,6 +162,7 @@ export default function VerifyPage() {
           "Verification loading error:",
           error
         );
+        setStatus("unavailable");
 
         if (showMessage) {
           toast.error(
@@ -407,6 +391,22 @@ export default function VerifyPage() {
             </div>
           </div>
         </section>
+
+        {status === "unavailable" && (
+          <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
+            <h2 className="text-2xl font-black text-[#1B1B1B]">
+              Couldn&apos;t check your verification status
+            </h2>
+            <button
+              type="button"
+              onClick={refreshStatus}
+              disabled={checking}
+              className="mt-5 rounded-2xl border border-[#C9A227] px-6 py-3 font-bold text-[#9A791D] disabled:opacity-60"
+            >
+              {checking ? "Checking..." : "Check again"}
+            </button>
+          </section>
+        )}
 
         {status === "verified" && (
           <section className="mt-8 rounded-[32px] border border-emerald-200 bg-white p-8 text-center shadow-xl sm:p-10">
