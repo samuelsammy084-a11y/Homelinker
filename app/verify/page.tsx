@@ -585,14 +585,11 @@ export default function VerifyPage() {
                   />
 
                   <p className="text-sm leading-6 text-slate-600">
-                    HomeLinker does not ask you to
-                    upload your identity document or
-                    selfie directly to this website.
-                    The identity verification process
-                    is handled by our verification
-                    provider, and HomeLinker receives
-                    the verification result needed to
-                    update your account.
+                    For guided verification, submit any requested
+                    identity document or selfie on Didit. Didit sends
+                    HomeLinker the result needed to update your account.
+                    If you choose manual review, upload your document
+                    from your HomeLinker Profile.
                   </p>
                 </div>
               </div>
