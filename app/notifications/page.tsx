@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -27,34 +27,41 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
 
-  const loadNotifications = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("notifications")
-      .select(
-        "id, title, message, is_read, created_at, action_url, action_label, type"
-      )
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setNotifications(data);
-    }
-
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadNotifications() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user || cancelled) return;
+
+        const { data, error } = await supabase
+          .from("notifications")
+          .select(
+            "id, title, message, is_read, created_at, action_url, action_label, type"
+          )
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (!cancelled && !error && data) {
+          setNotifications(data);
+        }
+      } catch (error) {
+        console.error("Unable to load notifications:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
     void loadNotifications();
-  }, [loadNotifications]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function markAsRead(id: string) {
     const {
@@ -63,6 +70,16 @@ export default function NotificationsPage() {
 
     if (!user) return;
 
+    const { data, error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select("id")
+      .maybeSingle();
+
+    if (error || !data) return;
+
     setNotifications((current) =>
       current.map((notification) =>
         notification.id === id
@@ -70,12 +87,6 @@ export default function NotificationsPage() {
           : notification
       )
     );
-
-    await supabase
-      .from("notifications")
-      .update({ is_read: true })
-      .eq("id", id)
-      .eq("user_id", user.id);
   }
 
   async function markAllAsRead() {
