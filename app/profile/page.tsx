@@ -986,7 +986,7 @@ export default function ProfilePage() {
                   </h3>
 
                   <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                    Upload a clear photo of an accepted identity document. Your document is stored privately and only used for verification.
+                    Choose guided verification with Didit, or upload a clear photo of your identity document below for private review by HomeLinker.
                   </p>
 
                 </div>
