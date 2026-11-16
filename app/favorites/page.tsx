@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -20,18 +21,24 @@ type FavoriteRow = {
 export default function FavoritesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const loadRequest = useRef(0);
   const [signedIn, setSignedIn] = useState<boolean | null>(
     null
   );
 
   const loadFavorites = useCallback(async () => {
+    const request = ++loadRequest.current;
     setLoading(true);
+    setLoadFailed(false);
 
     try {
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
+
+      if (request !== loadRequest.current) return;
 
       if (userError) {
         console.error(
@@ -90,15 +97,8 @@ export default function FavoritesPage() {
         `)
         .eq("user_id", user.id);
 
-      if (error) {
-        console.error(
-          "HomeLinker favorites error:",
-          error
-        );
-
-        setProperties([]);
-        return;
-      }
+      if (request !== loadRequest.current) return;
+      if (error) throw error;
 
       const favoriteProperties = (
         (data || []) as FavoriteRow[]
@@ -121,20 +121,20 @@ export default function FavoritesPage() {
 
       setProperties(favoriteProperties);
     } catch (error) {
+      if (request !== loadRequest.current) return;
       console.error(
-        "Unexpected HomeLinker favorites error:",
+        "Unable to load HomeLinker favorites:",
         error
       );
 
       setProperties([]);
+      setLoadFailed(true);
     } finally {
-      setLoading(false);
+      if (request === loadRequest.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadFavorites();
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
@@ -143,6 +143,8 @@ export default function FavoritesPage() {
           setSignedIn(true);
           void loadFavorites();
         } else {
+          loadRequest.current += 1;
+          setLoadFailed(false);
           setSignedIn(false);
           setProperties([]);
           setLoading(false);
@@ -151,6 +153,7 @@ export default function FavoritesPage() {
     );
 
     return () => {
+      loadRequest.current += 1;
       subscription.unsubscribe();
     };
   }, [loadFavorites]);
@@ -213,14 +216,30 @@ export default function FavoritesPage() {
           My Favorites ❤️
         </h1>
 
-        <p className="mb-10 text-gray-700">
-          {properties.length} saved{" "}
-          {properties.length === 1
-            ? "property"
-            : "properties"}
-        </p>
+        {!loadFailed && (
+          <p className="mb-10 text-gray-700">
+            {properties.length} saved{" "}
+            {properties.length === 1
+              ? "property"
+              : "properties"}
+          </p>
+        )}
 
-        {properties.length === 0 ? (
+        {loadFailed ? (
+          <div className="rounded-3xl bg-white p-8 text-center shadow-lg sm:p-12">
+            <p role="alert" className="font-semibold text-[#1B1B1B]">
+              Unable to load your saved properties.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => void loadFavorites()}
+              className="mt-8 rounded-xl bg-[#C9A227] px-6 py-3 font-semibold text-black transition hover:scale-[1.02]"
+            >
+              Try again
+            </button>
+          </div>
+        ) : properties.length === 0 ? (
           <div className="rounded-3xl bg-white p-8 text-center shadow-lg sm:p-12">
             <div className="text-5xl">♡</div>
 
