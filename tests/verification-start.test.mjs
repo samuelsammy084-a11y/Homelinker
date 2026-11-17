@@ -15,17 +15,20 @@ const source = ts.transpileModule(handler.getText(file), {
 
 function fixture(response) {
   const events = [];
+  const requests = [];
   const start = runInNewContext(source + "\nstartVerification;", {
     startInProgress: { current: false },
     setStarting() {},
     supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "mock" } } }) } },
-    fetch: async () => { events.push("request"); return response; },
+    fetch: async (path) => { requests.push(path); events.push("request"); return response; },
+    URL,
+    window: { location: { assign: (url) => events.push(url) } },
     router: { push: (path) => events.push(path) },
     toast: { error: (message) => events.push(message), success: (message) => events.push(message) },
     loadVerification: async () => events.push("refresh"),
     console: { error() {} },
   });
-  return { start, events };
+  return { start, events, requests };
 }
 
 test("an expired verification session returns through login to verification", async () => {
@@ -46,13 +49,14 @@ test("a non-JSON verification outage shows an actionable message", async () => {
   assert.deepEqual(events, ["request", "Could not start identity verification."]);
 });
 
-test("provider approval stays pending until the profile confirms verification", async () => {
+test("status checks recover from lookup failures and wait for profile confirmation", async () => {
   const callback = page.body.statements
     .flatMap((node) => node.declarationList?.declarations ?? [])
     .find((node) => node.name.getText(file) === "loadVerification")
     .initializer.arguments[0];
   const statuses = [];
   const messages = [];
+  let failingTable;
   let profile = { is_verified: false, verification_status: "pending" };
   const { outputText } = ts.transpileModule("(" + callback.getText(file) + ")", {
     compilerOptions: { target: ts.ScriptTarget.ES2022 },
@@ -67,12 +71,14 @@ test("provider approval stays pending until the profile confirms verification", 
           order: () => query,
           limit: () => query,
           maybeSingle: async () => ({
+            error: table === failingTable ? new Error("Unavailable") : null,
             data: table === "profiles" ? profile : { status: "approved" },
           }),
         };
         return query;
       },
     },
+    console: { error() {} },
     setStatus: (status) => statuses.push(status),
     toast: {
       info: (message) => messages.push(["info", message]),
@@ -80,10 +86,23 @@ test("provider approval stays pending until the profile confirms verification", 
     },
   });
 
+  for (const table of ["profiles", "identity_verifications"]) {
+    failingTable = table;
+    await load();
+  }
+  failingTable = undefined;
   await load(true);
   profile = { is_verified: true, verification_status: "verified" };
   await load(true);
 
-  assert.deepEqual(statuses, ["pending", "verified"]);
+  assert.deepEqual(statuses, ["unavailable", "unavailable", "updating_profile", "verified"]);
   assert.deepEqual(messages.map(([level]) => level), ["info", "success"]);
+});
+
+test("resuming verification opens the hosted link through the resume request", async () => {
+  const url = "https://verify.didit.me/session/mock";
+  const { start, events, requests } = fixture(Response.json({ verificationUrl: url }));
+  await start(true);
+  assert.deepEqual(requests, ["/api/verification/start?resume=1"]);
+  assert.deepEqual(events, ["request", url]);
 });

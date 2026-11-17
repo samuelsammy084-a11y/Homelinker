@@ -68,6 +68,8 @@ export default function ProfilePage() {
     useState<File | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submittingVerification, setSubmittingVerification] =
@@ -99,15 +101,7 @@ export default function ProfilePage() {
           .eq("id", user.id)
           .maybeSingle();
 
-        if (error) {
-          console.error(
-            "HomeLinker profile error:",
-            error
-          );
-
-          toast.error("Unable to load your profile.");
-          return;
-        }
+        if (error) throw error;
 
         if (data) {
           setProfile({
@@ -150,14 +144,14 @@ export default function ProfilePage() {
           error
         );
 
-        toast.error("Something went wrong.");
+        setLoadFailed(true);
       } finally {
         setLoading(false);
       }
     }
 
     void loadProfile();
-  }, [router]);
+  }, [router, loadAttempt]);
 
   async function handleAvatarUpload(
     event: React.ChangeEvent<HTMLInputElement>
@@ -542,16 +536,36 @@ export default function ProfilePage() {
     return "Home Seeker";
   }
 
-  if (loading) {
+  if (loading || loadFailed) {
     return (
       <main className="min-h-screen bg-[#F8F6F1] px-6 py-24">
         <div className="mx-auto max-w-3xl">
           <div className="rounded-[32px] border border-[#F0E7CF] bg-white p-10 text-center shadow-xl">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#C9A227]/20 border-t-[#C9A227]" />
-
-            <h1 className="mt-6 text-2xl font-black text-[#1B1B1B]">
-              Loading your profile...
-            </h1>
+            {loading ? (
+              <>
+                <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#C9A227]/20 border-t-[#C9A227]" />
+                <h1 className="mt-6 text-2xl font-black text-[#1B1B1B]">
+                  Loading your profile...
+                </h1>
+              </>
+            ) : (
+              <>
+                <h1 role="alert" className="text-2xl font-black text-[#1B1B1B]">
+                  Unable to load your profile.
+                </h1>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoading(true);
+                    setLoadFailed(false);
+                    setLoadAttempt((attempt) => attempt + 1);
+                  }}
+                  className="mt-6 rounded-xl bg-[#C9A227] px-6 py-3 font-bold text-black"
+                >
+                  Try again
+                </button>
+              </>
+            )}
           </div>
         </div>
       </main>
@@ -982,7 +996,7 @@ export default function ProfilePage() {
                   </h3>
 
                   <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                    Upload a clear photo of an accepted identity document. Your document is stored privately and only used for verification.
+                    Choose guided verification with Didit, or upload a clear photo of your identity document below for private review by HomeLinker.
                   </p>
 
                 </div>

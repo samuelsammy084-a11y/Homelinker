@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import ts from "typescript";
 
-function route(name, { user = "owner", profile, property, fetch, verificationInsertError } = {}) {
+function route(name, { user = "owner", profile, property, fetch, verificationInsertError, storedSession, activeSession } = {}) {
   const calls = [];
   const env = {
     NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
@@ -19,9 +19,11 @@ function route(name, { user = "owner", profile, property, fetch, verificationIns
     auth: { getUser: async () => ({ data: { user: { id: user } } }) },
     from(table) {
       const query = {};
+      let sessionLookup = false;
       for (const method of ["select", "eq", "in", "gt", "order", "limit", "update", "insert"]) {
         query[method] = (...args) => {
           calls.push([table, method, ...args]);
+          if (method === "eq" && args[0] === "provider_session_id") sessionLookup = true;
           if (table === "identity_verifications" && method === "insert") {
             return Promise.resolve({ error: verificationInsertError });
           }
@@ -30,6 +32,7 @@ function route(name, { user = "owner", profile, property, fetch, verificationIns
       }
       query.maybeSingle = query.single = async () => ({
         data: {
+          identity_verifications: sessionLookup ? storedSession : activeSession,
           profiles: profile,
           advertiser_subscriptions: { id: 1, user_id: user },
           properties: property,
@@ -51,7 +54,7 @@ function route(name, { user = "owner", profile, property, fetch, verificationIns
   });
   return {
     calls,
-    post: (body, authenticated = true) => exports.POST(new Request("http://localhost", {
+    post: (body, authenticated = true, path = "") => exports.POST(new Request("http://localhost" + path, {
       method: "POST",
       headers: authenticated ? { Authorization: "Bearer test" } : {},
       body: JSON.stringify(body),
@@ -151,3 +154,83 @@ for (const saveFails of [false, true]) {
     assert.equal(record.status, "pending");
   });
 }
+
+test("Didit can return a recorded session without rewriting its ownership or status", async () => {
+  const api = route("verification/start", {
+    profile: { is_verified: false },
+    storedSession: { user_id: "owner", status: "in_progress" },
+    fetch: async () => Response.json({
+      session_id: "mock-session",
+      url: "https://verify.didit.me/session/mock",
+    }),
+  });
+  const response = await api.post({});
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal((await response.json()).verificationUrl, "https://verify.didit.me/session/mock");
+  assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
+});
+
+for (const storedSession of [
+  { user_id: "different-account", status: "pending", reason: "different owner" },
+  { user_id: "owner", status: "approved", reason: "completed session" },
+]) {
+  test(`Didit withholds a resume link for a ${storedSession.reason}`, async () => {
+    const api = route("verification/start", {
+      profile: { is_verified: false },
+      storedSession,
+      fetch: async () => Response.json({
+        session_id: "mock-session",
+        url: "https://verify.didit.me/session/mock",
+      }),
+    });
+
+    const response = await api.post({});
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).verificationUrl, undefined);
+    assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
+  });
+}
+
+for (const [label, expires_at, expectedStatus] of [
+  ["future", new Date(Date.now() + 60000).toISOString(), 200],
+  ["no configured expiration", null, 200],
+  ["expired", "2000-01-01T00:00:00Z", 409],
+  ["missing", undefined, 409],
+]) {
+  test(`resume checks Didit expiration (${label}) without writing a session`, async () => {
+    const api = route("verification/start", {
+      profile: { is_verified: false },
+      activeSession: { provider_session_id: "mock-session" },
+      fetch: async (url, options) => {
+        assert.match(url, /\/mock-session\/decision\/$/);
+        assert.equal(options.method ?? "GET", "GET");
+        return Response.json({
+          session_id: "mock-session",
+          session_kind: "user",
+          vendor_data: "owner",
+          workflow_id: "test",
+          status: "In Progress",
+          expires_at,
+          session_url: "https://verify.didit.me/session/mock",
+        });
+      },
+    });
+    const response = await api.post({}, true, "/?resume=1");
+    assert.equal(response.status, expectedStatus);
+    assert.equal((await response.json()).verificationUrl, expectedStatus === 200 ? "https://verify.didit.me/session/mock" : undefined);
+    assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
+  });
+}
+
+test("resume reports an invalid Didit response without returning a link", async () => {
+  const api = route("verification/start", {
+    profile: { is_verified: false },
+    activeSession: { provider_session_id: "mock-session" },
+    fetch: async () => new Response("Service temporarily unavailable"),
+  });
+  const response = await api.post({}, true, "/?resume=1");
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "Unable to retrieve verification." });
+  assert.ok(api.calls.every(([, method]) => method !== "insert" && method !== "update"));
+});

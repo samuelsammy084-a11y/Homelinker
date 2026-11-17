@@ -18,10 +18,13 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 type VerificationStatus =
+  | "unavailable"
   | "unverified"
   | "pending"
   | "in_progress"
   | "approved"
+  | "updating_profile"
+  | "profile_pending"
   | "verified"
   | "declined"
   | "expired"
@@ -66,20 +69,7 @@ export default function VerifyPage() {
             .eq("id", user.id)
             .maybeSingle();
 
-        if (profileError) {
-          console.error(
-            "Profile verification error:",
-            profileError
-          );
-
-          if (showMessage) {
-            toast.error(
-              "Could not refresh your verification status."
-            );
-          }
-
-          return;
-        }
+        if (profileError) throw profileError;
 
         if (
           profile?.is_verified === true &&
@@ -112,19 +102,14 @@ export default function VerifyPage() {
           .limit(1)
           .maybeSingle<IdentityVerification>();
 
-        if (verificationError) {
-          console.error(
-            "Identity verification error:",
-            verificationError
-          );
-        }
+        if (verificationError) throw verificationError;
 
         if (verification?.status) {
           const latestStatus =
             verification.status as VerificationStatus;
 
           const displayStatus =
-            latestStatus === "approved" ? "pending" : latestStatus;
+            latestStatus === "approved" ? "updating_profile" : latestStatus;
           setStatus(displayStatus);
 
           if (showMessage) {
@@ -153,7 +138,7 @@ export default function VerifyPage() {
           profile?.verification_status;
 
         if (profileStatus === "pending") {
-          setStatus("pending");
+          setStatus("profile_pending");
         } else if (
           profileStatus === "declined" ||
           profileStatus === "rejected"
@@ -177,6 +162,7 @@ export default function VerifyPage() {
           "Verification loading error:",
           error
         );
+        setStatus("unavailable");
 
         if (showMessage) {
           toast.error(
@@ -198,7 +184,7 @@ export default function VerifyPage() {
     void initialise();
   }, [loadVerification]);
 
-  async function startVerification() {
+  async function startVerification(resume = false) {
     if (startInProgress.current) return;
 
     startInProgress.current = true;
@@ -223,7 +209,7 @@ export default function VerifyPage() {
       }
 
       const response = await fetch(
-        "/api/verification/start",
+        resume ? "/api/verification/start?resume=1" : "/api/verification/start",
         {
           method: "POST",
           headers: {
@@ -344,7 +330,8 @@ export default function VerifyPage() {
 
   const isPending =
     status === "pending" ||
-    status === "in_progress";
+    status === "in_progress" ||
+    status === "updating_profile" || status === "profile_pending";
 
   const needsRetry =
     status === "declined" ||
@@ -405,6 +392,22 @@ export default function VerifyPage() {
           </div>
         </section>
 
+        {status === "unavailable" && (
+          <section className="mt-8 rounded-[32px] border border-[#F0E7CF] bg-white p-6 shadow-xl sm:p-10">
+            <h2 className="text-2xl font-black text-[#1B1B1B]">
+              Couldn&apos;t check your verification status
+            </h2>
+            <button
+              type="button"
+              onClick={refreshStatus}
+              disabled={checking}
+              className="mt-5 rounded-2xl border border-[#C9A227] px-6 py-3 font-bold text-[#9A791D] disabled:opacity-60"
+            >
+              {checking ? "Checking..." : "Check again"}
+            </button>
+          </section>
+        )}
+
         {status === "verified" && (
           <section className="mt-8 rounded-[32px] border border-emerald-200 bg-white p-8 text-center shadow-xl sm:p-10">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
@@ -453,7 +456,7 @@ export default function VerifyPage() {
             </div>
 
             <h2 className="mt-6 text-3xl font-black text-[#1B1B1B]">
-              Verification in progress
+              {status === "updating_profile" ? "Updating your profile" : "Verification in progress"}
             </h2>
 
             <p className="mx-auto mt-3 max-w-xl leading-7 text-slate-600">
@@ -468,6 +471,17 @@ export default function VerifyPage() {
               You can publish Free listings while you wait.
               Premium and Pro require approval.
             </p>
+
+            {(status === "pending" || status === "in_progress") && (
+              <button
+                type="button"
+                onClick={() => void startVerification(true)}
+                disabled={starting}
+                className="mr-3 mt-7 inline-flex rounded-2xl bg-[#C9A227] px-7 py-3.5 font-bold text-black hover:bg-[#D8B43C] disabled:opacity-60"
+              >
+                {starting ? "Opening verification..." : "Resume verification"}
+              </button>
+            )}
 
             <button
               type="button"
@@ -509,7 +523,7 @@ export default function VerifyPage() {
 
             <button
               type="button"
-              onClick={startVerification}
+              onClick={() => void startVerification()}
               disabled={starting}
               className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-8 py-4 font-bold text-black transition hover:bg-[#D8B43C] disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -571,21 +585,18 @@ export default function VerifyPage() {
                   />
 
                   <p className="text-sm leading-6 text-slate-600">
-                    HomeLinker does not ask you to
-                    upload your identity document or
-                    selfie directly to this website.
-                    The identity verification process
-                    is handled by our verification
-                    provider, and HomeLinker receives
-                    the verification result needed to
-                    update your account.
+                    For guided verification, submit any requested
+                    identity document or selfie on Didit. Didit sends
+                    HomeLinker the result needed to update your account.
+                    If you choose manual review, upload your document
+                    from your HomeLinker Profile.
                   </p>
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={startVerification}
+                onClick={() => void startVerification()}
                 disabled={starting}
                 className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A227] px-6 py-4 font-bold text-black transition hover:bg-[#D8B43C] disabled:cursor-not-allowed disabled:opacity-60"
               >
