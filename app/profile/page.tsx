@@ -300,10 +300,6 @@ export default function ProfilePage() {
                 profile.avatar_url || null,
               bio: profile.bio.trim(),
               role: profile.role,
-              is_verified:
-                profile.is_verified,
-              verification_status:
-                profile.verification_status,
               updated_at:
                 new Date().toISOString(),
             },
