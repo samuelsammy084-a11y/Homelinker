@@ -25,6 +25,8 @@ type Notification = {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
@@ -34,8 +36,10 @@ export default function NotificationsPage() {
       try {
         const {
           data: { user },
+          error: userError,
         } = await supabase.auth.getUser();
 
+        if (userError) throw userError;
         if (!user || cancelled) return;
 
         const { data, error } = await supabase
@@ -46,11 +50,14 @@ export default function NotificationsPage() {
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
 
-        if (!cancelled && !error && data) {
+        if (error) throw error;
+
+        if (!cancelled && data) {
           setNotifications(data);
         }
       } catch (error) {
         console.error("Unable to load notifications:", error);
+        if (!cancelled) setLoadFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -61,7 +68,7 @@ export default function NotificationsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   async function markAsRead(id: string) {
     const {
@@ -175,7 +182,11 @@ export default function NotificationsPage() {
                 </h1>
 
                 <p className="mt-1 text-sm text-gray-400">
-                  {unreadCount > 0
+                  {loadFailed
+                    ? "Notifications unavailable"
+                    : loading
+                    ? "Loading notifications..."
+                    : unreadCount > 0
                     ? `${unreadCount} unread ${
                         unreadCount === 1 ? "notification" : "notifications"
                       }`
@@ -206,6 +217,24 @@ export default function NotificationsPage() {
             <p className="mt-4 text-sm text-gray-400">
               Loading notifications...
             </p>
+          </div>
+        ) : loadFailed ? (
+          <div className="rounded-3xl border border-white/10 bg-[#181818] px-6 py-16 text-center">
+            <p role="alert" className="text-lg font-semibold">
+              Unable to load your notifications.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => {
+                setLoading(true);
+                setLoadFailed(false);
+                setLoadAttempt((attempt) => attempt + 1);
+              }}
+              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-[#C9A227] px-7 py-3 font-bold text-black transition hover:bg-[#D8B43C]"
+            >
+              Try again
+            </button>
           </div>
         ) : notifications.length === 0 ? (
           <div className="rounded-3xl border border-white/10 bg-[#181818] px-6 py-16 text-center">
