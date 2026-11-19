@@ -68,6 +68,8 @@ export default function ProfilePage() {
     useState<File | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submittingVerification, setSubmittingVerification] =
@@ -76,6 +78,7 @@ export default function ProfilePage() {
   useEffect(() => {
     async function loadProfile() {
       setLoading(true);
+      setLoadFailed(false);
 
       try {
         const {
@@ -100,13 +103,7 @@ export default function ProfilePage() {
           .maybeSingle();
 
         if (error) {
-          console.error(
-            "HomeLinker profile error:",
-            error
-          );
-
-          toast.error("Unable to load your profile.");
-          return;
+          throw error;
         }
 
         if (data) {
@@ -145,19 +142,20 @@ export default function ProfilePage() {
           );
         }
       } catch (error) {
+        setLoadFailed(true);
         console.error(
           "Profile loading error:",
           error
         );
 
-        toast.error("Something went wrong.");
+        toast.error("Unable to load your profile. Please try again.");
       } finally {
         setLoading(false);
       }
     }
 
     void loadProfile();
-  }, [router]);
+  }, [router, loadAttempt]);
 
   async function handleAvatarUpload(
     event: React.ChangeEvent<HTMLInputElement>
@@ -552,6 +550,33 @@ export default function ProfilePage() {
             <h1 className="mt-6 text-2xl font-black text-[#1B1B1B]">
               Loading your profile...
             </h1>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <main className="min-h-screen bg-[#F8F6F1] px-6 py-24">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-[32px] border border-[#F0E7CF] bg-white p-10 text-center shadow-xl">
+            <h1 className="text-2xl font-black text-[#1B1B1B]">
+              Unable to load your profile
+            </h1>
+            <p className="mt-3 text-slate-600" role="alert">
+              Your saved details and verification status could not be loaded. Please try again.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setLoading(true);
+                setLoadAttempt((attempt) => attempt + 1);
+              }}
+              className="mt-6 rounded-full bg-[#C9A227] px-6 py-3 font-bold text-[#1B1B1B] transition hover:bg-[#b8901f]"
+            >
+              Try again
+            </button>
           </div>
         </div>
       </main>
