@@ -1,3 +1,4 @@
+import ListingViewTracker from "@/app/components/ListingViewTracker";
 import type { Metadata } from "next";
 import type { Property } from "@/app/types/property";
 
@@ -546,6 +547,7 @@ export default async function PropertyDetails({
 
   return (
     <main className="min-h-screen bg-[#F8F6F1]">
+      {property.status === "active" && <ListingViewTracker propertyId={property.id} />}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
